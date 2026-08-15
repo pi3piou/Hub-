@@ -1467,3 +1467,171 @@ a {
     flex-basis: 38px;
   }
 }
+
+/* =========================================================
+   PROGRESSION PAR SAISON
+   ========================================================= */
+
+.progress-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  margin-bottom: 10px;
+}
+
+.progress-title > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-title strong {
+  font-size: 14px;
+}
+
+.global-progress {
+  display: flex;
+  justify-content: space-between;
+
+  margin-top: 8px;
+
+  font-size: 11px;
+
+  opacity: 0.45;
+}
+
+.global-progress strong {
+  font-weight: 600;
+}
+
+
+/* =========================================================
+   SAISONS
+   ========================================================= */
+
+.season-progress-list {
+  display: flex;
+
+  gap: 8px;
+
+  margin-top: 17px;
+
+  overflow-x: auto;
+
+  padding-bottom: 3px;
+
+  scrollbar-width: none;
+}
+
+.season-progress-list::-webkit-scrollbar {
+  display: none;
+}
+
+.season-progress {
+  flex: 0 0 auto;
+
+  min-width: 105px;
+
+  padding: 9px 10px;
+
+  border: 1px solid
+    rgba(128, 128, 128, 0.12);
+
+  border-radius: 11px;
+
+  background: rgba(
+    128,
+    128,
+    128,
+    0.06
+  );
+
+  color: inherit;
+
+  cursor: pointer;
+
+  opacity: 0.55;
+
+  transition:
+    opacity 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.season-progress.active {
+  opacity: 1;
+
+  border-color:
+    rgba(128, 128, 128, 0.3);
+
+  background: rgba(
+    128,
+    128,
+    128,
+    0.12
+  );
+}
+
+.season-progress:hover {
+  opacity: 1;
+}
+
+.season-progress-top {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 7px;
+
+  font-size: 11px;
+}
+
+.season-progress-top strong {
+  font-weight: 650;
+}
+
+.season-progress-track {
+  width: 100%;
+  height: 3px;
+
+  overflow: hidden;
+
+  border-radius: 999px;
+
+  background: rgba(
+    128,
+    128,
+    128,
+    0.15
+  );
+}
+
+.season-progress-track span {
+  display: block;
+
+  height: 100%;
+
+  border-radius: inherit;
+
+  background: currentColor;
+
+  transition:
+    width 0.3s ease;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 600px) {
+  .season-progress {
+    min-width: 95px;
+  }
+
+  .global-progress {
+    font-size: 10px;
+  }
+}
