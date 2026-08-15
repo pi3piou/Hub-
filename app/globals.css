@@ -1013,3 +1013,109 @@ a {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* =========================================================
+   PROGRESSION
+   ========================================================= */
+
+.anime-progress {
+  margin: 18px 0 24px;
+}
+
+.progress-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 9px;
+
+  font-size: 13px;
+  opacity: 0.72;
+}
+
+.progress-info strong {
+  font-weight: 600;
+  opacity: 1;
+}
+
+.progress-track {
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.2);
+}
+
+.progress-value {
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  transition: width 0.35s ease;
+}
+
+
+/* =========================================================
+   ÉPISODE VU
+   ========================================================= */
+
+.episode {
+  position: relative;
+  overflow: hidden;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.episode.watched {
+  opacity: 0.38;
+  filter: grayscale(0.65);
+}
+
+.episode.watched::after {
+  content: "✓";
+
+  position: absolute;
+  top: 4px;
+  right: 5px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 15px;
+  height: 15px;
+
+  border-radius: 50%;
+
+  font-size: 9px;
+  font-weight: 700;
+
+  background: currentColor;
+  color: inherit;
+}
+
+.episode.active {
+  opacity: 1;
+  filter: none;
+}
+
+.episode:hover {
+  opacity: 1;
+  filter: none;
+  transform: translateY(-1px);
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 600px) {
+  .progress-info {
+    font-size: 12px;
+  }
+
+  .anime-progress {
+    margin-top: 14px;
+  }
+}
