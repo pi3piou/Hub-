@@ -1,7 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 interface Player {
   name: string;
@@ -29,12 +34,43 @@ interface ContinueItem {
   updatedAt: number;
 }
 
+interface FavoriteItem {
+  name: string;
+  slug: string;
+  image?: string;
+}
+
+interface SeasonProgress {
+  season: number;
+  watched: number;
+  total: number;
+  lastEpisode: number;
+  updatedAt: number;
+}
+
+/*
+ * Délai avant de considérer un épisode
+ * comme réellement regardé (60 secondes).
+ */
+const WATCH_DELAY = 60000;
+
 function getWatchKey(
   slug: string,
   season: number,
   lang: string
 ) {
   return `anime_watched_${slug}_s${season}_${lang}`;
+}
+
+/*
+ * La clé de progression inclut désormais
+ * la langue, comme la clé des épisodes vus.
+ */
+function getProgressKey(
+  slug: string,
+  lang: string
+) {
+  return `anime_progress_${slug}_${lang}`;
 }
 
 function getContinueKey(slug: string) {
@@ -57,18 +93,58 @@ function getAnimeName(slug: string) {
     .join(' ');
 }
 
-function getProgressKey(slug: string) {
-  return `anime_progress_${slug}`;
-}
+/*
+ * Normalise les favoris : l'ancien format
+ * stockait des chaînes, le nouveau des objets.
+ */
+function readFavorites(): FavoriteItem[] {
+  try {
+    const raw = localStorage.getItem(
+      'anime_favorites'
+    );
 
-interface SeasonProgress {
-  season: number;
-  watched: number;
-  total: number;
-  lastEpisode: number;
-  updatedAt: number;
-}
+    if (!raw) return [];
 
+    const parsed = JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item: unknown): FavoriteItem | null => {
+        if (typeof item === 'string') {
+          return {
+            name: getAnimeName(item),
+            slug: item,
+          };
+        }
+
+        if (
+          item &&
+          typeof item === 'object' &&
+          typeof (item as FavoriteItem).slug ===
+            'string'
+        ) {
+          const favorite = item as FavoriteItem;
+
+          return {
+            name:
+              favorite.name ||
+              getAnimeName(favorite.slug),
+            slug: favorite.slug,
+            image: favorite.image,
+          };
+        }
+
+        return null;
+      })
+      .filter(
+        (item): item is FavoriteItem =>
+          item !== null
+      );
+  } catch {
+    return [];
+  }
+}
 
 export default function AnimePage({
   params,
@@ -96,101 +172,217 @@ export default function AnimePage({
   const [watched, setWatched] =
     useState<number[]>([]);
 
-const [seasonProgress, setSeasonProgress] =
-  useState<SeasonProgress[]>([]);
+  const [seasonProgress, setSeasonProgress] =
+    useState<SeasonProgress[]>([]);
 
-const [globalProgress, setGlobalProgress] =
-  useState({
-    watched: 0,
-    total: 0,
-  });
+  const [globalProgress, setGlobalProgress] =
+    useState({
+      watched: 0,
+      total: 0,
+    });
 
-useEffect(() => {
-  try {
-    const raw = localStorage.getItem(
-      getProgressKey(slug)
-    );
+  /*
+   * -------------------------------------------------------
+   * ÉPISODES (dérivé — doit rester avant les effets
+   * qui utilisent episodes.length en dépendance)
+   * -------------------------------------------------------
+   */
 
-    if (!raw) {
-      setSeasonProgress([]);
+  const episodes = useMemo(() => {
+    if (!data?.players?.[player]) {
+      return [];
+    }
+
+    return data.players[player].urls || [];
+  }, [data, player]);
+
+  const videoUrl = episodes[episode] || '';
+
+  /*
+   * -------------------------------------------------------
+   * ÉCRITURES localStorage
+   * -------------------------------------------------------
+   */
+
+  const saveContinue = (
+    episodeIndex: number
+  ) => {
+    try {
+      const item: ContinueItem = {
+        slug,
+        name: getAnimeName(slug),
+        image: poster || undefined,
+        season,
+        episode: episodeIndex,
+        lang,
+        updatedAt: Date.now(),
+      };
+
+      localStorage.setItem(
+        getContinueKey(slug),
+        JSON.stringify(item)
+      );
+
+      const historyRaw =
+        localStorage.getItem(
+          getHistoryKey()
+        );
+
+      let history: ContinueItem[] =
+        historyRaw
+          ? JSON.parse(historyRaw)
+          : [];
+
+      if (!Array.isArray(history)) {
+        history = [];
+      }
+
+      history = history.filter(
+        (entry) => entry.slug !== slug
+      );
+
+      history.unshift(item);
+
+      localStorage.setItem(
+        getHistoryKey(),
+        JSON.stringify(
+          history.slice(0, 20)
+        )
+      );
+    } catch {
+      // localStorage indisponible
+    }
+  };
+
+  const updateSeasonProgress = (
+    seasonNumber: number,
+    episodeNumber: number,
+    totalEpisodes: number,
+    watchedEpisodes: number[]
+  ) => {
+    try {
+      const key = getProgressKey(slug, lang);
+
+      const raw = localStorage.getItem(key);
+
+      let progress: SeasonProgress[] = raw
+        ? JSON.parse(raw)
+        : [];
+
+      if (!Array.isArray(progress)) {
+        progress = [];
+      }
+
+      const updated: SeasonProgress = {
+        season: seasonNumber,
+        watched: watchedEpisodes.length,
+        total: totalEpisodes,
+        lastEpisode: episodeNumber,
+        updatedAt: Date.now(),
+      };
+
+      const exists = progress.some(
+        (item) =>
+          item.season === seasonNumber
+      );
+
+      progress = exists
+        ? progress.map((item) =>
+            item.season === seasonNumber
+              ? updated
+              : item
+          )
+        : [...progress, updated];
+
+      progress.sort(
+        (a, b) => a.season - b.season
+      );
+
+      localStorage.setItem(
+        key,
+        JSON.stringify(progress)
+      );
+
+      setSeasonProgress(progress);
+    } catch {
+      // localStorage indisponible
+    }
+  };
+
+  /*
+   * Effets de bord sortis de l'updater :
+   * on calcule d'abord, on écrit ensuite.
+   */
+  const markEpisodeAsWatched = (
+    episodeIndex: number
+  ) => {
+    if (watched.includes(episodeIndex)) {
+      saveContinue(episodeIndex);
       return;
     }
 
-    const parsed = JSON.parse(raw);
+    const next = [
+      ...watched,
+      episodeIndex,
+    ].sort((a, b) => a - b);
 
-    if (Array.isArray(parsed)) {
-      setSeasonProgress(parsed);
-    }
-  } catch {
-    setSeasonProgress([]);
-  }
-}, [slug]);
+    setWatched(next);
 
-
-const updateSeasonProgress = (
-  seasonNumber: number,
-  episodeNumber: number,
-  totalEpisodes: number,
-  watchedEpisodes: number[]
-) => {
-  try {
-    const key = getProgressKey(slug);
-
-    const raw =
-      localStorage.getItem(key);
-
-    let progress: SeasonProgress[] =
-      raw ? JSON.parse(raw) : [];
-
-    if (!Array.isArray(progress)) {
-      progress = [];
+    try {
+      localStorage.setItem(
+        getWatchKey(slug, season, lang),
+        JSON.stringify(next)
+      );
+    } catch {
+      // localStorage indisponible
     }
 
-    const existing =
-      progress.find(
-        (item) =>
-          item.season ===
-          seasonNumber
+    updateSeasonProgress(
+      season,
+      episodeIndex,
+      episodes.length,
+      next
+    );
+
+    saveContinue(episodeIndex);
+  };
+
+  /*
+   * Référence toujours à jour, pour que le
+   * minuteur n'ait pas à dépendre de la fonction.
+   */
+  const markRef = useRef(markEpisodeAsWatched);
+
+  useEffect(() => {
+    markRef.current = markEpisodeAsWatched;
+  });
+
+  /*
+   * -------------------------------------------------------
+   * PROGRESSION STOCKÉE
+   * -------------------------------------------------------
+   */
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(
+        getProgressKey(slug, lang)
       );
 
-    const updated: SeasonProgress = {
-      season: seasonNumber,
-      watched:
-        watchedEpisodes.length,
-      total: totalEpisodes,
-      lastEpisode:
-        episodeNumber,
-      updatedAt: Date.now(),
-    };
+      if (!raw) {
+        setSeasonProgress([]);
+        return;
+      }
 
-    if (existing) {
-      progress =
-        progress.map((item) =>
-          item.season ===
-          seasonNumber
-            ? updated
-            : item
-        );
-    } else {
-      progress.push(updated);
+      const parsed = JSON.parse(raw);
+
+      setSeasonProgress(
+        Array.isArray(parsed) ? parsed : []
+      );
+    } catch {
+      setSeasonProgress([]);
     }
-
-    progress.sort(
-      (a, b) =>
-        a.season - b.season
-    );
-
-    localStorage.setItem(
-      key,
-      JSON.stringify(progress)
-    );
-
-    setSeasonProgress(progress);
-
-  } catch {
-    // localStorage indisponible
-  }
-};
+  }, [slug, lang]);
 
   /*
    * -------------------------------------------------------
@@ -219,7 +411,7 @@ const updateSeasonProgress = (
 
         if (Array.isArray(json.results)) {
           const exact = json.results.find(
-            (item: any) =>
+            (item: { slug?: string }) =>
               item.slug === slug
           );
 
@@ -244,36 +436,17 @@ const updateSeasonProgress = (
    */
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(
-        'anime_favorites'
-      );
+    const favorites = readFavorites();
 
-      if (!raw) return;
+    const current = favorites.find(
+      (item) => item.slug === slug
+    );
 
-      const favorites = JSON.parse(raw);
-
-      if (!Array.isArray(favorites)) return;
-
-      const current = favorites.find(
-        (item) =>
-          typeof item === 'string'
-            ? item === slug
-            : item?.slug === slug
-      );
-
-      if (
-        current &&
-        typeof current === 'object' &&
-        current.image
-      ) {
-        setPoster(current.image);
-      }
-
-      setFavorite(Boolean(current));
-    } catch {
-      setFavorite(false);
+    if (current?.image) {
+      setPoster(current.image);
     }
+
+    setFavorite(Boolean(current));
   }, [slug]);
 
   /*
@@ -284,13 +457,9 @@ const updateSeasonProgress = (
 
   useEffect(() => {
     try {
-      const key = getWatchKey(
-        slug,
-        season,
-        lang
+      const raw = localStorage.getItem(
+        getWatchKey(slug, season, lang)
       );
-
-      const raw = localStorage.getItem(key);
 
       if (!raw) {
         setWatched([]);
@@ -316,10 +485,6 @@ const updateSeasonProgress = (
       setWatched([]);
     }
   }, [slug, season, lang]);
-
-
-
-
 
   /*
    * -------------------------------------------------------
@@ -359,18 +524,16 @@ const updateSeasonProgress = (
 
         setData(json);
 
-        const defaultPlayer =
+        setPlayer(
           Number.isInteger(
             json.defaultPlayerIndex
           )
             ? json.defaultPlayerIndex
-            : 0;
-
-        setPlayer(defaultPlayer);
+            : 0
+        );
       } catch (err) {
         if (
-          (err as Error).name !==
-          'AbortError'
+          (err as Error).name !== 'AbortError'
         ) {
           console.error(err);
           setError(true);
@@ -390,133 +553,115 @@ const updateSeasonProgress = (
 
   /*
    * -------------------------------------------------------
-   * ÉPISODES
+   * SYNCHRO DU TOTAL D'ÉPISODES
    * -------------------------------------------------------
    */
 
-  const episodes = useMemo(() => {
-    if (!data?.players?.[player]) {
-      return [];
+  useEffect(() => {
+    if (!data || episodes.length === 0) return;
+
+    const current = seasonProgress.find(
+      (item) => item.season === season
+    );
+
+    if (
+      !current ||
+      current.total === episodes.length
+    ) {
+      return;
     }
 
-    return data.players[player].urls || [];
-  }, [data, player]);
+    const progress = seasonProgress.map(
+      (item) =>
+        item.season === season
+          ? { ...item, total: episodes.length }
+          : item
+    );
 
-  const videoUrl = episodes[episode] || '';
-
-  /*
-   * -------------------------------------------------------
-   * CONTINUER LA LECTURE
-   * -------------------------------------------------------
-   */
-
-  const saveContinue = (
-    episodeIndex: number
-  ) => {
     try {
-      const item: ContinueItem = {
-        slug,
-        name: getAnimeName(slug),
-        image: poster || undefined,
-        season,
-        episode: episodeIndex,
-        lang,
-        updatedAt: Date.now(),
-      };
-
       localStorage.setItem(
-        getContinueKey(slug),
-        JSON.stringify(item)
-      );
-
-      const historyRaw =
-        localStorage.getItem(
-          getHistoryKey()
-        );
-
-      let history: ContinueItem[] =
-        historyRaw
-          ? JSON.parse(historyRaw)
-          : [];
-
-      if (!Array.isArray(history)) {
-        history = [];
-      }
-
-      history = history.filter(
-        (item) =>
-          item.slug !== slug
-      );
-
-      history.unshift(item);
-
-      localStorage.setItem(
-        getHistoryKey(),
-        JSON.stringify(
-          history.slice(0, 20)
-        )
+        getProgressKey(slug, lang),
+        JSON.stringify(progress)
       );
     } catch {
       // localStorage indisponible
     }
-  };
+
+    setSeasonProgress(progress);
+  }, [
+    data,
+    episodes.length,
+    season,
+    seasonProgress,
+    slug,
+    lang,
+  ]);
 
   /*
    * -------------------------------------------------------
-   * MARQUER COMME VU
+   * PROGRESSION GLOBALE
    * -------------------------------------------------------
    */
 
-const markEpisodeAsWatched = (
-  episodeIndex: number
-) => {
-  try {
-    const key = getWatchKey(
-      slug,
-      season,
-      lang
-    );
+  useEffect(() => {
+    let watchedTotal = 0;
+    let knownTotal = 0;
 
-    setWatched((current) => {
-
-      if (
-        current.includes(
-          episodeIndex
-        )
-      ) {
-        return current;
-      }
-
-      const next = [
-        ...current,
-        episodeIndex,
-      ].sort(
-        (a, b) => a - b
-      );
-
-      localStorage.setItem(
-        key,
-        JSON.stringify(next)
-      );
-
-      updateSeasonProgress(
-        season,
-        episodeIndex,
-        episodes.length,
-        next
-      );
-
-      saveContinue(
-        episodeIndex
-      );
-
-      return next;
+    seasonProgress.forEach((item) => {
+      watchedTotal += item.watched;
+      knownTotal += item.total;
     });
 
-  } catch {
-    // Rien
-  }
-};
+    /*
+     * La saison courante n'est pas encore
+     * enregistrée : on ajoute son décompte local.
+     */
+    const currentTracked = seasonProgress.some(
+      (item) => item.season === season
+    );
+
+    if (!currentTracked) {
+      watchedTotal += watched.length;
+      knownTotal += episodes.length;
+    }
+
+    /*
+     * Le dénominateur vient de l'API quand
+     * il est plus complet que ce qu'on connaît.
+     */
+    const total =
+      data?.totalEpisodes &&
+      data.totalEpisodes > knownTotal
+        ? data.totalEpisodes
+        : knownTotal;
+
+    setGlobalProgress({
+      watched: watchedTotal,
+      total,
+    });
+  }, [
+    seasonProgress,
+    watched.length,
+    episodes.length,
+    season,
+    data,
+  ]);
+
+  /*
+   * -------------------------------------------------------
+   * MARQUAGE APRÈS VISIONNAGE RÉEL
+   * -------------------------------------------------------
+   */
+
+  useEffect(() => {
+    if (!videoUrl) return;
+
+    const timer = setTimeout(() => {
+      markRef.current(episode);
+    }, WATCH_DELAY);
+
+    return () => clearTimeout(timer);
+  }, [videoUrl, episode]);
 
   /*
    * -------------------------------------------------------
@@ -526,38 +671,24 @@ const markEpisodeAsWatched = (
 
   const toggleFavorite = () => {
     try {
-      const raw =
-        localStorage.getItem(
-          'anime_favorites'
-        );
+      const favorites = readFavorites();
 
-      let favorites = raw
-        ? JSON.parse(raw)
-        : [];
-
-      if (!Array.isArray(favorites)) {
-        favorites = [];
-      }
-
-      if (favorite) {
-        favorites =
-          favorites.filter(
-            (item: any) =>
-              (typeof item === 'string'
-                ? item
-                : item?.slug) !== slug
-          );
-      } else {
-        favorites.push({
-          name: getAnimeName(slug),
-          slug,
-          image: poster || undefined,
-        });
-      }
+      const next = favorite
+        ? favorites.filter(
+            (item) => item.slug !== slug
+          )
+        : [
+            ...favorites,
+            {
+              name: getAnimeName(slug),
+              slug,
+              image: poster || undefined,
+            },
+          ];
 
       localStorage.setItem(
         'anime_favorites',
-        JSON.stringify(favorites)
+        JSON.stringify(next)
       );
 
       setFavorite(!favorite);
@@ -579,86 +710,11 @@ const markEpisodeAsWatched = (
       <main className="page">
         <div className="loading-page">
           <span className="loader large" />
-          <p>
-            Chargement des épisodes…
-          </p>
+          <p>Chargement des épisodes…</p>
         </div>
       </main>
     );
   }
-
-useEffect(() => {
-  if (!data) return;
-
-  try {
-    const progress: SeasonProgress[] =
-      seasonProgress.map(
-        (item) => ({
-          ...item,
-        })
-      );
-
-    const current =
-      progress.find(
-        (item) =>
-          item.season === season
-      );
-
-    if (
-      current &&
-      current.total !==
-        episodes.length
-    ) {
-      current.total =
-        episodes.length;
-
-      localStorage.setItem(
-        getProgressKey(slug),
-        JSON.stringify(progress)
-      );
-
-      setSeasonProgress(progress);
-    }
-  } catch {
-    // Rien
-  }
-}, [
-  data,
-  episodes.length,
-  season,
-]);
-
-useEffect(() => {
-  let watchedTotal = 0;
-  let episodeTotal = 0;
-
-  seasonProgress.forEach(
-    (item) => {
-      watchedTotal += item.watched;
-      episodeTotal += item.total;
-    }
-  );
-
-  if (
-    seasonProgress.length === 0 &&
-    episodes.length > 0
-  ) {
-    episodeTotal =
-      episodes.length;
-    watchedTotal =
-      watched.length;
-  }
-
-  setGlobalProgress({
-    watched: watchedTotal,
-    total: episodeTotal,
-  });
-}, [
-  seasonProgress,
-  episodes.length,
-  watched.length,
-]);
-
 
   /*
    * -------------------------------------------------------
@@ -673,12 +729,11 @@ useEffect(() => {
           <span>⚠️</span>
 
           <h2>
-            Impossible de charger
-            cet anime
+            Impossible de charger cet anime
           </h2>
 
           <p>
-            La source n'a pas répondu
+            La source n&apos;a pas répondu
             correctement.
           </p>
 
@@ -686,7 +741,7 @@ useEffect(() => {
             href="/"
             className="primary-button"
           >
-            Retour à l'accueil
+            Retour à l&apos;accueil
           </Link>
         </div>
       </main>
@@ -719,13 +774,9 @@ useEffect(() => {
 
         <button
           className={`favorite-button ${
-            favorite
-              ? 'is-favorite'
-              : ''
+            favorite ? 'is-favorite' : ''
           }`}
-          onClick={
-            toggleFavorite
-          }
+          onClick={toggleFavorite}
           aria-label="Favori"
         >
           {favorite ? '★' : '☆'}
@@ -746,18 +797,11 @@ useEffect(() => {
             }`}
             allowFullScreen
             className="video-frame"
-            onLoad={() => {
-              markEpisodeAsWatched(
-                episode
-              );
-            }}
           />
         ) : (
           <div className="player-empty">
             <span>▶</span>
-            <p>
-              Lecteur indisponible
-            </p>
+            <p>Lecteur indisponible</p>
           </div>
         )}
 
@@ -765,137 +809,130 @@ useEffect(() => {
 
       {/* INFO PROGRESSION */}
 
- <section className="anime-progress">
+      <section className="anime-progress">
 
-  <div className="progress-title">
+        <div className="progress-title">
 
-    <div>
-      <span className="section-eyebrow">
-        PROGRESSION
-      </span>
+          <div>
+            <span className="section-eyebrow">
+              PROGRESSION
+            </span>
 
-      <strong>
-        Saison {season}
-      </strong>
-    </div>
+            <strong>Saison {season}</strong>
+          </div>
 
-    <strong>
-      {watched.length} / {episodes.length}
-    </strong>
+          <strong>
+            {watched.length} / {episodes.length}
+          </strong>
 
-  </div>
+        </div>
 
-  <div className="progress-track">
+        <div className="progress-track">
 
-    <div
-      className="progress-value"
-      style={{
-        width: `${
-          episodes.length
-            ? Math.min(
-                100,
-                (watched.length /
-                  episodes.length) *
-                  100
-              )
-            : 0
-        }%`,
-      }}
-    />
-
-  </div>
-
-  <div className="global-progress">
-
-    <span>
-      Progression totale
-    </span>
-
-    <strong>
-      {globalProgress.watched} /{' '}
-      {globalProgress.total}
-      {' épisodes'}
-    </strong>
-
-  </div>
-
-  <div className="season-progress-list">
-
-    {data.seasons.map(
-      (seasonNumber) => {
-
-        const item =
-          seasonProgress.find(
-            (progress) =>
-              progress.season ===
-              seasonNumber
-          );
-
-        const watchedCount =
-          item?.watched || 0;
-
-        const totalCount =
-          item?.total || 0;
-
-        const percentage =
-          totalCount > 0
-            ? Math.min(
-                100,
-                (watchedCount /
-                  totalCount) *
-                  100
-              )
-            : 0;
-
-        return (
-          <button
-            key={seasonNumber}
-            className={
-              season ===
-              seasonNumber
-                ? 'season-progress active'
-                : 'season-progress'
-            }
-            onClick={() => {
-              setSeason(
-                seasonNumber
-              );
-
-              setEpisode(0);
+          <div
+            className="progress-value"
+            style={{
+              width: `${
+                episodes.length
+                  ? Math.min(
+                      100,
+                      (watched.length /
+                        episodes.length) *
+                        100
+                    )
+                  : 0
+              }%`,
             }}
-          >
+          />
 
-            <div className="season-progress-top">
+        </div>
 
-              <span>
-                Saison {seasonNumber}
-              </span>
+        <div className="global-progress">
 
-              <strong>
-                {watchedCount}/
-                {totalCount || '—'}
-              </strong>
+          <span>Progression totale</span>
 
-            </div>
+          <strong>
+            {globalProgress.watched} /{' '}
+            {globalProgress.total || '—'}
+            {' épisodes'}
+          </strong>
 
-            <div className="season-progress-track">
+        </div>
 
-              <span
-                style={{
-                  width: `${percentage}%`,
+        <div className="season-progress-list">
+
+          {data.seasons.map((seasonNumber) => {
+
+            const item = seasonProgress.find(
+              (progress) =>
+                progress.season === seasonNumber
+            );
+
+            const isCurrent =
+              season === seasonNumber;
+
+            const watchedCount = isCurrent
+              ? watched.length
+              : item?.watched || 0;
+
+            const totalCount = isCurrent
+              ? episodes.length
+              : item?.total || 0;
+
+            const percentage =
+              totalCount > 0
+                ? Math.min(
+                    100,
+                    (watchedCount /
+                      totalCount) *
+                      100
+                  )
+                : 0;
+
+            return (
+              <button
+                key={seasonNumber}
+                className={
+                  isCurrent
+                    ? 'season-progress active'
+                    : 'season-progress'
+                }
+                onClick={() => {
+                  setSeason(seasonNumber);
+                  setEpisode(0);
                 }}
-              />
+              >
 
-            </div>
+                <div className="season-progress-top">
 
-          </button>
-        );
-      }
-    )}
+                  <span>
+                    Saison {seasonNumber}
+                  </span>
 
-  </div>
+                  <strong>
+                    {watchedCount}/
+                    {totalCount || '—'}
+                  </strong>
 
-</section>
+                </div>
+
+                <div className="season-progress-track">
+
+                  <span
+                    style={{
+                      width: `${percentage}%`,
+                    }}
+                  />
+
+                </div>
+
+              </button>
+            );
+          })}
+
+        </div>
+
+      </section>
 
       {/* CONTRÔLES */}
 
@@ -940,26 +977,22 @@ useEffect(() => {
           <select
             value={season}
             onChange={(event) => {
-              const value =
-                Number(
-                  event.target.value
-                );
+              setSeason(
+                Number(event.target.value)
+              );
 
-              setSeason(value);
               setEpisode(0);
             }}
           >
 
-            {data.seasons.map(
-              (number) => (
-                <option
-                  key={number}
-                  value={number}
-                >
-                  Saison {number}
-                </option>
-              )
-            )}
+            {data.seasons.map((number) => (
+              <option
+                key={number}
+                value={number}
+              >
+                Saison {number}
+              </option>
+            ))}
 
           </select>
 
@@ -968,9 +1001,7 @@ useEffect(() => {
         {data.players.length > 1 && (
           <div className="players">
 
-            <span>
-              Lecteur
-            </span>
+            <span>Lecteur</span>
 
             <div className="player-list">
 
@@ -1011,9 +1042,7 @@ useEffect(() => {
               SAISON {season}
             </span>
 
-            <h2>
-              Épisodes
-            </h2>
+            <h2>Épisodes</h2>
           </div>
 
           <span className="episode-count">
@@ -1024,55 +1053,45 @@ useEffect(() => {
 
         <div className="episode-grid">
 
-          {episodes.map(
-            (_, index) => {
+          {episodes.map((_, index) => {
 
-              const isWatched =
-                watched.includes(
-                  index
-                );
+            const isWatched =
+              watched.includes(index);
 
-              const isActive =
-                episode === index;
+            const isActive = episode === index;
 
-              return (
-                <button
-                  key={index}
-                  className={[
-                    'episode',
-                    isActive
-                      ? 'active'
-                      : '',
-                    isWatched
-                      ? 'watched'
-                      : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={() => {
-                    setEpisode(index);
+            return (
+              <button
+                key={index}
+                className={[
+                  'episode',
+                  isActive ? 'active' : '',
+                  isWatched ? 'watched' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                onClick={() => {
+                  setEpisode(index);
 
-                    saveContinue(index);
+                  saveContinue(index);
 
-                    window.scrollTo({
-                      top: 0,
-                      behavior:
-                        'smooth',
-                    });
-                  }}
-                >
-                  {index + 1}
-                </button>
-              );
-            }
-          )}
+                  window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth',
+                  });
+                }}
+              >
+                {index + 1}
+              </button>
+            );
+          })}
 
         </div>
 
         {episodes.length === 0 && (
           <div className="empty-card">
-            Aucun épisode disponible
-            pour cette sélection.
+            Aucun épisode disponible pour
+            cette sélection.
           </div>
         )}
 
