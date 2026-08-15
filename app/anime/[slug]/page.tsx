@@ -57,6 +57,19 @@ function getAnimeName(slug: string) {
     .join(' ');
 }
 
+function getProgressKey(slug: string) {
+  return `anime_progress_${slug}`;
+}
+
+interface SeasonProgress {
+  season: number;
+  watched: number;
+  total: number;
+  lastEpisode: number;
+  updatedAt: number;
+}
+
+
 export default function AnimePage({
   params,
 }: {
@@ -82,6 +95,102 @@ export default function AnimePage({
 
   const [watched, setWatched] =
     useState<number[]>([]);
+
+const [seasonProgress, setSeasonProgress] =
+  useState<SeasonProgress[]>([]);
+
+const [globalProgress, setGlobalProgress] =
+  useState({
+    watched: 0,
+    total: 0,
+  });
+
+useEffect(() => {
+  try {
+    const raw = localStorage.getItem(
+      getProgressKey(slug)
+    );
+
+    if (!raw) {
+      setSeasonProgress([]);
+      return;
+    }
+
+    const parsed = JSON.parse(raw);
+
+    if (Array.isArray(parsed)) {
+      setSeasonProgress(parsed);
+    }
+  } catch {
+    setSeasonProgress([]);
+  }
+}, [slug]);
+
+
+const updateSeasonProgress = (
+  seasonNumber: number,
+  episodeNumber: number,
+  totalEpisodes: number,
+  watchedEpisodes: number[]
+) => {
+  try {
+    const key = getProgressKey(slug);
+
+    const raw =
+      localStorage.getItem(key);
+
+    let progress: SeasonProgress[] =
+      raw ? JSON.parse(raw) : [];
+
+    if (!Array.isArray(progress)) {
+      progress = [];
+    }
+
+    const existing =
+      progress.find(
+        (item) =>
+          item.season ===
+          seasonNumber
+      );
+
+    const updated: SeasonProgress = {
+      season: seasonNumber,
+      watched:
+        watchedEpisodes.length,
+      total: totalEpisodes,
+      lastEpisode:
+        episodeNumber,
+      updatedAt: Date.now(),
+    };
+
+    if (existing) {
+      progress =
+        progress.map((item) =>
+          item.season ===
+          seasonNumber
+            ? updated
+            : item
+        );
+    } else {
+      progress.push(updated);
+    }
+
+    progress.sort(
+      (a, b) =>
+        a.season - b.season
+    );
+
+    localStorage.setItem(
+      key,
+      JSON.stringify(progress)
+    );
+
+    setSeasonProgress(progress);
+
+  } catch {
+    // localStorage indisponible
+  }
+};
 
   /*
    * -------------------------------------------------------
@@ -207,6 +316,10 @@ export default function AnimePage({
       setWatched([]);
     }
   }, [slug, season, lang]);
+
+
+
+
 
   /*
    * -------------------------------------------------------
@@ -354,43 +467,56 @@ export default function AnimePage({
    * -------------------------------------------------------
    */
 
-  const markEpisodeAsWatched = (
-    episodeIndex: number
-  ) => {
-    try {
-      const key = getWatchKey(
-        slug,
-        season,
-        lang
+const markEpisodeAsWatched = (
+  episodeIndex: number
+) => {
+  try {
+    const key = getWatchKey(
+      slug,
+      season,
+      lang
+    );
+
+    setWatched((current) => {
+
+      if (
+        current.includes(
+          episodeIndex
+        )
+      ) {
+        return current;
+      }
+
+      const next = [
+        ...current,
+        episodeIndex,
+      ].sort(
+        (a, b) => a - b
       );
 
-      setWatched((current) => {
-        if (
-          current.includes(
-            episodeIndex
-          )
-        ) {
-          return current;
-        }
+      localStorage.setItem(
+        key,
+        JSON.stringify(next)
+      );
 
-        const next = [
-          ...current,
-          episodeIndex,
-        ].sort((a, b) => a - b);
+      updateSeasonProgress(
+        season,
+        episodeIndex,
+        episodes.length,
+        next
+      );
 
-        localStorage.setItem(
-          key,
-          JSON.stringify(next)
-        );
+      saveContinue(
+        episodeIndex
+      );
 
-        return next;
-      });
+      return next;
+    });
 
-      saveContinue(episodeIndex);
-    } catch {
-      // Rien
-    }
-  };
+  } catch {
+    // Rien
+  }
+};
 
   /*
    * -------------------------------------------------------
@@ -460,6 +586,79 @@ export default function AnimePage({
       </main>
     );
   }
+
+useEffect(() => {
+  if (!data) return;
+
+  try {
+    const progress: SeasonProgress[] =
+      seasonProgress.map(
+        (item) => ({
+          ...item,
+        })
+      );
+
+    const current =
+      progress.find(
+        (item) =>
+          item.season === season
+      );
+
+    if (
+      current &&
+      current.total !==
+        episodes.length
+    ) {
+      current.total =
+        episodes.length;
+
+      localStorage.setItem(
+        getProgressKey(slug),
+        JSON.stringify(progress)
+      );
+
+      setSeasonProgress(progress);
+    }
+  } catch {
+    // Rien
+  }
+}, [
+  data,
+  episodes.length,
+  season,
+]);
+
+useEffect(() => {
+  let watchedTotal = 0;
+  let episodeTotal = 0;
+
+  seasonProgress.forEach(
+    (item) => {
+      watchedTotal += item.watched;
+      episodeTotal += item.total;
+    }
+  );
+
+  if (
+    seasonProgress.length === 0 &&
+    episodes.length > 0
+  ) {
+    episodeTotal =
+      episodes.length;
+    watchedTotal =
+      watched.length;
+  }
+
+  setGlobalProgress({
+    watched: watchedTotal,
+    total: episodeTotal,
+  });
+}, [
+  seasonProgress,
+  episodes.length,
+  watched.length,
+]);
+
 
   /*
    * -------------------------------------------------------
@@ -566,42 +765,137 @@ export default function AnimePage({
 
       {/* INFO PROGRESSION */}
 
-      <section className="anime-progress">
+ <section className="anime-progress">
 
-        <div className="progress-info">
+  <div className="progress-title">
 
-          <span>
-            Saison {season}
-          </span>
+    <div>
+      <span className="section-eyebrow">
+        PROGRESSION
+      </span>
 
-          <strong>
-            {watched.length} /{' '}
-            {episodes.length} épisodes vus
-          </strong>
+      <strong>
+        Saison {season}
+      </strong>
+    </div>
 
-        </div>
+    <strong>
+      {watched.length} / {episodes.length}
+    </strong>
 
-        <div className="progress-track">
+  </div>
 
-          <div
-            className="progress-value"
-            style={{
-              width: `${
-                episodes.length
-                  ? Math.min(
-                      100,
-                      (watched.length /
-                        episodes.length) *
-                        100
-                    )
-                  : 0
-              }%`,
+  <div className="progress-track">
+
+    <div
+      className="progress-value"
+      style={{
+        width: `${
+          episodes.length
+            ? Math.min(
+                100,
+                (watched.length /
+                  episodes.length) *
+                  100
+              )
+            : 0
+        }%`,
+      }}
+    />
+
+  </div>
+
+  <div className="global-progress">
+
+    <span>
+      Progression totale
+    </span>
+
+    <strong>
+      {globalProgress.watched} /{' '}
+      {globalProgress.total}
+      {' épisodes'}
+    </strong>
+
+  </div>
+
+  <div className="season-progress-list">
+
+    {data.seasons.map(
+      (seasonNumber) => {
+
+        const item =
+          seasonProgress.find(
+            (progress) =>
+              progress.season ===
+              seasonNumber
+          );
+
+        const watchedCount =
+          item?.watched || 0;
+
+        const totalCount =
+          item?.total || 0;
+
+        const percentage =
+          totalCount > 0
+            ? Math.min(
+                100,
+                (watchedCount /
+                  totalCount) *
+                  100
+              )
+            : 0;
+
+        return (
+          <button
+            key={seasonNumber}
+            className={
+              season ===
+              seasonNumber
+                ? 'season-progress active'
+                : 'season-progress'
+            }
+            onClick={() => {
+              setSeason(
+                seasonNumber
+              );
+
+              setEpisode(0);
             }}
-          />
+          >
 
-        </div>
+            <div className="season-progress-top">
 
-      </section>
+              <span>
+                Saison {seasonNumber}
+              </span>
+
+              <strong>
+                {watchedCount}/
+                {totalCount || '—'}
+              </strong>
+
+            </div>
+
+            <div className="season-progress-track">
+
+              <span
+                style={{
+                  width: `${percentage}%`,
+                }}
+              />
+
+            </div>
+
+          </button>
+        );
+      }
+    )}
+
+  </div>
+
+</section>
 
       {/* CONTRÔLES */}
 
