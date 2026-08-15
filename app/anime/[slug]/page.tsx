@@ -11,17 +11,11 @@ interface Player {
 interface AnimeData {
   slug: string;
   saison: number;
-
   seasons: number[];
-
   totalSeasons: number;
-
   hasVF: boolean;
-
   players: Player[];
-
   defaultPlayerIndex: number;
-
   totalEpisodes: number;
 }
 
@@ -30,19 +24,27 @@ export default function AnimePage({
 }: {
   params: { slug: string };
 }) {
-  const slug = decodeURIComponent(params.slug);
+  const slug =
+    decodeURIComponent(params.slug);
 
   const [lang, setLang] =
-    useState<'vostfr' | 'vf'>('vostfr');
+    useState<'vostfr' | 'vf'>(
+      'vostfr'
+    );
 
-  const [season, setSeason] = useState(1);
+  const [season, setSeason] =
+    useState(1);
 
-  const [player, setPlayer] = useState(0);
+  const [player, setPlayer] =
+    useState(0);
 
-  const [episode, setEpisode] = useState(0);
+  const [episode, setEpisode] =
+    useState(0);
 
   const [data, setData] =
-    useState<AnimeData | null>(null);
+    useState<AnimeData | null>(
+      null
+    );
 
   const [loading, setLoading] =
     useState(true);
@@ -53,10 +55,71 @@ export default function AnimePage({
   const [favorite, setFavorite] =
     useState(false);
 
+  const [poster, setPoster] =
+    useState('');
+
   /*
-   * -------------------------------------------------------
+   * RÉCUPÉRATION DE L'AFFICHE
+   *
+   * La page catalogue de l'anime
+   * est utilisée comme source.
+   */
+
+  useEffect(() => {
+    const controller =
+      new AbortController();
+
+    async function loadPoster() {
+      try {
+        const response =
+          await fetch(
+            `/api/search?q=${encodeURIComponent(
+              slug.replace(/-/g, ' ')
+            )}`,
+            {
+              signal:
+                controller.signal,
+              cache: 'no-store',
+            }
+          );
+
+        if (!response.ok) {
+          return;
+        }
+
+        const json =
+          await response.json();
+
+        if (
+          Array.isArray(
+            json.results
+          )
+        ) {
+          const exact =
+            json.results.find(
+              (item: any) =>
+                item.slug === slug
+            );
+
+          if (exact?.image) {
+            setPoster(
+              exact.image
+            );
+          }
+        }
+      } catch {
+        // Rien
+      }
+    }
+
+    loadPoster();
+
+    return () =>
+      controller.abort();
+  }, [slug]);
+
+  /*
    * FAVORIS
-   * -------------------------------------------------------
    */
 
   useEffect(() => {
@@ -68,15 +131,32 @@ export default function AnimePage({
 
       if (!raw) return;
 
-      const favorites = JSON.parse(raw);
+      const favorites =
+        JSON.parse(raw);
 
       if (Array.isArray(favorites)) {
+        const current =
+          favorites.find(
+            (item) =>
+              typeof item ===
+                'string'
+                ? item === slug
+                : item?.slug === slug
+          );
+
+        if (
+          current &&
+          typeof current ===
+            'object' &&
+          current.image
+        ) {
+          setPoster(
+            current.image
+          );
+        }
+
         setFavorite(
-          favorites.some((item) =>
-            typeof item === 'string'
-              ? item === slug
-              : item?.slug === slug
-          )
+          Boolean(current)
         );
       }
     } catch {
@@ -85,9 +165,7 @@ export default function AnimePage({
   }, [slug]);
 
   /*
-   * -------------------------------------------------------
    * CHARGEMENT ANIME
-   * -------------------------------------------------------
    */
 
   useEffect(() => {
@@ -100,15 +178,17 @@ export default function AnimePage({
       setEpisode(0);
 
       try {
-        const response = await fetch(
-          `/api/anime?slug=${encodeURIComponent(
-            slug
-          )}&saison=${season}&lang=${lang}`,
-          {
-            signal: controller.signal,
-            cache: 'no-store',
-          }
-        );
+        const response =
+          await fetch(
+            `/api/anime?slug=${encodeURIComponent(
+              slug
+            )}&saison=${season}&lang=${lang}`,
+            {
+              signal:
+                controller.signal,
+              cache: 'no-store',
+            }
+          );
 
         if (!response.ok) {
           throw new Error(
@@ -120,15 +200,13 @@ export default function AnimePage({
           await response.json();
 
         if (json.error) {
-          throw new Error(json.error);
+          throw new Error(
+            json.error
+          );
         }
 
         setData(json);
 
-        /*
-         * Le changement de saison peut faire disparaître
-         * le lecteur précédemment sélectionné.
-         */
         const defaultPlayer =
           Number.isInteger(
             json.defaultPlayerIndex
@@ -136,19 +214,22 @@ export default function AnimePage({
             ? json.defaultPlayerIndex
             : 0;
 
-        setPlayer(defaultPlayer);
+        setPlayer(
+          defaultPlayer
+        );
       } catch (err) {
         if (
           (err as Error).name !==
           'AbortError'
         ) {
           console.error(err);
-
           setError(true);
           setData(null);
         }
       } finally {
-        if (!controller.signal.aborted) {
+        if (
+          !controller.signal.aborted
+        ) {
           setLoading(false);
         }
       }
@@ -156,35 +237,32 @@ export default function AnimePage({
 
     load();
 
-    return () => {
+    return () =>
       controller.abort();
-    };
-  }, [slug, season, lang]);
-
-  /*
-   * -------------------------------------------------------
-   * ÉPISODES
-   * -------------------------------------------------------
-   */
+  }, [
+    slug,
+    season,
+    lang,
+  ]);
 
   const episodes = useMemo(() => {
-    if (!data?.players?.[player]) {
+    if (
+      !data?.players?.[player]
+    ) {
       return [];
     }
 
     return (
-      data.players[player].urls || []
+      data.players[player]
+        .urls || []
     );
-  }, [data, player]);
+  }, [
+    data,
+    player,
+  ]);
 
   const videoUrl =
     episodes[episode] || '';
-
-  /*
-   * -------------------------------------------------------
-   * FAVORI
-   * -------------------------------------------------------
-   */
 
   const toggleFavorite = () => {
     try {
@@ -205,9 +283,11 @@ export default function AnimePage({
         favorites =
           favorites.filter(
             (item: any) =>
-              (typeof item === 'string'
+              (typeof item ===
+              'string'
                 ? item
-                : item?.slug) !== slug
+                : item?.slug) !==
+              slug
           );
       } else {
         const name = slug
@@ -225,48 +305,42 @@ export default function AnimePage({
         favorites.push({
           name,
           slug,
+          image: poster || undefined,
         });
       }
 
       localStorage.setItem(
         'anime_favorites',
-        JSON.stringify(favorites)
+        JSON.stringify(
+          favorites
+        )
       );
 
-      setFavorite(!favorite);
+      setFavorite(
+        !favorite
+      );
     } catch (err) {
       console.error(err);
     }
   };
-
-  /*
-   * -------------------------------------------------------
-   * NOM
-   * -------------------------------------------------------
-   */
 
   const title = slug
     .split('-')
     .filter(Boolean)
     .map(
       (word) =>
-        word.charAt(0).toUpperCase() +
+        word
+          .charAt(0)
+          .toUpperCase() +
         word.slice(1)
     )
     .join(' ');
-
-  /*
-   * -------------------------------------------------------
-   * LOADING
-   * -------------------------------------------------------
-   */
 
   if (loading) {
     return (
       <main className="page">
         <div className="loading-page">
           <span className="loader large" />
-
           <p>
             Chargement des épisodes…
           </p>
@@ -275,12 +349,6 @@ export default function AnimePage({
     );
   }
 
-  /*
-   * -------------------------------------------------------
-   * ERREUR
-   * -------------------------------------------------------
-   */
-
   if (error || !data) {
     return (
       <main className="page">
@@ -288,7 +356,8 @@ export default function AnimePage({
           <span>⚠️</span>
 
           <h2>
-            Impossible de charger cet anime
+            Impossible de charger
+            cet anime
           </h2>
 
           <p>
@@ -307,12 +376,6 @@ export default function AnimePage({
     );
   }
 
-  /*
-   * -------------------------------------------------------
-   * PAGE
-   * -------------------------------------------------------
-   */
-
   return (
     <main className="page anime-page">
 
@@ -326,9 +389,31 @@ export default function AnimePage({
         </Link>
 
         <div className="anime-title">
-          <span>ANIME</span>
 
-          <h1>{title}</h1>
+          {poster && (
+            <img
+              src={poster}
+              alt=""
+              style={{
+                position:
+                  'absolute',
+                width: 1,
+                height: 1,
+                opacity: 0,
+                pointerEvents:
+                  'none',
+              }}
+            />
+          )}
+
+          <span>
+            ANIME
+          </span>
+
+          <h1>
+            {title}
+          </h1>
+
         </div>
 
         <button
@@ -337,15 +422,17 @@ export default function AnimePage({
               ? 'is-favorite'
               : ''
           }`}
-          onClick={toggleFavorite}
+          onClick={
+            toggleFavorite
+          }
           aria-label="Favori"
         >
-          {favorite ? '★' : '☆'}
+          {favorite
+            ? '★'
+            : '☆'}
         </button>
 
       </header>
-
-      {/* LECTEUR */}
 
       <section className="player-container">
 
@@ -361,36 +448,32 @@ export default function AnimePage({
           />
         ) : (
           <div className="player-empty">
-
             <span>▶</span>
-
             <p>
               Lecteur indisponible
             </p>
-
           </div>
         )}
 
       </section>
 
-      {/* CONTRÔLES */}
-
       <section className="episode-controls">
 
         <div className="control-row">
-
-          {/* LANGUE */}
 
           <div className="segmented">
 
             <button
               className={
-                lang === 'vostfr'
+                lang ===
+                'vostfr'
                   ? 'selected'
                   : ''
               }
               onClick={() => {
-                setLang('vostfr');
+                setLang(
+                  'vostfr'
+                );
                 setEpisode(0);
               }}
             >
@@ -415,28 +498,29 @@ export default function AnimePage({
 
           </div>
 
-          {/* SAISONS */}
-
           <select
             value={season}
-            onChange={(event) => {
-              const newSeason =
+            onChange={(
+              event
+            ) => {
+              const value =
                 Number(
-                  event.target.value
+                  event.target
+                    .value
                 );
 
-              setSeason(newSeason);
+              setSeason(value);
               setEpisode(0);
             }}
           >
 
             {data.seasons.map(
-              (seasonNumber) => (
+              (number) => (
                 <option
-                  key={seasonNumber}
-                  value={seasonNumber}
+                  key={number}
+                  value={number}
                 >
-                  Saison {seasonNumber}
+                  Saison {number}
                 </option>
               )
             )}
@@ -445,9 +529,8 @@ export default function AnimePage({
 
         </div>
 
-        {/* LECTEURS */}
-
-        {data.players.length > 1 && (
+        {data.players.length >
+          1 && (
           <div className="players">
 
             <span>
@@ -457,17 +540,25 @@ export default function AnimePage({
             <div className="player-list">
 
               {data.players.map(
-                (item, index) => (
+                (
+                  item,
+                  index
+                ) => (
                   <button
                     key={`${item.name}-${index}`}
                     className={
-                      player === index
+                      player ===
+                      index
                         ? 'player-selected'
                         : ''
                     }
                     onClick={() => {
-                      setPlayer(index);
-                      setEpisode(0);
+                      setPlayer(
+                        index
+                      );
+                      setEpisode(
+                        0
+                      );
                     }}
                   >
                     {item.name}
@@ -481,8 +572,6 @@ export default function AnimePage({
         )}
 
       </section>
-
-      {/* ÉPISODES */}
 
       <section className="episodes-section">
 
@@ -518,11 +607,14 @@ export default function AnimePage({
                     : 'episode'
                 }
                 onClick={() => {
-                  setEpisode(index);
+                  setEpisode(
+                    index
+                  );
 
                   window.scrollTo({
                     top: 0,
-                    behavior: 'smooth',
+                    behavior:
+                      'smooth',
                   });
                 }}
               >
@@ -533,10 +625,12 @@ export default function AnimePage({
 
         </div>
 
-        {episodes.length === 0 && (
+        {episodes.length ===
+          0 && (
           <div className="empty-card">
-            Aucun épisode disponible
-            pour cette sélection.
+            Aucun épisode
+            disponible pour
+            cette sélection.
           </div>
         )}
 
