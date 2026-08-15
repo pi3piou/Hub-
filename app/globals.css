@@ -807,3 +807,124 @@ a {
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+/* =========================================================
+   AFFICHES
+   ========================================================= */
+
+.anime-cover,
+.favorite-cover,
+.search-cover {
+  position: relative;
+  overflow: hidden;
+  background: #111;
+  border-radius: 18px;
+}
+
+.anime-cover {
+  aspect-ratio: 2 / 3;
+}
+
+.favorite-cover {
+  aspect-ratio: 2 / 3;
+}
+
+.search-cover {
+  width: 64px;
+  min-width: 64px;
+  height: 88px;
+}
+
+.anime-cover img,
+.favorite-cover img,
+.search-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+
+
+/* =========================================================
+   ÉPISODES VUS
+   ========================================================= */
+
+.episode {
+  position: relative;
+  overflow: hidden;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.episode.watched {
+  opacity: 0.42;
+}
+
+.episode.watched::after {
+  content: "✓";
+  position: absolute;
+  top: 4px;
+  right: 5px;
+
+  width: 16px;
+  height: 16px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  background: currentColor;
+  color: inherit;
+
+  opacity: 0.9;
+}
+
+.episode.watched:not(.active) {
+  filter: grayscale(0.65);
+}
+
+.episode.active {
+  opacity: 1;
+  filter: none;
+}
+
+.episode:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+
+/* =========================================================
+   INDICATION "VU"
+   ========================================================= */
+
+.episode.watched:not(.active) {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 600px) {
+  .anime-cover,
+  .favorite-cover {
+    border-radius: 14px;
+  }
+
+  .search-cover {
+    width: 58px;
+    min-width: 58px;
+    height: 80px;
+  }
+}
