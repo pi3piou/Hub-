@@ -165,22 +165,18 @@ export default function FavoritesPage() {
                 >
 
                   <div className="favorite-cover">
-
-                    {item.image ? (
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        loading="lazy"
-                        onError={(
-                          event
-                        ) => {
-                          event.currentTarget.style.display =
-                            'none';
-                        }}
-                      />
-                    ) : null}
-
-                  </div>
+  {item.image && (
+    <img
+      src={item.image}
+      alt={item.name}
+      loading="lazy"
+      onError={(event) => {
+        event.currentTarget.style.display =
+          'none';
+      }}
+    />
+  )}
+</div>
 
                 </Link>
 
