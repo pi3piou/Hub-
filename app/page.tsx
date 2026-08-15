@@ -371,22 +371,18 @@ export default function Home() {
                 >
 
                   <div className="anime-cover">
-
-                    {item.image ? (
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        loading="lazy"
-                        onError={(
-                          event
-                        ) => {
-                          event.currentTarget.style.display =
-                            'none';
-                        }}
-                      />
-                    ) : null}
-
-                  </div>
+  {item.image && (
+    <img
+      src={item.image}
+      alt={item.name}
+      loading="lazy"
+      onError={(event) => {
+        event.currentTarget.style.display =
+          'none';
+      }}
+    />
+  )}
+</div>
 
                   <span>
                     {item.name}
