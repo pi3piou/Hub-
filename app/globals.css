@@ -1,21 +1,67 @@
+/* =========================================================
+   VARIABLES
+   ========================================================= */
+
+:root {
+  /* Fonds */
+  --bg: #050507;
+  --surface: rgba(18, 18, 23, 0.75);
+  --surface-solid: #15151a;
+  --surface-input: #111116;
+  --surface-hover: rgba(255, 255, 255, 0.04);
+
+  /* Bordures */
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  /* Texte */
+  --text: #f7f7fa;
+  --text-muted: #85858f;
+  --text-dim: #66666f;
+
+  /* Accent */
+  --accent: #6659e8;
+  --accent-light: #8d82ff;
+  --accent-tint: rgba(117, 99, 255, 0.12);
+  --accent-border: rgba(117, 99, 255, 0.2);
+
+  /* Rayons */
+  --radius-sm: 11px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+
+  /* Gabarit */
+  --page-max: 560px;
+  --page-pad: 16px;
+
+  /* Transitions */
+  --ease: 0.2s ease;
+}
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
 * {
   box-sizing: border-box;
 }
 
 html {
-  background: #050507;
+  background: var(--bg);
 }
 
 body {
   margin: 0;
+  min-height: 100vh;
   background:
     radial-gradient(
       circle at 50% -10%,
       rgba(91, 76, 255, 0.18),
       transparent 35%
     ),
-    #050507;
-  color: #f7f7fa;
+    var(--bg);
+  color: var(--text);
   font-family:
     -apple-system,
     BlinkMacSystemFont,
@@ -24,7 +70,7 @@ body {
     Inter,
     Arial,
     sans-serif;
-  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -42,29 +88,37 @@ a {
   text-decoration: none;
 }
 
-/* PAGE */
+/* =========================================================
+   PAGE
+   ========================================================= */
 
 .page {
   width: 100%;
-  max-width: 560px;
+  max-width: var(--page-max);
   margin: 0 auto;
-  padding: 22px 16px 120px;
+  padding: 22px var(--page-pad) 120px;
 }
 
-/* HEADER */
+/* =========================================================
+   EN-TÊTES
+   ========================================================= */
 
 .hero {
   padding: 25px 4px 24px;
 }
 
+.simple-header {
+  padding: 20px 4px 25px;
+}
+
 .eyebrow,
 .section-eyebrow {
   display: block;
-  color: #8d82ff;
+  margin-bottom: 7px;
+  color: var(--accent-light);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.16em;
-  margin-bottom: 7px;
 }
 
 .hero h1,
@@ -76,13 +130,21 @@ a {
 }
 
 .hero p {
-  color: #85858f;
+  margin: 10px 0 0;
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.5;
-  margin: 10px 0 0;
 }
 
-/* SEARCH */
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* =========================================================
+   RECHERCHE
+   ========================================================= */
 
 .search-section {
   position: relative;
@@ -95,12 +157,12 @@ a {
   gap: 9px;
   height: 52px;
   padding: 0 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(255,255,255,.09);
-  background: rgba(23,23,28,.8);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: rgba(23, 23, 28, 0.8);
   box-shadow:
-    inset 0 1px rgba(255,255,255,.035),
-    0 15px 45px rgba(0,0,0,.25);
+    inset 0 1px rgba(255, 255, 255, 0.035),
+    0 15px 45px rgba(0, 0, 0, 0.25);
   backdrop-filter: blur(20px);
 }
 
@@ -113,10 +175,10 @@ a {
 .search-box input {
   flex: 1;
   min-width: 0;
-  color: white;
-  background: transparent;
   border: 0;
   outline: 0;
+  background: transparent;
+  color: var(--text);
   font-size: 14px;
 }
 
@@ -125,28 +187,28 @@ a {
 }
 
 .clear-button {
-  border: 0;
-  background: #292930;
-  color: #a8a8b2;
   width: 25px;
   height: 25px;
-  border-radius: 50%;
-  line-height: 20px;
   padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #292930;
+  color: #a8a8b2;
+  line-height: 20px;
 }
 
 .search-results {
   position: absolute;
   top: 59px;
-  left: 0;
   right: 0;
+  left: 0;
   max-height: 370px;
   overflow: auto;
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 18px;
-  background: rgba(20,20,25,.96);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(20, 20, 25, 0.96);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(25px);
-  box-shadow: 0 25px 60px rgba(0,0,0,.5);
 }
 
 .search-result {
@@ -154,7 +216,7 @@ a {
   align-items: center;
   gap: 12px;
   padding: 10px;
-  border-bottom: 1px solid rgba(255,255,255,.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .search-result:last-child {
@@ -162,91 +224,122 @@ a {
 }
 
 .search-result:hover {
-  background: rgba(255,255,255,.04);
-}
-
-.search-cover {
-  width: 40px;
-  height: 55px;
-  overflow: hidden;
-  flex: 0 0 auto;
-  border-radius: 9px;
-  background: #292930;
-}
-
-.search-cover img,
-.anime-cover img,
-.favorite-cover img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
+  background: var(--surface-hover);
 }
 
 .search-result-info {
-  min-width: 0;
   flex: 1;
+  min-width: 0;
 }
 
 .search-result-info strong {
   display: block;
-  font-size: 13px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 13px;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .search-result-info span {
   display: block;
-  color: #686871;
-  font-size: 10px;
   margin-top: 4px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  color: #686871;
+  font-size: 10px;
   white-space: nowrap;
-}
-
-.arrow {
-  color: #66666f;
-  font-size: 22px;
+  text-overflow: ellipsis;
 }
 
 .search-state {
-  min-height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 9px;
+  min-height: 80px;
   color: #7d7d87;
   font-size: 12px;
 }
 
-/* FEATURED */
+.arrow {
+  color: var(--text-dim);
+  font-size: 22px;
+}
+
+/* =========================================================
+   AFFICHES (définition unique)
+   ========================================================= */
+
+.anime-cover,
+.favorite-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  background: var(--surface-solid);
+}
+
+.search-cover,
+.continue-cover {
+  position: relative;
+  flex: 0 0 58px;
+  width: 58px;
+  height: 84px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--surface-solid);
+}
+
+.history-cover {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 70px;
+  overflow: hidden;
+  border-radius: 9px;
+  background: var(--surface-solid);
+}
+
+.anime-cover img,
+.favorite-cover img,
+.search-cover img,
+.continue-cover img,
+.history-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* =========================================================
+   MISE EN AVANT
+   ========================================================= */
 
 .featured-card {
   position: relative;
-  overflow: hidden;
   min-height: 190px;
   margin-top: 22px;
+  overflow: hidden;
+  border: 1px solid var(--accent-border);
   border-radius: 27px;
-  border: 1px solid rgba(125,113,255,.2);
   background:
     linear-gradient(
       135deg,
-      rgba(69,56,170,.34),
-      rgba(25,25,34,.8)
+      rgba(69, 56, 170, 0.34),
+      rgba(25, 25, 34, 0.8)
     );
-  box-shadow: 0 20px 55px rgba(0,0,0,.25);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.25);
 }
 
 .featured-glow {
   position: absolute;
+  top: -80px;
+  right: -90px;
   width: 220px;
   height: 220px;
-  right: -90px;
-  top: -80px;
   border-radius: 50%;
-  background: rgba(117,99,255,.25);
+  background: rgba(117, 99, 255, 0.25);
   filter: blur(35px);
 }
 
@@ -255,24 +348,12 @@ a {
   padding: 24px;
 }
 
-.badge {
-  display: inline-block;
-  padding: 6px 9px;
-  border-radius: 8px;
-  color: #aaa2ff;
-  background: rgba(117,99,255,.12);
-  border: 1px solid rgba(117,99,255,.16);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: .12em;
-}
-
 .featured-content h2 {
   max-width: 260px;
   margin: 13px 0 6px;
   font-size: 22px;
   line-height: 1.1;
-  letter-spacing: -.03em;
+  letter-spacing: -0.03em;
 }
 
 .featured-content p {
@@ -287,17 +368,31 @@ a {
   position: absolute;
   right: 25px;
   bottom: 24px;
-  width: 55px;
-  height: 55px;
   display: grid;
   place-items: center;
+  width: 55px;
+  height: 55px;
+  border: 1px solid var(--border-strong);
   border-radius: 50%;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255, 255, 255, 0.08);
   font-size: 18px;
 }
 
-/* SECTIONS */
+.badge {
+  display: inline-block;
+  padding: 6px 9px;
+  border: 1px solid rgba(117, 99, 255, 0.16);
+  border-radius: 8px;
+  background: var(--accent-tint);
+  color: #aaa2ff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+/* =========================================================
+   SECTIONS ET GRILLES
+   ========================================================= */
 
 .section {
   margin-top: 34px;
@@ -305,15 +400,15 @@ a {
 
 .section-header {
   display: flex;
-  justify-content: space-between;
   align-items: flex-end;
+  justify-content: space-between;
   margin-bottom: 13px;
 }
 
 .section-header h2 {
   margin: 0;
   font-size: 19px;
-  letter-spacing: -.025em;
+  letter-spacing: -0.025em;
 }
 
 .see-all {
@@ -322,39 +417,95 @@ a {
   font-weight: 700;
 }
 
-.anime-grid {
+.anime-grid,
+.favorite-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.anime-card {
+.anime-card,
+.favorite-card {
   min-width: 0;
-}
-
-.anime-cover {
-  aspect-ratio: 2 / 3;
-  overflow: hidden;
-  border-radius: 17px;
-  background: #15151a;
-  border: 1px solid rgba(255,255,255,.06);
 }
 
 .anime-card span {
   display: block;
   padding: 8px 3px 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 12px;
   font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
+
+.favorite-info {
+  padding: 8px 2px;
+}
+
+.favorite-info strong {
+  display: block;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.count-badge,
+.episode-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 7px;
+  border-radius: 99px;
+  background: var(--accent-tint);
+  color: #948aff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* =========================================================
+   BOUTONS
+   ========================================================= */
+
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  margin-top: 20px;
+  padding: 0 17px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.remove-button {
+  margin-top: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.remove-button:hover {
+  color: #f27676;
+}
+
+/* =========================================================
+   ÉTAT VIDE
+   ========================================================= */
 
 .empty-card {
   padding: 32px 20px;
-  border-radius: 21px;
-  border: 1px solid rgba(255,255,255,.06);
-  background: rgba(18,18,23,.75);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
   text-align: center;
 }
 
@@ -377,14 +528,16 @@ a {
   line-height: 1.5;
 }
 
-/* NAV */
+/* =========================================================
+   NAVIGATION
+   ========================================================= */
 
 .bottom-nav {
   position: fixed;
-  z-index: 100;
   right: 0;
   bottom: 17px;
   left: 0;
+  z-index: 100;
   display: flex;
   justify-content: center;
   pointer-events: none;
@@ -394,20 +547,20 @@ a {
   display: flex;
   gap: 34px;
   padding: 10px 23px;
-  border: 1px solid rgba(255,255,255,.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 25px;
-  background: rgba(18,18,23,.82);
+  background: rgba(18, 18, 23, 0.82);
+  box-shadow: 0 15px 45px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(25px);
-  box-shadow: 0 15px 45px rgba(0,0,0,.45);
   pointer-events: auto;
 }
 
 .nav-item {
   display: flex;
-  min-width: 55px;
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  min-width: 55px;
   color: #6e6e78;
   font-size: 9px;
   font-weight: 650;
@@ -420,704 +573,6 @@ a {
 .nav-icon {
   font-size: 20px;
   line-height: 20px;
-}
-
-/* FAVORITES */
-
-.simple-header {
-  padding: 20px 4px 25px;
-}
-
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.count-badge,
-.episode-count {
-  display: inline-grid;
-  min-width: 25px;
-  height: 25px;
-  padding: 0 7px;
-  place-items: center;
-  border-radius: 99px;
-  background: rgba(129,117,255,.12);
-  color: #948aff;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.favorite-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-}
-
-.favorite-card {
-  min-width: 0;
-}
-
-.favorite-cover {
-  aspect-ratio: 2 / 3;
-  overflow: hidden;
-  border-radius: 18px;
-  background: #15151a;
-}
-
-.favorite-info {
-  padding: 8px 2px;
-}
-
-.favorite-info strong {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-}
-
-.remove-button {
-  margin-top: 5px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #66666f;
-  font-size: 10px;
-}
-
-.remove-button:hover {
-  color: #f27676;
-}
-
-.primary-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 42px;
-  margin-top: 20px;
-  padding: 0 17px;
-  border: 0;
-  border-radius: 13px;
-  background: #6659e8;
-  color: white;
-  font-size: 12px;
-  font-weight: 750;
-}
-
-/* ANIME */
-
-.anime-page {
-  padding-top: 12px;
-}
-
-.anime-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 15px;
-}
-
-.back-button,
-.favorite-button {
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 13px;
-  background: #15151a;
-  color: #b4b4bd;
-}
-
-.back-button {
-  font-size: 28px;
-  line-height: 1;
-}
-
-.favorite-button {
-  font-size: 19px;
-}
-
-.favorite-button.is-favorite {
-  color: #ffd45c;
-  border-color: rgba(255,212,92,.2);
-  background: rgba(255,212,92,.08);
-}
-
-.anime-title {
-  flex: 1;
-  min-width: 0;
-}
-
-.anime-title span {
-  color: #8177f4;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: .14em;
-}
-
-.anime-title h1 {
-  overflow: hidden;
-  margin: 2px 0 0;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 18px;
-  letter-spacing: -.025em;
-}
-
-.player-container {
-  position: relative;
-  overflow: hidden;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 19px;
-  background: #000;
-  box-shadow: 0 20px 50px rgba(0,0,0,.35);
-}
-
-.video-frame {
-  width: 100%;
-  height: 100%;
-  display: block;
-  border: 0;
-}
-
-.player-empty {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 5px;
-  color: #55555e;
-}
-
-.player-empty span {
-  font-size: 25px;
-}
-
-.player-empty p {
-  margin: 0;
-  font-size: 11px;
-}
-
-.episode-controls {
-  margin-top: 14px;
-  padding: 14px;
-  border: 1px solid rgba(255,255,255,.06);
-  border-radius: 18px;
-  background: rgba(18,18,23,.75);
-}
-
-.control-row {
-  display: flex;
-  gap: 8px;
-}
-
-.segmented {
-  display: flex;
-  flex: 1;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 12px;
-  background: #111116;
-}
-
-.segmented button {
-  flex: 1;
-  min-height: 34px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: #777780;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.segmented button.selected {
-  background: #6256df;
-  color: white;
-}
-
-.control-row select {
-  min-width: 105px;
-  padding: 0 10px;
-  border: 1px solid rgba(255,255,255,.07);
-  border-radius: 12px;
-  outline: 0;
-  background: #111116;
-  color: white;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.players {
-  margin-top: 13px;
-}
-
-.players > span {
-  display: block;
-  margin-bottom: 7px;
-  color: #65656f;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-
-.player-list {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-}
-
-.player-list button {
-  flex: 0 0 auto;
-  padding: 7px 10px;
-  border: 1px solid rgba(255,255,255,.07);
-  border-radius: 9px;
-  background: #111116;
-  color: #777780;
-  font-size: 9px;
-  font-weight: 700;
-}
-
-.player-list button.player-selected {
-  border-color: #5c51d8;
-  background: #5c51d8;
-  color: white;
-}
-
-.episodes-section {
-  margin-top: 27px;
-}
-
-.episode-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 7px;
-  max-height: 300px;
-  overflow-y: auto;
-  padding-right: 2px;
-}
-
-.episode {
-  min-height: 42px;
-  border: 1px solid rgba(255,255,255,.06);
-  border-radius: 11px;
-  background: #111116;
-  color: #777780;
-  font-size: 11px;
-  font-weight: 750;
-}
-
-.episode.active {
-  border-color: #6659e8;
-  background: #6659e8;
-  color: white;
-}
-
-/* STATES */
-
-.loading-page {
-  min-height: 70vh;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 12px;
-  color: #72727c;
-  font-size: 11px;
-}
-
-.loader {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255,255,255,.12);
-  border-top-color: #8a80ff;
-  border-radius: 50%;
-  animation: spin .8s linear infinite;
-}
-
-.loader.large {
-  width: 25px;
-  height: 25px;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.error-page {
-  min-height: 80vh;
-  display: grid;
-  place-items: center;
-}
-
-.error-card {
-  width: 100%;
-  padding: 28px 20px;
-  border: 1px solid rgba(255,255,255,.07);
-  border-radius: 22px;
-  background: #121217;
-  text-align: center;
-}
-
-.error-icon {
-  width: 45px;
-  height: 45px;
-  display: grid;
-  place-items: center;
-  margin: 0 auto 12px;
-  border-radius: 50%;
-  background: rgba(239,91,91,.12);
-  color: #ef7777;
-  font-weight: 900;
-}
-
-.error-card h1,
-.error-card h2 {
-  margin: 0 0 7px;
-  font-size: 16px;
-}
-
-.error-card p {
-  margin: 0;
-  color: #777780;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-@media (min-width: 700px) {
-  .page {
-    padding-top: 40px;
-  }
-
-  .bottom-nav {
-    bottom: 25px;
-  }
-
-  .anime-grid,
-  .favorite-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-/* =========================================================
-   AFFICHES
-   ========================================================= */
-
-.anime-cover,
-.favorite-cover,
-.search-cover {
-  position: relative;
-  overflow: hidden;
-  background: #111;
-  border-radius: 18px;
-}
-
-.anime-cover {
-  aspect-ratio: 2 / 3;
-}
-
-.favorite-cover {
-  aspect-ratio: 2 / 3;
-}
-
-.search-cover {
-  width: 64px;
-  min-width: 64px;
-  height: 88px;
-}
-
-.anime-cover img,
-.favorite-cover img,
-.search-cover img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center center;
-}
-
-
-/* =========================================================
-   ÉPISODES VUS
-   ========================================================= */
-
-.episode {
-  position: relative;
-  overflow: hidden;
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease,
-    background 0.2s ease;
-}
-
-.episode.watched {
-  opacity: 0.42;
-}
-
-.episode.watched::after {
-  content: "✓";
-  position: absolute;
-  top: 4px;
-  right: 5px;
-
-  width: 16px;
-  height: 16px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 50%;
-
-  font-size: 10px;
-  font-weight: 700;
-
-  background: currentColor;
-  color: inherit;
-
-  opacity: 0.9;
-}
-
-.episode.watched:not(.active) {
-  filter: grayscale(0.65);
-}
-
-.episode.active {
-  opacity: 1;
-  filter: none;
-}
-
-.episode:hover {
-  opacity: 1;
-  transform: translateY(-1px);
-}
-
-
-/* =========================================================
-   INDICATION "VU"
-   ========================================================= */
-
-.episode.watched:not(.active) {
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-}
-
-
-/* =========================================================
-   RESPONSIVE
-   ========================================================= */
-
-@media (max-width: 600px) {
-  .anime-cover,
-  .favorite-cover {
-    border-radius: 14px;
-  }
-
-  .search-cover {
-    width: 58px;
-    min-width: 58px;
-    height: 80px;
-  }
-}
-
-/* =========================================================
-   AFFICHES ANIME — FORMAT PORTRAIT
-   ========================================================= */
-
-.anime-cover,
-.favorite-cover {
-  position: relative;
-  overflow: hidden;
-  width: 100%;
-  aspect-ratio: 2 / 3;
-  border-radius: 18px;
-  background: #111;
-}
-
-.anime-cover img,
-.favorite-cover img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center;
-  background: #111;
-}
-
-/* Recherche */
-
-.search-cover {
-  position: relative;
-  flex: 0 0 58px;
-  width: 58px;
-  height: 84px;
-  overflow: hidden;
-  border-radius: 10px;
-  background: #111;
-}
-
-.search-cover img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center;
-  background: #111;
-}
-
-/* =========================================================
-   GRILLES
-   ========================================================= */
-
-.anime-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.favorite-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-}
-
-/* =========================================================
-   MOBILE
-   ========================================================= */
-
-@media (max-width: 700px) {
-  .anime-grid,
-  .favorite-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-  }
-
-  .anime-cover,
-  .favorite-cover {
-    border-radius: 14px;
-  }
-}
-
-@media (min-width: 701px) and (max-width: 1000px) {
-  .anime-grid,
-  .favorite-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-/* =========================================================
-   PROGRESSION
-   ========================================================= */
-
-.anime-progress {
-  margin: 18px 0 24px;
-}
-
-.progress-info {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 9px;
-
-  font-size: 13px;
-  opacity: 0.72;
-}
-
-.progress-info strong {
-  font-weight: 600;
-  opacity: 1;
-}
-
-.progress-track {
-  width: 100%;
-  height: 5px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(128, 128, 128, 0.2);
-}
-
-.progress-value {
-  height: 100%;
-  border-radius: inherit;
-  background: currentColor;
-  transition: width 0.35s ease;
-}
-
-
-/* =========================================================
-   ÉPISODE VU
-   ========================================================= */
-
-.episode {
-  position: relative;
-  overflow: hidden;
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-
-.episode.watched {
-  opacity: 0.38;
-  filter: grayscale(0.65);
-}
-
-.episode.watched::after {
-  content: "✓";
-
-  position: absolute;
-  top: 4px;
-  right: 5px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 15px;
-  height: 15px;
-
-  border-radius: 50%;
-
-  font-size: 9px;
-  font-weight: 700;
-
-  background: currentColor;
-  color: inherit;
-}
-
-.episode.active {
-  opacity: 1;
-  filter: none;
-}
-
-.episode:hover {
-  opacity: 1;
-  filter: none;
-  transform: translateY(-1px);
-}
-
-
-/* =========================================================
-   MOBILE
-   ========================================================= */
-
-@media (max-width: 600px) {
-  .progress-info {
-    font-size: 12px;
-  }
-
-  .anime-progress {
-    margin-top: 14px;
-  }
 }
 
 /* =========================================================
@@ -1134,19 +589,13 @@ a {
   display: flex;
   align-items: center;
   gap: 15px;
-
   padding: 10px;
-
-  border-radius: 18px;
-
-  text-decoration: none;
-  color: inherit;
-
+  border-radius: var(--radius-lg);
   background: rgba(128, 128, 128, 0.08);
-
+  color: inherit;
   transition:
-    transform 0.2s ease,
-    background 0.2s ease;
+    transform var(--ease),
+    background var(--ease);
 }
 
 .continue-card:hover {
@@ -1154,44 +603,18 @@ a {
   background: rgba(128, 128, 128, 0.13);
 }
 
-.continue-cover {
-  position: relative;
-  flex: 0 0 64px;
-
-  width: 64px;
-  height: 88px;
-
-  overflow: hidden;
-
-  border-radius: 11px;
-
-  background: #111;
-}
-
-.continue-cover img {
-  width: 100%;
-  height: 100%;
-
-  display: block;
-
-  object-fit: contain;
-}
-
 .continue-info {
-  min-width: 0;
-  flex: 1;
-
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
 }
 
 .continue-info strong {
   overflow: hidden;
-
   font-size: 15px;
   font-weight: 650;
-
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -1210,50 +633,24 @@ a {
 .continue-progress {
   width: 100%;
   height: 3px;
-
-  overflow: hidden;
-
   margin-top: 2px;
-
+  overflow: hidden;
   border-radius: 999px;
-
   background: rgba(128, 128, 128, 0.2);
 }
 
 .continue-progress span {
   display: block;
-
   width: 100%;
   height: 100%;
-
   border-radius: inherit;
-
-  background: currentColor;
+  background: var(--accent);
 }
 
 .continue-card .arrow {
   flex: 0 0 auto;
-
   font-size: 25px;
-
   opacity: 0.35;
-}
-
-
-/* =========================================================
-   MOBILE
-   ========================================================= */
-
-@media (max-width: 600px) {
-  .continue-card {
-    border-radius: 15px;
-  }
-
-  .continue-cover {
-    flex-basis: 58px;
-    width: 58px;
-    height: 80px;
-  }
 }
 
 /* =========================================================
@@ -1269,214 +666,209 @@ a {
 .history-card {
   display: flex;
   align-items: center;
-
   min-width: 0;
-
-  border-radius: 17px;
-
-  background: rgba(
-    128,
-    128,
-    128,
-    0.07
-  );
-
   overflow: hidden;
-
+  border-radius: var(--radius-lg);
+  background: rgba(128, 128, 128, 0.07);
   transition:
-    background 0.2s ease,
-    transform 0.2s ease;
+    background var(--ease),
+    transform var(--ease);
 }
 
 .history-card:hover {
-  background: rgba(
-    128,
-    128,
-    128,
-    0.12
-  );
-
   transform: translateY(-1px);
+  background: rgba(128, 128, 128, 0.12);
 }
 
 .history-main {
   display: flex;
-  align-items: center;
-
-  gap: 13px;
-
-  min-width: 0;
   flex: 1;
-
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
   padding: 9px;
-
   color: inherit;
-  text-decoration: none;
-}
-
-.history-cover {
-  flex: 0 0 52px;
-
-  width: 52px;
-  height: 70px;
-
-  overflow: hidden;
-
-  border-radius: 9px;
-
-  background: #111;
-}
-
-.history-cover img {
-  display: block;
-
-  width: 100%;
-  height: 100%;
-
-  object-fit: contain;
 }
 
 .history-info {
   display: flex;
   flex-direction: column;
-
-  min-width: 0;
-
   gap: 4px;
+  min-width: 0;
 }
 
 .history-info strong {
   overflow: hidden;
-
   font-size: 14px;
   font-weight: 650;
-
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .history-info span {
   font-size: 12px;
-
   opacity: 0.62;
 }
 
 .history-info small {
   font-size: 11px;
-
   opacity: 0.4;
 }
 
 .history-delete {
   flex: 0 0 42px;
-
   align-self: stretch;
-
   border: 0;
-
   background: transparent;
-
   color: inherit;
-
   font-size: 24px;
-
   opacity: 0.3;
-
-  cursor: pointer;
-
   transition:
-    opacity 0.2s ease,
-    background 0.2s ease;
+    opacity var(--ease),
+    background var(--ease);
 }
 
 .history-delete:hover {
+  background: rgba(128, 128, 128, 0.08);
   opacity: 0.8;
-
-  background: rgba(
-    128,
-    128,
-    128,
-    0.08
-  );
 }
 
 .clear-history {
-  border: 0;
-
   padding: 6px 10px;
-
+  border: 0;
   border-radius: 9px;
-
-  background: rgba(
-    128,
-    128,
-    128,
-    0.1
-  );
-
+  background: rgba(128, 128, 128, 0.1);
   color: inherit;
-
   font-size: 12px;
-
-  cursor: pointer;
-
   opacity: 0.65;
-
   transition:
-    opacity 0.2s ease,
-    background 0.2s ease;
+    opacity var(--ease),
+    background var(--ease);
 }
 
 .clear-history:hover {
+  background: rgba(128, 128, 128, 0.16);
   opacity: 1;
-
-  background: rgba(
-    128,
-    128,
-    128,
-    0.16
-  );
-}
-
-
-/* =========================================================
-   MOBILE
-   ========================================================= */
-
-@media (max-width: 600px) {
-  .history-card {
-    border-radius: 14px;
-  }
-
-  .history-cover {
-    flex-basis: 48px;
-
-    width: 48px;
-    height: 65px;
-  }
-
-  .history-main {
-    gap: 11px;
-  }
-
-  .history-info strong {
-    font-size: 13px;
-  }
-
-  .history-delete {
-    flex-basis: 38px;
-  }
 }
 
 /* =========================================================
-   PROGRESSION PAR SAISON
+   PAGE ANIME — EN-TÊTE
    ========================================================= */
+
+.anime-page {
+  padding-top: 12px;
+}
+
+.anime-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.back-button,
+.favorite-button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  background: var(--surface-solid);
+  color: #b4b4bd;
+}
+
+.back-button {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.favorite-button {
+  font-size: 19px;
+}
+
+.favorite-button.is-favorite {
+  border-color: rgba(255, 212, 92, 0.2);
+  background: rgba(255, 212, 92, 0.08);
+  color: #ffd45c;
+}
+
+.anime-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.anime-title span {
+  color: #8177f4;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.anime-title h1 {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 18px;
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* =========================================================
+   LECTEUR — pleine largeur sur mobile
+   ========================================================= */
+
+.player-container {
+  position: relative;
+  width: calc(100% + var(--page-pad) * 2);
+  margin-inline: calc(var(--page-pad) * -1);
+  aspect-ratio: 16 / 9;
+  max-height: 70vh;
+  overflow: hidden;
+  border-block: 1px solid rgba(255, 255, 255, 0.08);
+  background: #000;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+.video-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.player-empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  width: 100%;
+  height: 100%;
+  color: #55555e;
+}
+
+.player-empty span {
+  font-size: 25px;
+}
+
+.player-empty p {
+  margin: 0;
+  font-size: 11px;
+}
+
+/* =========================================================
+   PROGRESSION
+   ========================================================= */
+
+.anime-progress {
+  margin: 18px 0 24px;
+}
 
 .progress-title {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-
   margin-bottom: 10px;
 }
 
@@ -1490,14 +882,26 @@ a {
   font-size: 14px;
 }
 
+.progress-track {
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.2);
+}
+
+.progress-value {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.35s ease;
+}
+
 .global-progress {
   display: flex;
   justify-content: space-between;
-
   margin-top: 8px;
-
   font-size: 11px;
-
   opacity: 0.45;
 }
 
@@ -1505,22 +909,14 @@ a {
   font-weight: 600;
 }
 
-
-/* =========================================================
-   SAISONS
-   ========================================================= */
+/* Saisons */
 
 .season-progress-list {
   display: flex;
-
   gap: 8px;
-
   margin-top: 17px;
-
-  overflow-x: auto;
-
   padding-bottom: 3px;
-
+  overflow-x: auto;
   scrollbar-width: none;
 }
 
@@ -1530,47 +926,23 @@ a {
 
 .season-progress {
   flex: 0 0 auto;
-
   min-width: 105px;
-
   padding: 9px 10px;
-
-  border: 1px solid
-    rgba(128, 128, 128, 0.12);
-
-  border-radius: 11px;
-
-  background: rgba(
-    128,
-    128,
-    128,
-    0.06
-  );
-
+  border: 1px solid rgba(128, 128, 128, 0.12);
+  border-radius: var(--radius-sm);
+  background: rgba(128, 128, 128, 0.06);
   color: inherit;
-
-  cursor: pointer;
-
   opacity: 0.55;
-
   transition:
-    opacity 0.2s ease,
-    background 0.2s ease,
-    border-color 0.2s ease;
+    opacity var(--ease),
+    background var(--ease),
+    border-color var(--ease);
 }
 
 .season-progress.active {
+  border-color: var(--accent-border);
+  background: var(--accent-tint);
   opacity: 1;
-
-  border-color:
-    rgba(128, 128, 128, 0.3);
-
-  background: rgba(
-    128,
-    128,
-    128,
-    0.12
-  );
 }
 
 .season-progress:hover {
@@ -1579,12 +951,9 @@ a {
 
 .season-progress-top {
   display: flex;
-
   align-items: center;
   justify-content: space-between;
-
   margin-bottom: 7px;
-
   font-size: 11px;
 }
 
@@ -1595,43 +964,297 @@ a {
 .season-progress-track {
   width: 100%;
   height: 3px;
-
   overflow: hidden;
-
   border-radius: 999px;
-
-  background: rgba(
-    128,
-    128,
-    128,
-    0.15
-  );
+  background: rgba(128, 128, 128, 0.15);
 }
 
 .season-progress-track span {
   display: block;
-
   height: 100%;
-
   border-radius: inherit;
-
-  background: currentColor;
-
-  transition:
-    width 0.3s ease;
+  background: var(--accent);
+  transition: width 0.3s ease;
 }
 
-
 /* =========================================================
-   MOBILE
+   CONTRÔLES
    ========================================================= */
 
-@media (max-width: 600px) {
-  .season-progress {
-    min-width: 95px;
+.episode-controls {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.control-row {
+  display: flex;
+  gap: 8px;
+}
+
+.segmented {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface-input);
+}
+
+.segmented button {
+  flex: 1;
+  min-height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #777780;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.segmented button.selected {
+  background: var(--accent);
+  color: #fff;
+}
+
+.control-row select {
+  min-width: 105px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  outline: 0;
+  background: var(--surface-input);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.players {
+  margin-top: 13px;
+}
+
+.players > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #65656f;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.player-list {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.player-list button {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-input);
+  color: #777780;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.player-list button.player-selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+/* =========================================================
+   ÉPISODES (définition unique)
+   ========================================================= */
+
+.episodes-section {
+  margin-top: 27px;
+}
+
+.episode-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
+  max-height: 300px;
+  padding-right: 2px;
+  overflow-y: auto;
+}
+
+.episode {
+  position: relative;
+  min-height: 42px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  background: var(--surface-input);
+  color: #777780;
+  font-size: 11px;
+  font-weight: 750;
+  transition:
+    opacity var(--ease),
+    transform var(--ease),
+    background var(--ease);
+}
+
+.episode:hover {
+  transform: translateY(-1px);
+  opacity: 1;
+}
+
+.episode.watched {
+  opacity: 0.6;
+}
+
+.episode.watched::after {
+  content: "✓";
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.episode.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  opacity: 1;
+}
+
+.episode.active.watched::after {
+  background: #fff;
+  color: var(--accent);
+}
+
+/* =========================================================
+   ÉTATS
+   ========================================================= */
+
+.loading-page {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  min-height: 70vh;
+  color: #72727c;
+  font-size: 11px;
+}
+
+.loader {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent-light);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loader.large {
+  width: 25px;
+  height: 25px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-page {
+  display: grid;
+  place-items: center;
+  min-height: 80vh;
+}
+
+.error-card {
+  width: 100%;
+  padding: 28px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: #121217;
+  text-align: center;
+}
+
+.error-icon {
+  display: grid;
+  place-items: center;
+  width: 45px;
+  height: 45px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: rgba(239, 91, 91, 0.12);
+  color: #ef7777;
+  font-weight: 900;
+}
+
+.error-card h1,
+.error-card h2 {
+  margin: 0 0 7px;
+  font-size: 16px;
+}
+
+.error-card p {
+  margin: 0;
+  color: #777780;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* =========================================================
+   RESPONSIVE — un seul jeu de points de rupture
+   ========================================================= */
+
+@media (min-width: 700px) {
+  :root {
+    --page-max: 720px;
+    --page-pad: 22px;
   }
 
-  .global-progress {
-    font-size: 10px;
+  .page {
+    padding-top: 40px;
+  }
+
+  .bottom-nav {
+    bottom: 25px;
+  }
+
+  .anime-grid,
+  .favorite-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  /* Le lecteur reprend sa carte arrondie */
+  .player-container {
+    width: 100%;
+    margin-inline: 0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 19px;
+  }
+
+  .episode-grid {
+    grid-template-columns: repeat(8, 1fr);
+    max-height: 260px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .anime-grid,
+  .favorite-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
