@@ -9,6 +9,16 @@ interface AnimeItem {
   image?: string;
 }
 
+interface ContinueItem {
+  slug: string;
+  name: string;
+  image?: string;
+  season: number;
+  episode: number;
+  lang: 'vostfr' | 'vf';
+  updatedAt: number;
+}
+
 function readFavorites(): AnimeItem[] {
   try {
     const raw =
@@ -62,6 +72,43 @@ function readFavorites(): AnimeItem[] {
   }
 }
 
+function readContinue(): ContinueItem[] {
+  try {
+    const raw =
+      localStorage.getItem(
+        'anime_history'
+      );
+
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter(
+        (item) =>
+          item &&
+          item.slug &&
+          Number.isInteger(
+            item.season
+          ) &&
+          Number.isInteger(
+            item.episode
+          )
+      )
+      .sort(
+        (a, b) =>
+          b.updatedAt -
+          a.updatedAt
+      );
+  } catch {
+    return [];
+  }
+}
+
 export default function Home() {
   const [query, setQuery] =
     useState('');
@@ -72,6 +119,9 @@ export default function Home() {
   const [favorites, setFavorites] =
     useState<AnimeItem[]>([]);
 
+  const [continueWatching, setContinueWatching] =
+    useState<ContinueItem[]>([]);
+
   const [searching, setSearching] =
     useState(false);
 
@@ -79,10 +129,10 @@ export default function Home() {
     useState(false);
 
   useEffect(() => {
-    setFavorites(
-      readFavorites()
+    setFavorites(readFavorites());
+    setContinueWatching(
+      readContinue()
     );
-
     setMounted(true);
   }, []);
 
@@ -176,6 +226,8 @@ export default function Home() {
 
       </header>
 
+      {/* RECHERCHE */}
+
       <section className="search-section">
 
         <div className="search-box">
@@ -239,19 +291,23 @@ export default function Home() {
                     }
                   >
 
-               <div className="search-cover">
-  {item.image && (
-    <img
-      src={item.image}
-      alt={item.name}
-      loading="lazy"
-      onError={(event) => {
-        event.currentTarget.style.display =
-          'none';
-      }}
-    />
-  )}
-</div>
+                    <div className="search-cover">
+
+                      {item.image && (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          loading="lazy"
+                          onError={(
+                            event
+                          ) => {
+                            event.currentTarget.style.display =
+                              'none';
+                          }}
+                        />
+                      )}
+
+                    </div>
 
                     <div className="search-result-info">
 
@@ -278,6 +334,96 @@ export default function Home() {
         )}
 
       </section>
+
+      {/* CONTINUER */}
+
+      {mounted &&
+        continueWatching.length > 0 && (
+          <section className="section">
+
+            <div className="section-header">
+
+              <div>
+
+                <span className="section-eyebrow">
+                  REPRENDRE
+                </span>
+
+                <h2>
+                  Continuer la lecture
+                </h2>
+
+              </div>
+
+            </div>
+
+            <div className="continue-list">
+
+              {continueWatching
+                .slice(0, 5)
+                .map((item) => (
+                  <Link
+                    key={`${item.slug}-${item.season}-${item.lang}`}
+                    href={`/anime/${encodeURIComponent(
+                      item.slug
+                    )}?saison=${
+                      item.season
+                    }&episode=${
+                      item.episode
+                    }&lang=${
+                      item.lang
+                    }`}
+                    className="continue-card"
+                  >
+
+                    <div className="continue-cover">
+
+                      {item.image && (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          loading="lazy"
+                        />
+                      )}
+
+                    </div>
+
+                    <div className="continue-info">
+
+                      <strong>
+                        {item.name}
+                      </strong>
+
+                      <span>
+                        Saison {item.season}
+                        {' • '}
+                        Épisode{' '}
+                        {item.episode + 1}
+                      </span>
+
+                      <div className="continue-progress">
+                        <span />
+                      </div>
+
+                      <small>
+                        ▶ Reprendre
+                      </small>
+
+                    </div>
+
+                    <span className="arrow">
+                      ›
+                    </span>
+
+                  </Link>
+                ))}
+
+            </div>
+
+          </section>
+        )}
+
+      {/* CATALOGUE */}
 
       <section className="featured-card">
 
@@ -306,6 +452,8 @@ export default function Home() {
         </div>
 
       </section>
+
+      {/* FAVORIS */}
 
       <section className="section">
 
@@ -371,18 +519,16 @@ export default function Home() {
                 >
 
                   <div className="anime-cover">
-  {item.image && (
-    <img
-      src={item.image}
-      alt={item.name}
-      loading="lazy"
-      onError={(event) => {
-        event.currentTarget.style.display =
-          'none';
-      }}
-    />
-  )}
-</div>
+
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        loading="lazy"
+                      />
+                    )}
+
+                  </div>
 
                   <span>
                     {item.name}
