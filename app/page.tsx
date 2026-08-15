@@ -239,23 +239,19 @@ export default function Home() {
                     }
                   >
 
-                    <div className="search-cover">
-
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          loading="lazy"
-                          onError={(
-                            event
-                          ) => {
-                            event.currentTarget.style.display =
-                              'none';
-                          }}
-                        />
-                      ) : null}
-
-                    </div>
+               <div className="search-cover">
+  {item.image && (
+    <img
+      src={item.image}
+      alt={item.name}
+      loading="lazy"
+      onError={(event) => {
+        event.currentTarget.style.display =
+          'none';
+      }}
+    />
+  )}
+</div>
 
                     <div className="search-result-info">
 
