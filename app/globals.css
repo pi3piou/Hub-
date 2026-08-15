@@ -266,14 +266,14 @@ a {
 }
 
 /* =========================================================
-   AFFICHES (définition unique)
+   AFFICHES — format paysage 16/9 (source Anime-Sama)
    ========================================================= */
 
 .anime-cover,
 .favorite-cover {
   position: relative;
   width: 100%;
-  aspect-ratio: 2 / 3;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-md);
@@ -283,20 +283,20 @@ a {
 .search-cover,
 .continue-cover {
   position: relative;
-  flex: 0 0 58px;
-  width: 58px;
-  height: 84px;
+  flex: 0 0 96px;
+  width: 96px;
+  height: 54px;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: 9px;
   background: var(--surface-solid);
 }
 
 .history-cover {
-  flex: 0 0 52px;
-  width: 52px;
-  height: 70px;
+  flex: 0 0 84px;
+  width: 84px;
+  height: 47px;
   overflow: hidden;
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--surface-solid);
 }
 
@@ -311,6 +311,7 @@ a {
   object-fit: cover;
   object-position: center;
 }
+
 
 /* =========================================================
    MISE EN AVANT
