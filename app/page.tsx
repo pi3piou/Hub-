@@ -109,6 +109,54 @@ function readContinue(): ContinueItem[] {
   }
 }
 
+function formatHistoryDate(timestamp: number) {
+  const date = new Date(timestamp);
+  const now = new Date();
+
+  const diff =
+    now.getTime() - date.getTime();
+
+  const minutes = Math.floor(
+    diff / 60000
+  );
+
+  if (minutes < 1) {
+    return 'À l’instant';
+  }
+
+  if (minutes < 60) {
+    return `Il y a ${minutes} min`;
+  }
+
+  const hours = Math.floor(
+    minutes / 60
+  );
+
+  if (hours < 24) {
+    return `Il y a ${hours} h`;
+  }
+
+  const days = Math.floor(
+    hours / 24
+  );
+
+  if (days === 1) {
+    return 'Hier';
+  }
+
+  if (days < 7) {
+    return `Il y a ${days} jours`;
+  }
+
+  return date.toLocaleDateString(
+    'fr-FR',
+    {
+      day: 'numeric',
+      month: 'short',
+    }
+  );
+}
+
 export default function Home() {
   const [query, setQuery] =
     useState('');
@@ -422,6 +470,146 @@ export default function Home() {
 
           </section>
         )}
+
+{/* =====================================================
+    HISTORIQUE
+    ===================================================== */}
+
+{mounted &&
+  continueWatching.length > 0 && (
+    <section className="section">
+
+      <div className="section-header">
+
+        <div>
+          <span className="section-eyebrow">
+            HISTORIQUE
+          </span>
+
+          <h2>
+            Récemment regardés
+          </h2>
+        </div>
+
+        <button
+          className="clear-history"
+          onClick={() => {
+            if (
+              !window.confirm(
+                'Effacer tout l’historique ?'
+              )
+            ) {
+              return;
+            }
+
+            localStorage.removeItem(
+              'anime_history'
+            );
+
+            setContinueWatching([]);
+          }}
+        >
+          Effacer
+        </button>
+
+      </div>
+
+      <div className="history-list">
+
+        {continueWatching
+          .slice(0, 10)
+          .map((item) => (
+            <div
+              className="history-card"
+              key={`${item.slug}-${item.season}-${item.lang}`}
+            >
+
+              <Link
+                href={`/anime/${encodeURIComponent(
+                  item.slug
+                )}?saison=${
+                  item.season
+                }&episode=${
+                  item.episode
+                }&lang=${
+                  item.lang
+                }`}
+                className="history-main"
+              >
+
+                <div className="history-cover">
+
+                  {item.image && (
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      loading="lazy"
+                    />
+                  )}
+
+                </div>
+
+                <div className="history-info">
+
+                  <strong>
+                    {item.name}
+                  </strong>
+
+                  <span>
+                    Saison {item.season}
+                    {' • '}
+                    Épisode{' '}
+                    {item.episode + 1}
+                  </span>
+
+                  <small>
+                    {formatHistoryDate(
+                      item.updatedAt
+                    )}
+                  </small>
+
+                </div>
+
+              </Link>
+
+              <button
+                className="history-delete"
+                aria-label={`Supprimer ${item.name} de l’historique`}
+                onClick={() => {
+                  const next =
+                    continueWatching.filter(
+                      (historyItem) =>
+                        !(
+                          historyItem.slug ===
+                            item.slug &&
+                          historyItem.season ===
+                            item.season &&
+                          historyItem.lang ===
+                            item.lang
+                        )
+                    );
+
+                  localStorage.setItem(
+                    'anime_history',
+                    JSON.stringify(next)
+                  );
+
+                  setContinueWatching(
+                    next
+                  );
+                }}
+              >
+                ×
+              </button>
+
+            </div>
+          ))}
+
+      </div>
+
+    </section>
+  )}
+
 
       {/* CATALOGUE */}
 
