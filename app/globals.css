@@ -1255,3 +1255,215 @@ a {
     height: 80px;
   }
 }
+
+/* =========================================================
+   HISTORIQUE
+   ========================================================= */
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-card {
+  display: flex;
+  align-items: center;
+
+  min-width: 0;
+
+  border-radius: 17px;
+
+  background: rgba(
+    128,
+    128,
+    128,
+    0.07
+  );
+
+  overflow: hidden;
+
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.history-card:hover {
+  background: rgba(
+    128,
+    128,
+    128,
+    0.12
+  );
+
+  transform: translateY(-1px);
+}
+
+.history-main {
+  display: flex;
+  align-items: center;
+
+  gap: 13px;
+
+  min-width: 0;
+  flex: 1;
+
+  padding: 9px;
+
+  color: inherit;
+  text-decoration: none;
+}
+
+.history-cover {
+  flex: 0 0 52px;
+
+  width: 52px;
+  height: 70px;
+
+  overflow: hidden;
+
+  border-radius: 9px;
+
+  background: #111;
+}
+
+.history-cover img {
+  display: block;
+
+  width: 100%;
+  height: 100%;
+
+  object-fit: contain;
+}
+
+.history-info {
+  display: flex;
+  flex-direction: column;
+
+  min-width: 0;
+
+  gap: 4px;
+}
+
+.history-info strong {
+  overflow: hidden;
+
+  font-size: 14px;
+  font-weight: 650;
+
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.history-info span {
+  font-size: 12px;
+
+  opacity: 0.62;
+}
+
+.history-info small {
+  font-size: 11px;
+
+  opacity: 0.4;
+}
+
+.history-delete {
+  flex: 0 0 42px;
+
+  align-self: stretch;
+
+  border: 0;
+
+  background: transparent;
+
+  color: inherit;
+
+  font-size: 24px;
+
+  opacity: 0.3;
+
+  cursor: pointer;
+
+  transition:
+    opacity 0.2s ease,
+    background 0.2s ease;
+}
+
+.history-delete:hover {
+  opacity: 0.8;
+
+  background: rgba(
+    128,
+    128,
+    128,
+    0.08
+  );
+}
+
+.clear-history {
+  border: 0;
+
+  padding: 6px 10px;
+
+  border-radius: 9px;
+
+  background: rgba(
+    128,
+    128,
+    128,
+    0.1
+  );
+
+  color: inherit;
+
+  font-size: 12px;
+
+  cursor: pointer;
+
+  opacity: 0.65;
+
+  transition:
+    opacity 0.2s ease,
+    background 0.2s ease;
+}
+
+.clear-history:hover {
+  opacity: 1;
+
+  background: rgba(
+    128,
+    128,
+    128,
+    0.16
+  );
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 600px) {
+  .history-card {
+    border-radius: 14px;
+  }
+
+  .history-cover {
+    flex-basis: 48px;
+
+    width: 48px;
+    height: 65px;
+  }
+
+  .history-main {
+    gap: 11px;
+  }
+
+  .history-info strong {
+    font-size: 13px;
+  }
+
+  .history-delete {
+    flex-basis: 38px;
+  }
+}
