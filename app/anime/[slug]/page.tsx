@@ -19,6 +19,14 @@ interface AnimeData {
   totalEpisodes: number;
 }
 
+function getWatchKey(
+  slug: string,
+  season: number,
+  lang: string
+) {
+  return `anime_watched_${slug}_s${season}_${lang}`;
+}
+
 export default function AnimePage({
   params,
 }: {
@@ -59,10 +67,112 @@ export default function AnimePage({
     useState('');
 
   /*
-   * RÉCUPÉRATION DE L'AFFICHE
+   * ÉPISODES VUS
    *
-   * La page catalogue de l'anime
-   * est utilisée comme source.
+   * On stocke uniquement les numéros
+   * d'épisodes dans le navigateur.
+   */
+
+  const [watched, setWatched] =
+    useState<number[]>([]);
+
+  /*
+   * -------------------------------------------------------
+   * CHARGEMENT DES ÉPISODES VUS
+   * -------------------------------------------------------
+   */
+
+  useEffect(() => {
+    try {
+      const key = getWatchKey(
+        slug,
+        season,
+        lang
+      );
+
+      const raw =
+        localStorage.getItem(key);
+
+      if (!raw) {
+        setWatched([]);
+        return;
+      }
+
+      const parsed =
+        JSON.parse(raw);
+
+      if (Array.isArray(parsed)) {
+        setWatched(
+          parsed
+            .map(Number)
+            .filter(
+              (number) =>
+                Number.isInteger(
+                  number
+                ) &&
+                number >= 0
+            )
+        );
+      } else {
+        setWatched([]);
+      }
+    } catch {
+      setWatched([]);
+    }
+  }, [
+    slug,
+    season,
+    lang,
+  ]);
+
+  /*
+   * -------------------------------------------------------
+   * MARQUER UN ÉPISODE COMME VU
+   * -------------------------------------------------------
+   */
+
+  const markEpisodeAsWatched = (
+    episodeIndex: number
+  ) => {
+    try {
+      const key = getWatchKey(
+        slug,
+        season,
+        lang
+      );
+
+      setWatched((current) => {
+        if (
+          current.includes(
+            episodeIndex
+          )
+        ) {
+          return current;
+        }
+
+        const next = [
+          ...current,
+          episodeIndex,
+        ].sort(
+          (a, b) => a - b
+        );
+
+        localStorage.setItem(
+          key,
+          JSON.stringify(next)
+        );
+
+        return next;
+      });
+    } catch {
+      // localStorage indisponible
+    }
+  };
+
+  /*
+   * -------------------------------------------------------
+   * AFFICHES
+   * -------------------------------------------------------
    */
 
   useEffect(() => {
@@ -74,7 +184,10 @@ export default function AnimePage({
         const response =
           await fetch(
             `/api/search?q=${encodeURIComponent(
-              slug.replace(/-/g, ' ')
+              slug.replace(
+                /-/g,
+                ' '
+              )
             )}`,
             {
               signal:
@@ -98,7 +211,8 @@ export default function AnimePage({
           const exact =
             json.results.find(
               (item: any) =>
-                item.slug === slug
+                item.slug ===
+                slug
             );
 
           if (exact?.image) {
@@ -119,7 +233,9 @@ export default function AnimePage({
   }, [slug]);
 
   /*
+   * -------------------------------------------------------
    * FAVORIS
+   * -------------------------------------------------------
    */
 
   useEffect(() => {
@@ -165,7 +281,9 @@ export default function AnimePage({
   }, [slug]);
 
   /*
+   * -------------------------------------------------------
    * CHARGEMENT ANIME
+   * -------------------------------------------------------
    */
 
   useEffect(() => {
@@ -223,6 +341,7 @@ export default function AnimePage({
           'AbortError'
         ) {
           console.error(err);
+
           setError(true);
           setData(null);
         }
@@ -245,6 +364,12 @@ export default function AnimePage({
     lang,
   ]);
 
+  /*
+   * -------------------------------------------------------
+   * ÉPISODES
+   * -------------------------------------------------------
+   */
+
   const episodes = useMemo(() => {
     if (
       !data?.players?.[player]
@@ -263,6 +388,12 @@ export default function AnimePage({
 
   const videoUrl =
     episodes[episode] || '';
+
+  /*
+   * -------------------------------------------------------
+   * FAVORI
+   * -------------------------------------------------------
+   */
 
   const toggleFavorite = () => {
     try {
@@ -305,7 +436,8 @@ export default function AnimePage({
         favorites.push({
           name,
           slug,
-          image: poster || undefined,
+          image:
+            poster || undefined,
         });
       }
 
@@ -336,33 +468,53 @@ export default function AnimePage({
     )
     .join(' ');
 
+  /*
+   * -------------------------------------------------------
+   * LOADING
+   * -------------------------------------------------------
+   */
+
   if (loading) {
     return (
       <main className="page">
         <div className="loading-page">
           <span className="loader large" />
+
           <p>
-            Chargement des épisodes…
+            Chargement des
+            épisodes…
           </p>
         </div>
       </main>
     );
   }
 
-  if (error || !data) {
+  /*
+   * -------------------------------------------------------
+   * ERREUR
+   * -------------------------------------------------------
+   */
+
+  if (
+    error ||
+    !data
+  ) {
     return (
       <main className="page">
         <div className="error-card">
-          <span>⚠️</span>
+
+          <span>
+            ⚠️
+          </span>
 
           <h2>
-            Impossible de charger
-            cet anime
+            Impossible de
+            charger cet anime
           </h2>
 
           <p>
-            La source n'a pas répondu
-            correctement.
+            La source n'a pas
+            répondu correctement.
           </p>
 
           <Link
@@ -371,10 +523,17 @@ export default function AnimePage({
           >
             Retour à l'accueil
           </Link>
+
         </div>
       </main>
     );
   }
+
+  /*
+   * -------------------------------------------------------
+   * PAGE
+   * -------------------------------------------------------
+   */
 
   return (
     <main className="page anime-page">
@@ -434,6 +593,10 @@ export default function AnimePage({
 
       </header>
 
+      {/* ===================================================
+          LECTEUR
+          =================================================== */}
+
       <section className="player-container">
 
         {videoUrl ? (
@@ -445,17 +608,36 @@ export default function AnimePage({
             }`}
             allowFullScreen
             className="video-frame"
+            onLoad={() => {
+              /*
+               * L'épisode est considéré comme vu
+               * dès que son lecteur a correctement
+               * été chargé.
+               */
+              markEpisodeAsWatched(
+                episode
+              );
+            }}
           />
         ) : (
           <div className="player-empty">
-            <span>▶</span>
+
+            <span>
+              ▶
+            </span>
+
             <p>
               Lecteur indisponible
             </p>
+
           </div>
         )}
 
       </section>
+
+      {/* ===================================================
+          CONTRÔLES
+          =================================================== */}
 
       <section className="episode-controls">
 
@@ -573,6 +755,10 @@ export default function AnimePage({
 
       </section>
 
+      {/* ===================================================
+          ÉPISODES
+          =================================================== */}
+
       <section className="episodes-section">
 
         <div className="section-header">
@@ -598,29 +784,47 @@ export default function AnimePage({
         <div className="episode-grid">
 
           {episodes.map(
-            (_, index) => (
-              <button
-                key={index}
-                className={
-                  episode === index
-                    ? 'episode active'
-                    : 'episode'
-                }
-                onClick={() => {
-                  setEpisode(
-                    index
-                  );
+            (_, index) => {
 
-                  window.scrollTo({
-                    top: 0,
-                    behavior:
-                      'smooth',
-                  });
-                }}
-              >
-                {index + 1}
-              </button>
-            )
+              const isWatched =
+                watched.includes(
+                  index
+                );
+
+              const isActive =
+                episode ===
+                index;
+
+              return (
+                <button
+                  key={index}
+                  className={[
+                    'episode',
+                    isActive
+                      ? 'active'
+                      : '',
+                    isWatched
+                      ? 'watched'
+                      : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => {
+                    setEpisode(
+                      index
+                    );
+
+                    window.scrollTo({
+                      top: 0,
+                      behavior:
+                        'smooth',
+                    });
+                  }}
+                >
+                  {index + 1}
+                </button>
+              );
+            }
           )}
 
         </div>
