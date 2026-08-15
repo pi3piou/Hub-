@@ -19,6 +19,16 @@ interface AnimeData {
   totalEpisodes: number;
 }
 
+interface ContinueItem {
+  slug: string;
+  name: string;
+  image?: string;
+  season: number;
+  episode: number;
+  lang: 'vostfr' | 'vf';
+  updatedAt: number;
+}
+
 function getWatchKey(
   slug: string,
   season: number,
@@ -27,58 +37,139 @@ function getWatchKey(
   return `anime_watched_${slug}_s${season}_${lang}`;
 }
 
+function getContinueKey(slug: string) {
+  return `anime_continue_${slug}`;
+}
+
+function getHistoryKey() {
+  return 'anime_history';
+}
+
+function getAnimeName(slug: string) {
+  return slug
+    .split('-')
+    .filter(Boolean)
+    .map(
+      (word) =>
+        word.charAt(0).toUpperCase() +
+        word.slice(1)
+    )
+    .join(' ');
+}
+
 export default function AnimePage({
   params,
 }: {
   params: { slug: string };
 }) {
-  const slug =
-    decodeURIComponent(params.slug);
+  const slug = decodeURIComponent(params.slug);
 
   const [lang, setLang] =
-    useState<'vostfr' | 'vf'>(
-      'vostfr'
-    );
+    useState<'vostfr' | 'vf'>('vostfr');
 
-  const [season, setSeason] =
-    useState(1);
-
-  const [player, setPlayer] =
-    useState(0);
-
-  const [episode, setEpisode] =
-    useState(0);
+  const [season, setSeason] = useState(1);
+  const [player, setPlayer] = useState(0);
+  const [episode, setEpisode] = useState(0);
 
   const [data, setData] =
-    useState<AnimeData | null>(
-      null
-    );
+    useState<AnimeData | null>(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const [error, setError] =
-    useState(false);
-
-  const [favorite, setFavorite] =
-    useState(false);
-
-  const [poster, setPoster] =
-    useState('');
-
-  /*
-   * ÉPISODES VUS
-   *
-   * On stocke uniquement les numéros
-   * d'épisodes dans le navigateur.
-   */
+  const [favorite, setFavorite] = useState(false);
+  const [poster, setPoster] = useState('');
 
   const [watched, setWatched] =
     useState<number[]>([]);
 
   /*
    * -------------------------------------------------------
-   * CHARGEMENT DES ÉPISODES VUS
+   * AFFICHE
+   * -------------------------------------------------------
+   */
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadPoster() {
+      try {
+        const response = await fetch(
+          `/api/search?q=${encodeURIComponent(
+            slug.replace(/-/g, ' ')
+          )}`,
+          {
+            signal: controller.signal,
+            cache: 'no-store',
+          }
+        );
+
+        if (!response.ok) return;
+
+        const json = await response.json();
+
+        if (Array.isArray(json.results)) {
+          const exact = json.results.find(
+            (item: any) =>
+              item.slug === slug
+          );
+
+          if (exact?.image) {
+            setPoster(exact.image);
+          }
+        }
+      } catch {
+        // Rien
+      }
+    }
+
+    loadPoster();
+
+    return () => controller.abort();
+  }, [slug]);
+
+  /*
+   * -------------------------------------------------------
+   * FAVORIS
+   * -------------------------------------------------------
+   */
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(
+        'anime_favorites'
+      );
+
+      if (!raw) return;
+
+      const favorites = JSON.parse(raw);
+
+      if (!Array.isArray(favorites)) return;
+
+      const current = favorites.find(
+        (item) =>
+          typeof item === 'string'
+            ? item === slug
+            : item?.slug === slug
+      );
+
+      if (
+        current &&
+        typeof current === 'object' &&
+        current.image
+      ) {
+        setPoster(current.image);
+      }
+
+      setFavorite(Boolean(current));
+    } catch {
+      setFavorite(false);
+    }
+  }, [slug]);
+
+  /*
+   * -------------------------------------------------------
+   * ÉPISODES VUS
    * -------------------------------------------------------
    */
 
@@ -90,16 +181,14 @@ export default function AnimePage({
         lang
       );
 
-      const raw =
-        localStorage.getItem(key);
+      const raw = localStorage.getItem(key);
 
       if (!raw) {
         setWatched([]);
         return;
       }
 
-      const parsed =
-        JSON.parse(raw);
+      const parsed = JSON.parse(raw);
 
       if (Array.isArray(parsed)) {
         setWatched(
@@ -107,9 +196,7 @@ export default function AnimePage({
             .map(Number)
             .filter(
               (number) =>
-                Number.isInteger(
-                  number
-                ) &&
+                Number.isInteger(number) &&
                 number >= 0
             )
         );
@@ -119,15 +206,151 @@ export default function AnimePage({
     } catch {
       setWatched([]);
     }
-  }, [
-    slug,
-    season,
-    lang,
-  ]);
+  }, [slug, season, lang]);
 
   /*
    * -------------------------------------------------------
-   * MARQUER UN ÉPISODE COMME VU
+   * CHARGEMENT ANIME
+   * -------------------------------------------------------
+   */
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function load() {
+      setLoading(true);
+      setError(false);
+
+      try {
+        const response = await fetch(
+          `/api/anime?slug=${encodeURIComponent(
+            slug
+          )}&saison=${season}&lang=${lang}`,
+          {
+            signal: controller.signal,
+            cache: 'no-store',
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            'Impossible de charger l’anime'
+          );
+        }
+
+        const json = await response.json();
+
+        if (json.error) {
+          throw new Error(json.error);
+        }
+
+        setData(json);
+
+        const defaultPlayer =
+          Number.isInteger(
+            json.defaultPlayerIndex
+          )
+            ? json.defaultPlayerIndex
+            : 0;
+
+        setPlayer(defaultPlayer);
+      } catch (err) {
+        if (
+          (err as Error).name !==
+          'AbortError'
+        ) {
+          console.error(err);
+          setError(true);
+          setData(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => controller.abort();
+  }, [slug, season, lang]);
+
+  /*
+   * -------------------------------------------------------
+   * ÉPISODES
+   * -------------------------------------------------------
+   */
+
+  const episodes = useMemo(() => {
+    if (!data?.players?.[player]) {
+      return [];
+    }
+
+    return data.players[player].urls || [];
+  }, [data, player]);
+
+  const videoUrl = episodes[episode] || '';
+
+  /*
+   * -------------------------------------------------------
+   * CONTINUER LA LECTURE
+   * -------------------------------------------------------
+   */
+
+  const saveContinue = (
+    episodeIndex: number
+  ) => {
+    try {
+      const item: ContinueItem = {
+        slug,
+        name: getAnimeName(slug),
+        image: poster || undefined,
+        season,
+        episode: episodeIndex,
+        lang,
+        updatedAt: Date.now(),
+      };
+
+      localStorage.setItem(
+        getContinueKey(slug),
+        JSON.stringify(item)
+      );
+
+      const historyRaw =
+        localStorage.getItem(
+          getHistoryKey()
+        );
+
+      let history: ContinueItem[] =
+        historyRaw
+          ? JSON.parse(historyRaw)
+          : [];
+
+      if (!Array.isArray(history)) {
+        history = [];
+      }
+
+      history = history.filter(
+        (item) =>
+          item.slug !== slug
+      );
+
+      history.unshift(item);
+
+      localStorage.setItem(
+        getHistoryKey(),
+        JSON.stringify(
+          history.slice(0, 20)
+        )
+      );
+    } catch {
+      // localStorage indisponible
+    }
+  };
+
+  /*
+   * -------------------------------------------------------
+   * MARQUER COMME VU
    * -------------------------------------------------------
    */
 
@@ -153,9 +376,7 @@ export default function AnimePage({
         const next = [
           ...current,
           episodeIndex,
-        ].sort(
-          (a, b) => a - b
-        );
+        ].sort((a, b) => a - b);
 
         localStorage.setItem(
           key,
@@ -164,230 +385,12 @@ export default function AnimePage({
 
         return next;
       });
+
+      saveContinue(episodeIndex);
     } catch {
-      // localStorage indisponible
+      // Rien
     }
   };
-
-  /*
-   * -------------------------------------------------------
-   * AFFICHES
-   * -------------------------------------------------------
-   */
-
-  useEffect(() => {
-    const controller =
-      new AbortController();
-
-    async function loadPoster() {
-      try {
-        const response =
-          await fetch(
-            `/api/search?q=${encodeURIComponent(
-              slug.replace(
-                /-/g,
-                ' '
-              )
-            )}`,
-            {
-              signal:
-                controller.signal,
-              cache: 'no-store',
-            }
-          );
-
-        if (!response.ok) {
-          return;
-        }
-
-        const json =
-          await response.json();
-
-        if (
-          Array.isArray(
-            json.results
-          )
-        ) {
-          const exact =
-            json.results.find(
-              (item: any) =>
-                item.slug ===
-                slug
-            );
-
-          if (exact?.image) {
-            setPoster(
-              exact.image
-            );
-          }
-        }
-      } catch {
-        // Rien
-      }
-    }
-
-    loadPoster();
-
-    return () =>
-      controller.abort();
-  }, [slug]);
-
-  /*
-   * -------------------------------------------------------
-   * FAVORIS
-   * -------------------------------------------------------
-   */
-
-  useEffect(() => {
-    try {
-      const raw =
-        localStorage.getItem(
-          'anime_favorites'
-        );
-
-      if (!raw) return;
-
-      const favorites =
-        JSON.parse(raw);
-
-      if (Array.isArray(favorites)) {
-        const current =
-          favorites.find(
-            (item) =>
-              typeof item ===
-                'string'
-                ? item === slug
-                : item?.slug === slug
-          );
-
-        if (
-          current &&
-          typeof current ===
-            'object' &&
-          current.image
-        ) {
-          setPoster(
-            current.image
-          );
-        }
-
-        setFavorite(
-          Boolean(current)
-        );
-      }
-    } catch {
-      setFavorite(false);
-    }
-  }, [slug]);
-
-  /*
-   * -------------------------------------------------------
-   * CHARGEMENT ANIME
-   * -------------------------------------------------------
-   */
-
-  useEffect(() => {
-    const controller =
-      new AbortController();
-
-    async function load() {
-      setLoading(true);
-      setError(false);
-      setEpisode(0);
-
-      try {
-        const response =
-          await fetch(
-            `/api/anime?slug=${encodeURIComponent(
-              slug
-            )}&saison=${season}&lang=${lang}`,
-            {
-              signal:
-                controller.signal,
-              cache: 'no-store',
-            }
-          );
-
-        if (!response.ok) {
-          throw new Error(
-            'Impossible de charger l’anime'
-          );
-        }
-
-        const json =
-          await response.json();
-
-        if (json.error) {
-          throw new Error(
-            json.error
-          );
-        }
-
-        setData(json);
-
-        const defaultPlayer =
-          Number.isInteger(
-            json.defaultPlayerIndex
-          )
-            ? json.defaultPlayerIndex
-            : 0;
-
-        setPlayer(
-          defaultPlayer
-        );
-      } catch (err) {
-        if (
-          (err as Error).name !==
-          'AbortError'
-        ) {
-          console.error(err);
-
-          setError(true);
-          setData(null);
-        }
-      } finally {
-        if (
-          !controller.signal.aborted
-        ) {
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
-
-    return () =>
-      controller.abort();
-  }, [
-    slug,
-    season,
-    lang,
-  ]);
-
-  /*
-   * -------------------------------------------------------
-   * ÉPISODES
-   * -------------------------------------------------------
-   */
-
-  const episodes = useMemo(() => {
-    if (
-      !data?.players?.[player]
-    ) {
-      return [];
-    }
-
-    return (
-      data.players[player]
-        .urls || []
-    );
-  }, [
-    data,
-    player,
-  ]);
-
-  const videoUrl =
-    episodes[episode] || '';
 
   /*
    * -------------------------------------------------------
@@ -414,59 +417,30 @@ export default function AnimePage({
         favorites =
           favorites.filter(
             (item: any) =>
-              (typeof item ===
-              'string'
+              (typeof item === 'string'
                 ? item
-                : item?.slug) !==
-              slug
+                : item?.slug) !== slug
           );
       } else {
-        const name = slug
-          .split('-')
-          .filter(Boolean)
-          .map(
-            (word) =>
-              word
-                .charAt(0)
-                .toUpperCase() +
-              word.slice(1)
-          )
-          .join(' ');
-
         favorites.push({
-          name,
+          name: getAnimeName(slug),
           slug,
-          image:
-            poster || undefined,
+          image: poster || undefined,
         });
       }
 
       localStorage.setItem(
         'anime_favorites',
-        JSON.stringify(
-          favorites
-        )
+        JSON.stringify(favorites)
       );
 
-      setFavorite(
-        !favorite
-      );
+      setFavorite(!favorite);
     } catch (err) {
       console.error(err);
     }
   };
 
-  const title = slug
-    .split('-')
-    .filter(Boolean)
-    .map(
-      (word) =>
-        word
-          .charAt(0)
-          .toUpperCase() +
-        word.slice(1)
-    )
-    .join(' ');
+  const title = getAnimeName(slug);
 
   /*
    * -------------------------------------------------------
@@ -479,10 +453,8 @@ export default function AnimePage({
       <main className="page">
         <div className="loading-page">
           <span className="loader large" />
-
           <p>
-            Chargement des
-            épisodes…
+            Chargement des épisodes…
           </p>
         </div>
       </main>
@@ -495,26 +467,20 @@ export default function AnimePage({
    * -------------------------------------------------------
    */
 
-  if (
-    error ||
-    !data
-  ) {
+  if (error || !data) {
     return (
       <main className="page">
         <div className="error-card">
-
-          <span>
-            ⚠️
-          </span>
+          <span>⚠️</span>
 
           <h2>
-            Impossible de
-            charger cet anime
+            Impossible de charger
+            cet anime
           </h2>
 
           <p>
-            La source n'a pas
-            répondu correctement.
+            La source n'a pas répondu
+            correctement.
           </p>
 
           <Link
@@ -523,7 +489,6 @@ export default function AnimePage({
           >
             Retour à l'accueil
           </Link>
-
         </div>
       </main>
     );
@@ -548,31 +513,9 @@ export default function AnimePage({
         </Link>
 
         <div className="anime-title">
+          <span>ANIME</span>
 
-          {poster && (
-            <img
-              src={poster}
-              alt=""
-              style={{
-                position:
-                  'absolute',
-                width: 1,
-                height: 1,
-                opacity: 0,
-                pointerEvents:
-                  'none',
-              }}
-            />
-          )}
-
-          <span>
-            ANIME
-          </span>
-
-          <h1>
-            {title}
-          </h1>
-
+          <h1>{title}</h1>
         </div>
 
         <button
@@ -586,16 +529,12 @@ export default function AnimePage({
           }
           aria-label="Favori"
         >
-          {favorite
-            ? '★'
-            : '☆'}
+          {favorite ? '★' : '☆'}
         </button>
 
       </header>
 
-      {/* ===================================================
-          LECTEUR
-          =================================================== */}
+      {/* LECTEUR */}
 
       <section className="player-container">
 
@@ -609,11 +548,6 @@ export default function AnimePage({
             allowFullScreen
             className="video-frame"
             onLoad={() => {
-              /*
-               * L'épisode est considéré comme vu
-               * dès que son lecteur a correctement
-               * été chargé.
-               */
               markEpisodeAsWatched(
                 episode
               );
@@ -621,23 +555,55 @@ export default function AnimePage({
           />
         ) : (
           <div className="player-empty">
-
-            <span>
-              ▶
-            </span>
-
+            <span>▶</span>
             <p>
               Lecteur indisponible
             </p>
-
           </div>
         )}
 
       </section>
 
-      {/* ===================================================
-          CONTRÔLES
-          =================================================== */}
+      {/* INFO PROGRESSION */}
+
+      <section className="anime-progress">
+
+        <div className="progress-info">
+
+          <span>
+            Saison {season}
+          </span>
+
+          <strong>
+            {watched.length} /{' '}
+            {episodes.length} épisodes vus
+          </strong>
+
+        </div>
+
+        <div className="progress-track">
+
+          <div
+            className="progress-value"
+            style={{
+              width: `${
+                episodes.length
+                  ? Math.min(
+                      100,
+                      (watched.length /
+                        episodes.length) *
+                        100
+                    )
+                  : 0
+              }%`,
+            }}
+          />
+
+        </div>
+
+      </section>
+
+      {/* CONTRÔLES */}
 
       <section className="episode-controls">
 
@@ -647,15 +613,12 @@ export default function AnimePage({
 
             <button
               className={
-                lang ===
-                'vostfr'
+                lang === 'vostfr'
                   ? 'selected'
                   : ''
               }
               onClick={() => {
-                setLang(
-                  'vostfr'
-                );
+                setLang('vostfr');
                 setEpisode(0);
               }}
             >
@@ -682,13 +645,10 @@ export default function AnimePage({
 
           <select
             value={season}
-            onChange={(
-              event
-            ) => {
+            onChange={(event) => {
               const value =
                 Number(
-                  event.target
-                    .value
+                  event.target.value
                 );
 
               setSeason(value);
@@ -711,8 +671,7 @@ export default function AnimePage({
 
         </div>
 
-        {data.players.length >
-          1 && (
+        {data.players.length > 1 && (
           <div className="players">
 
             <span>
@@ -722,25 +681,17 @@ export default function AnimePage({
             <div className="player-list">
 
               {data.players.map(
-                (
-                  item,
-                  index
-                ) => (
+                (item, index) => (
                   <button
                     key={`${item.name}-${index}`}
                     className={
-                      player ===
-                      index
+                      player === index
                         ? 'player-selected'
                         : ''
                     }
                     onClick={() => {
-                      setPlayer(
-                        index
-                      );
-                      setEpisode(
-                        0
-                      );
+                      setPlayer(index);
+                      setEpisode(0);
                     }}
                   >
                     {item.name}
@@ -755,16 +706,13 @@ export default function AnimePage({
 
       </section>
 
-      {/* ===================================================
-          ÉPISODES
-          =================================================== */}
+      {/* ÉPISODES */}
 
       <section className="episodes-section">
 
         <div className="section-header">
 
           <div>
-
             <span className="section-eyebrow">
               SAISON {season}
             </span>
@@ -772,7 +720,6 @@ export default function AnimePage({
             <h2>
               Épisodes
             </h2>
-
           </div>
 
           <span className="episode-count">
@@ -792,8 +739,7 @@ export default function AnimePage({
                 );
 
               const isActive =
-                episode ===
-                index;
+                episode === index;
 
               return (
                 <button
@@ -810,9 +756,9 @@ export default function AnimePage({
                     .filter(Boolean)
                     .join(' ')}
                   onClick={() => {
-                    setEpisode(
-                      index
-                    );
+                    setEpisode(index);
+
+                    saveContinue(index);
 
                     window.scrollTo({
                       top: 0,
@@ -829,12 +775,10 @@ export default function AnimePage({
 
         </div>
 
-        {episodes.length ===
-          0 && (
+        {episodes.length === 0 && (
           <div className="empty-card">
-            Aucun épisode
-            disponible pour
-            cette sélection.
+            Aucun épisode disponible
+            pour cette sélection.
           </div>
         )}
 
