@@ -1259,3 +1259,147 @@ a {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* =========================================================
+   FICHE ANIME
+   ========================================================= */
+
+.anime-details {
+  display: flex;
+  gap: 15px;
+
+  margin: 20px 0 24px;
+  padding: 15px;
+
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+
+  background: var(--surface);
+
+  box-shadow:
+    0 15px 40px rgba(0, 0, 0, 0.18);
+}
+
+.anime-details-poster {
+  flex: 0 0 105px;
+
+  width: 105px;
+  height: 148px;
+
+  overflow: hidden;
+
+  border-radius: var(--radius-md);
+
+  background: var(--surface-solid);
+}
+
+.anime-details-poster img {
+  display: block;
+
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+}
+
+.anime-details-content {
+  min-width: 0;
+}
+
+.anime-details-content
+.section-eyebrow {
+  margin-bottom: 5px;
+}
+
+.anime-details-content h2 {
+  margin: 0;
+
+  overflow: hidden;
+
+  font-size: 18px;
+  line-height: 1.15;
+
+  letter-spacing: -0.025em;
+
+  text-overflow: ellipsis;
+}
+
+.anime-meta {
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 5px;
+
+  margin-top: 9px;
+}
+
+.anime-meta span {
+  padding: 4px 7px;
+
+  border-radius: 7px;
+
+  background: var(--accent-tint);
+
+  color: var(--accent-light);
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.anime-genres {
+  display: flex;
+  flex-wrap: wrap;
+
+  gap: 5px;
+
+  margin-top: 9px;
+}
+
+.anime-genres span {
+  color: var(--text-muted);
+
+  font-size: 9px;
+}
+
+.anime-genres span:not(:last-child)::after {
+  content: " •";
+
+  margin-left: 5px;
+
+  color: var(--text-dim);
+}
+
+.anime-description {
+  display: -webkit-box;
+
+  margin: 10px 0 0;
+
+  overflow: hidden;
+
+  color: var(--text-muted);
+
+  font-size: 11px;
+  line-height: 1.5;
+
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+}
+
+@media (max-width: 430px) {
+  .anime-details {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .anime-details-poster {
+    flex-basis: 90px;
+
+    width: 90px;
+    height: 127px;
+  }
+
+  .anime-details-content h2 {
+    font-size: 16px;
+  }
+}
+
