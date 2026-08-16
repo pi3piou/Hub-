@@ -10,11 +10,17 @@ const items = [
     icon: '⌂',
   },
   {
+    href: '/planning',
+    label: 'Planning',
+    icon: '◷',
+  },
+  {
     href: '/favorites',
     label: 'Favoris',
     icon: '★',
   },
 ];
+
 
 export default function Navbar() {
   const pathname = usePathname();
