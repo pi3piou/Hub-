@@ -13,6 +13,16 @@ interface Player {
   urls: string[];
 }
 
+interface AnimeInfo {
+  title: string;
+  description: string;
+  image: string;
+  genres: string[];
+  status: string;
+  year: string;
+  type: string;
+}
+
 interface AnimeData {
   slug: string;
   saison: number;
@@ -22,6 +32,7 @@ interface AnimeData {
   players: Player[];
   defaultPlayerIndex: number;
   totalEpisodes: number;
+  info: AnimeInfo;
 }
 
 interface ContinueItem {
