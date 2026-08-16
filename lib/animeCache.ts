@@ -24,11 +24,15 @@ export interface EpisodesData {
   slug: string;
   saison: number;
   lang: 'vostfr' | 'vf';
+  requestedLang: 'vostfr' | 'vf';
+  fallback: boolean;
   players: Player[];
   defaultPlayerIndex: number;
   totalEpisodes: number;
   hasVF: boolean;
+  hasVOSTFR: boolean;
 }
+
 
 export interface AnimeInfoData {
   slug: string;
