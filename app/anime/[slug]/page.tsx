@@ -818,6 +818,82 @@ export default function AnimePage({
 
       </section>
 
+{/* FICHE ANIME */}
+
+<section className="anime-details">
+
+  {data.info.image && (
+    <div className="anime-details-poster">
+      <img
+        src={data.info.image}
+        alt={data.info.title || title}
+      />
+    </div>
+  )}
+
+  <div className="anime-details-content">
+
+    <span className="section-eyebrow">
+      FICHE ANIME
+    </span>
+
+    <h2>
+      {data.info.title || title}
+    </h2>
+
+    <div className="anime-meta">
+
+      {data.info.year && (
+        <span>
+          {data.info.year}
+        </span>
+      )}
+
+      {data.info.type && (
+        <span>
+          {data.info.type}
+        </span>
+      )}
+
+      {data.info.status && (
+        <span>
+          {data.info.status}
+        </span>
+      )}
+
+      <span>
+        {data.totalSeasons}{' '}
+        {data.totalSeasons > 1
+          ? 'saisons'
+          : 'saison'}
+      </span>
+
+    </div>
+
+    {data.info.genres.length > 0 && (
+      <div className="anime-genres">
+
+        {data.info.genres.map(
+          (genre) => (
+            <span key={genre}>
+              {genre}
+            </span>
+          )
+        )}
+
+      </div>
+    )}
+
+    {data.info.description && (
+      <p className="anime-description">
+        {data.info.description}
+      </p>
+    )}
+
+  </div>
+
+</section>
+
       {/* INFO PROGRESSION */}
 
       <section className="anime-progress">
@@ -1026,9 +1102,29 @@ export default function AnimePage({
                         : ''
                     }
                     onClick={() => {
-                      setPlayer(index);
-                      setEpisode(0);
-                    }}
+  const currentEpisode =
+    episode;
+
+  setPlayer(index);
+
+  const newPlayerEpisodes =
+    data.players[index]?.urls || [];
+
+  if (
+    newPlayerEpisodes.length === 0
+  ) {
+    return;
+  }
+
+  if (
+    currentEpisode >=
+    newPlayerEpisodes.length
+  ) {
+    setEpisode(
+      newPlayerEpisodes.length - 1
+    );
+  }
+}}
                   >
                     {item.name}
                   </button>
