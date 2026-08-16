@@ -251,6 +251,25 @@ export default function AnimeSeasonPage({
 
   /*
    * =======================================================
+   * BASCULE AUTOMATIQUE DE LANGUE
+   *
+   * Certains animes n'existent qu'en VF : l'API nous
+   * renvoie alors la langue disponible.
+   * =======================================================
+   */
+
+  useEffect(() => {
+    if (!data) return;
+
+    if (data.lang && data.lang !== lang) {
+      setLang(data.lang);
+    }
+  }, [data, lang]);
+
+
+
+  /*
+   * =======================================================
    * BORNAGE DE L'ÉPISODE
    * =======================================================
    */
@@ -700,18 +719,20 @@ export default function AnimeSeasonPage({
 
         <div className="control-row">
 
-          <div className="segmented">
+                <div className="segmented">
 
-            <button
-              className={
-                lang === 'vostfr'
-                  ? 'selected'
-                  : ''
-              }
-              onClick={() => setLang('vostfr')}
-            >
-              VOSTFR
-            </button>
+            {data?.hasVOSTFR !== false && (
+              <button
+                className={
+                  lang === 'vostfr'
+                    ? 'selected'
+                    : ''
+                }
+                onClick={() => setLang('vostfr')}
+              >
+                VOSTFR
+              </button>
+            )}
 
             {data?.hasVF && (
               <button
@@ -725,6 +746,7 @@ export default function AnimeSeasonPage({
             )}
 
           </div>
+
 
           <select
             value={season}
