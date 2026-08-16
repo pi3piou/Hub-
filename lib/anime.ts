@@ -15,8 +15,15 @@ export interface Player {
   urls: string[];
 }
 
+export interface SeasonEntry {
+  number: number;
+  label: string;
+  langs: string[];
+}
+
 export interface AnimeInfo {
   name: string;
+  altTitles: string[];
   slug: string;
   image: string;
   synopsis: string;
@@ -39,11 +46,14 @@ export function cleanUrl(value: string) {
 
 export function cleanText(value: string) {
   return value
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
     .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
+    .replace(/&#0?39;/gi, "'")
+    .replace(/&#x27;/gi, "'")
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/\s+/g, ' ')
@@ -111,12 +121,6 @@ export async function fetchText(
     const response = await fetch(url, {
       signal: controller.signal,
 
-      /*
-       * Cache de données Next : la même page
-       * n'est re-scrapée qu'une fois par
-       * intervalle, quel que soit le nombre
-       * de visiteurs.
-       */
       next: { revalidate },
 
       headers: {
@@ -157,11 +161,7 @@ export async function fetchEpisodes(
 }
 
 export function fetchCatalogue(slug: string) {
-  const url =
-    `${BASE_URL}/catalogue/` +
-    `${encodeURIComponent(slug)}/`;
-
-  return fetchText(url, 3600);
+  return fetchText(getCatalogueUrl(slug), 3600);
 }
 
 export function getCatalogueUrl(slug: string) {
@@ -172,15 +172,15 @@ export function getCatalogueUrl(slug: string) {
 }
 
 /* =========================================================
-   FICHE
+   TITRE
    ========================================================= */
 
 export function extractTitle(html: string) {
   const patterns = [
     /<h1[^>]*>([\s\S]*?)<\/h1>/i,
-    /<title[^>]*>([\s\S]*?)<\/title>/i,
     /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
     /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i,
+    /<title[^>]*>([\s\S]*?)<\/title>/i,
   ];
 
   for (const regex of patterns) {
@@ -207,6 +207,58 @@ export function extractTitle(html: string) {
 
   return '';
 }
+
+/*
+ * Titres alternatifs : Anime-Sama les place dans
+ * un conteneur dédié, en général séparés par des
+ * virgules. On retombe sur une recherche par
+ * libellé si la structure change.
+ */
+export function extractAltTitles(
+  html: string,
+  mainTitle: string
+) {
+  const patterns = [
+    /id=["']titreAlter["'][^>]*>([\s\S]*?)<\//i,
+    /class=["'][^"']*titreAlter[^"']*["'][^>]*>([\s\S]*?)<\//i,
+    /Titres?\s+alternatifs?\s*[:\-]?\s*<[^>]*>([\s\S]{1,300}?)<\//i,
+    /Titres?\s+alternatifs?\s*[:\-]\s*([^<\n]{1,300})/i,
+  ];
+
+  for (const regex of patterns) {
+    const match = html.match(regex);
+
+    if (!match?.[1]) continue;
+
+    const text = cleanText(match[1]);
+
+    if (!text) continue;
+
+    const titles = text
+      .split(/[,;/]|\s+\|\s+/)
+      .map((item) => item.trim())
+      .filter(
+        (item) =>
+          item.length > 1 &&
+          item.length < 120 &&
+          item.toLowerCase() !==
+            mainTitle.toLowerCase()
+      );
+
+    if (titles.length) {
+      return Array.from(new Set(titles)).slice(
+        0,
+        6
+      );
+    }
+  }
+
+  return [];
+}
+
+/* =========================================================
+   IMAGE
+   ========================================================= */
 
 export function extractMainImage(
   html: string,
@@ -238,11 +290,16 @@ export function extractMainImage(
   return '';
 }
 
+/* =========================================================
+   SYNOPSIS
+   ========================================================= */
+
 export function extractSynopsis(html: string) {
   const patterns = [
+    /Synopsis\s*<\/h[1-6]>([\s\S]{20,4000}?)<\/(?:p|div|section)>/i,
+    /class=["'][^"']*(?:synopsis|description|resume|résumé)[^"']*["'][^>]*>([\s\S]{20,4000}?)<\/(?:p|div|section)>/i,
     /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
     /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i,
-    /<[^>]+class=["'][^"']*(?:synopsis|description|resume|résumé)[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i,
   ];
 
   for (const regex of patterns) {
@@ -251,7 +308,12 @@ export function extractSynopsis(html: string) {
     if (match?.[1]) {
       const value = cleanText(match[1]);
 
-      if (value.length > 20) {
+      if (
+        value.length > 40 &&
+        !value
+          .toLowerCase()
+          .startsWith('anime-sama')
+      ) {
         return value;
       }
     }
@@ -260,35 +322,45 @@ export function extractSynopsis(html: string) {
   return '';
 }
 
+/* =========================================================
+   GENRES
+   ========================================================= */
+
 export function extractGenres(html: string) {
   const genres = new Set<string>();
 
-  const classPatterns = [
-    /class=["'][^"']*genre[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/gi,
-    /class=["'][^"']*genres[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/gi,
+  const blockPatterns = [
+    /Genres?\s*<\/h[1-6]>([\s\S]{1,600}?)<\/(?:p|div|section)>/i,
+    /Genres?\s*[:\-]\s*([^<\n]{1,300})/i,
+    /class=["'][^"']*genres?[^"']*["'][^>]*>([\s\S]{1,600}?)<\/(?:p|div|section|ul)>/i,
   ];
 
-  for (const regex of classPatterns) {
-    for (const match of html.matchAll(regex)) {
-      const text = cleanText(match[1]);
+  for (const regex of blockPatterns) {
+    const match = html.match(regex);
 
-      if (!text) continue;
+    if (!match?.[1]) continue;
 
-      const parts = text
-        .split(/[,|/]/)
-        .map((item) => item.trim())
-        .filter(Boolean);
+    const text = cleanText(match[1]);
 
-      for (const genre of parts) {
-        if (genre.length < 40) {
-          genres.add(genre);
-        }
+    if (!text) continue;
+
+    for (const part of text.split(/[,;|/]/)) {
+      const genre = part.trim();
+
+      if (genre.length > 1 && genre.length < 30) {
+        genres.add(genre);
       }
     }
+
+    if (genres.size) break;
   }
 
   return Array.from(genres).slice(0, 12);
 }
+
+/* =========================================================
+   CHAMPS LIBRES
+   ========================================================= */
 
 export function extractField(
   html: string,
@@ -302,12 +374,17 @@ export function extractField(
 
     const patterns = [
       new RegExp(
-        `${escaped}\\s*[:\\-]?\\s*([^<\\n]{1,100})`,
+        `${escaped}\\s*<\\/h[1-6]>\\s*<[^>]*>([^<]{1,80})<`,
         'i'
       ),
 
       new RegExp(
-        `${escaped}[\\s\\S]{0,150}?<[^>]+>([^<]{1,100})<`,
+        `${escaped}\\s*[:\\-]\\s*([^<\\n]{1,80})`,
+        'i'
+      ),
+
+      new RegExp(
+        `${escaped}[\\s\\S]{0,150}?<[^>]+>([^<]{1,80})<`,
         'i'
       ),
     ];
@@ -318,7 +395,7 @@ export function extractField(
       if (match?.[1]) {
         const value = cleanText(match[1]);
 
-        if (value) {
+        if (value && value.length > 1) {
           return value;
         }
       }
@@ -328,13 +405,75 @@ export function extractField(
   return '';
 }
 
+/*
+ * L'année n'est pas toujours étiquetée : à défaut,
+ * on cherche une année plausible dans la page.
+ */
+export function extractYear(html: string) {
+  const labelled = extractField(html, [
+    'Année',
+    'Annee',
+    'Year',
+    'Date de sortie',
+  ]);
+
+  const fromLabel = labelled.match(/(19|20)\d{2}/);
+
+  if (fromLabel) return fromLabel[0];
+
+  const match = html.match(
+    /\b(19[7-9]\d|20[0-4]\d)\b/
+  );
+
+  return match ? match[0] : '';
+}
+
+export function extractType(html: string) {
+  const value = extractField(html, [
+    'Type',
+    'Format',
+  ]);
+
+  if (value) {
+    const upper = value.toUpperCase();
+
+    for (const known of [
+      'OVA',
+      'ONA',
+      'FILM',
+      'MOVIE',
+      'SPECIAL',
+      'TV',
+    ]) {
+      if (upper.includes(known)) {
+        return known === 'MOVIE'
+          ? 'Film'
+          : known;
+      }
+    }
+
+    return value;
+  }
+
+  return 'Série';
+}
+
+/* =========================================================
+   FICHE COMPLÈTE
+   ========================================================= */
+
 export function extractAnimeInfo(
   html: string,
   slug: string,
   pageUrl: string
 ): AnimeInfo {
+  const name =
+    extractTitle(html) || slugToName(slug);
+
   return {
-    name: extractTitle(html) || slugToName(slug),
+    name,
+
+    altTitles: extractAltTitles(html, name),
 
     image:
       extractMainImage(html, pageUrl) ||
@@ -345,17 +484,15 @@ export function extractAnimeInfo(
     genres: extractGenres(html),
 
     status:
-      extractField(html, ['Statut', 'Status']) ||
-      '',
-
-    year:
       extractField(html, [
-        'Année',
-        'Annee',
-        'Year',
+        'Statut',
+        'Status',
+        'État',
       ]) || '',
 
-    type: extractField(html, ['Type']) || 'Série',
+    year: extractYear(html),
+
+    type: extractType(html),
 
     slug,
   };
@@ -363,33 +500,100 @@ export function extractAnimeInfo(
 
 /* =========================================================
    SAISONS
+   *
+   * Anime-Sama déclare ses saisons via des appels
+   * panneauAnime("Saison 1", "saison1/vostfr").
+   * C'est bien plus fiable que de scanner le HTML,
+   * qui contient aussi les recommandations.
    ========================================================= */
 
-export function parseSeasons(html: string) {
-  const seasons = new Set<number>();
+export function parseSeasons(
+  html: string
+): SeasonEntry[] {
+  const found = new Map<number, SeasonEntry>();
 
-  const patterns = [
-    /saison\s*(\d+)/gi,
-    /saison(\d+)/gi,
-  ];
+  const regex =
+    /panneauAnime\(\s*["'`]([^"'`]*)["'`]\s*,\s*["'`]([^"'`]*)["'`]\s*\)/gi;
 
-  for (const regex of patterns) {
-    for (const match of html.matchAll(regex)) {
-      const number = Number(match[1]);
+  for (const match of html.matchAll(regex)) {
+    const label = match[1].trim();
+    const path = match[2].trim();
 
-      if (
-        Number.isInteger(number) &&
-        number >= 1 &&
-        number <= 100
-      ) {
-        seasons.add(number);
+    /* Modèle laissé en commentaire par le site */
+    if (
+      !label ||
+      !path ||
+      label.toLowerCase() === 'nom' ||
+      path.toLowerCase() === 'url'
+    ) {
+      continue;
+    }
+
+    const seasonMatch = path.match(
+      /saison\s*(\d+)/i
+    );
+
+    if (!seasonMatch) continue;
+
+    const number = Number(seasonMatch[1]);
+
+    if (
+      !Number.isInteger(number) ||
+      number < 1 ||
+      number > 100
+    ) {
+      continue;
+    }
+
+    const lang = /\bvf\b/i.test(path)
+      ? 'vf'
+      : 'vostfr';
+
+    const existing = found.get(number);
+
+    if (existing) {
+      if (!existing.langs.includes(lang)) {
+        existing.langs.push(lang);
       }
+    } else {
+      found.set(number, {
+        number,
+        label: label || `Saison ${number}`,
+        langs: [lang],
+      });
     }
   }
 
-  return Array.from(seasons).sort(
-    (a, b) => a - b
-  );
+  if (found.size) {
+    return Array.from(found.values()).sort(
+      (a, b) => a.number - b.number
+    );
+  }
+
+  /* Repli : ancienne méthode par balayage */
+  const fallback = new Set<number>();
+
+  for (const match of html.matchAll(
+    /saison\s*(\d+)/gi
+  )) {
+    const number = Number(match[1]);
+
+    if (
+      Number.isInteger(number) &&
+      number >= 1 &&
+      number <= 100
+    ) {
+      fallback.add(number);
+    }
+  }
+
+  return Array.from(fallback)
+    .sort((a, b) => a - b)
+    .map((number) => ({
+      number,
+      label: `Saison ${number}`,
+      langs: [],
+    }));
 }
 
 /* =========================================================
