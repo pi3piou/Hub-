@@ -10,13 +10,9 @@ import {
  * =========================================================
  * ÉPISODES D'UNE SAISON
  *
- * N'a pas besoin de la page catalogue : le fichier
- * episodes.js s'atteint directement depuis le slug
- * et le numéro de saison.
- *
- * Les deux langues partent en parallèle, ce qui
- * permet de savoir si la VF existe sans allonger
- * le temps de réponse.
+ * Les deux langues partent en parallèle. Si la langue
+ * demandée n'existe pas, on renvoie l'autre plutôt
+ * qu'une erreur : certains animes ne sont qu'en VF.
  * =========================================================
  */
 
@@ -52,7 +48,11 @@ export async function GET(request: Request) {
         fetchEpisodes(slug, season, otherLang),
       ]);
 
-    if (!requestedText) {
+    /*
+     * Aucune des deux langues : la saison
+     * n'existe vraiment pas.
+     */
+    if (!requestedText && !otherText) {
       return NextResponse.json(
         {
           error: 'Saison indisponible',
@@ -64,7 +64,19 @@ export async function GET(request: Request) {
       );
     }
 
-    const players = parsePlayers(requestedText);
+    const fallback = !requestedText;
+
+    const effectiveLang = fallback
+      ? otherLang
+      : lang;
+
+    const effectiveText = fallback
+      ? otherText
+      : requestedText;
+
+    const players = parsePlayers(
+      effectiveText as string
+    );
 
     const defaultPlayerIndex =
       getDefaultPlayerIndex(players);
@@ -74,27 +86,39 @@ export async function GET(request: Request) {
       players[0]?.urls.length ||
       0;
 
+    const hasVostfr =
+      lang === 'vostfr'
+        ? Boolean(requestedText)
+        : Boolean(otherText);
+
     const hasVF =
       lang === 'vf'
-        ? true
+        ? Boolean(requestedText)
         : Boolean(otherText);
 
     return NextResponse.json(
       {
         slug,
         saison: season,
-        lang,
+
+        /* Langue réellement servie */
+        lang: effectiveLang,
+
+        /* Langue initialement demandée */
+        requestedLang: lang,
+
+        /* true si on a dû basculer */
+        fallback,
+
         players,
         defaultPlayerIndex,
         totalEpisodes,
+
         hasVF,
+        hasVOSTFR: hasVostfr,
       },
       {
         headers: {
-          /*
-           * Les épisodes d'une saison en cours
-           * peuvent s'ajouter : cache plus court.
-           */
           'Cache-Control':
             'public, s-maxage=900, stale-while-revalidate=3600',
         },
