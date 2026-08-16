@@ -8,9 +8,10 @@ interface Player {
 }
 
 interface AnimeInfo {
-  title: string;
-  description: string;
+  name: string;
+  slug: string;
   image: string;
+  synopsis: string;
   genres: string[];
   status: string;
   year: string;
@@ -24,21 +25,319 @@ function cleanUrl(value: string) {
     .replace(/['"`;,]+$/, '');
 }
 
+function cleanText(value: string) {
+  return value
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function absoluteUrl(
+  value: string,
+  base: string
+) {
+  try {
+    return new URL(value, base).toString();
+  } catch {
+    return '';
+  }
+}
+
+function slugToName(slug: string) {
+  return slug
+    .split('-')
+    .filter(Boolean)
+    .map(
+      (word) =>
+        word.charAt(0).toUpperCase() +
+        word.slice(1)
+    )
+    .join(' ');
+}
+
+function cleanImageUrl(
+  value: string,
+  base: string
+) {
+  let url = value
+    .trim()
+    .replace(/^['"`]/, '')
+    .replace(/['"`;,]+$/, '');
+
+  if (
+    !url ||
+    url.startsWith('data:') ||
+    url.startsWith('javascript:')
+  ) {
+    return '';
+  }
+
+  return absoluteUrl(url, base);
+}
+
+/* =========================================================
+   INFOS FICHE ANIME
+   ========================================================= */
+
+function extractAnimeInfo(
+  html: string,
+  slug: string,
+  pageUrl: string
+): AnimeInfo {
+  const name =
+    extractTitle(html) ||
+    slugToName(slug);
+
+  const image =
+    extractMainImage(html, pageUrl) ||
+    `https://cdn.statically.io/gh/anime-sama/assets/main/catalogue/${slug}/cover.jpg`;
+
+  const synopsis =
+    extractSynopsis(html);
+
+  const genres =
+    extractGenres(html);
+
+  const status =
+    extractField(
+      html,
+      [
+        'Statut',
+        'Status',
+      ]
+    ) || '';
+
+  const year =
+    extractField(
+      html,
+      [
+        'Année',
+        'Annee',
+        'Year',
+      ]
+    ) || '';
+
+  const type =
+    extractField(
+      html,
+      [
+        'Type',
+      ]
+    ) || 'Série';
+
+  return {
+    name,
+    slug,
+    image,
+    synopsis,
+    genres,
+    status,
+    year,
+    type,
+  };
+}
+
+function extractTitle(html: string) {
+  const patterns = [
+    /<h1[^>]*>([\s\S]*?)<\/h1>/i,
+
+    /<title[^>]*>([\s\S]*?)<\/title>/i,
+
+    /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
+
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i,
+  ];
+
+  for (const regex of patterns) {
+    const match = html.match(regex);
+
+    if (match?.[1]) {
+      const value = cleanText(match[1]);
+
+      if (
+        value &&
+        !value.toLowerCase().includes('anime-sama')
+      ) {
+        return value
+          .replace(
+            /\s*[-|]\s*Anime[- ]Sama.*$/i,
+            ''
+          )
+          .trim();
+      }
+    }
+  }
+
+  return '';
+}
+
+function extractMainImage(
+  html: string,
+  pageUrl: string
+) {
+  const patterns = [
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+
+    /<img[^>]+class=["'][^"']*(?:cover|poster|image)[^"']*["'][^>]+src=["']([^"']+)["']/i,
+
+    /<img[^>]+src=["']([^"']+)["'][^>]+class=["'][^"']*(?:cover|poster|image)[^"']*["']/i,
+
+    /<img[^>]+src=["']([^"']+)["']/i,
+  ];
+
+  for (const regex of patterns) {
+    const match = html.match(regex);
+
+    if (match?.[1]) {
+      const image = cleanImageUrl(
+        match[1],
+        pageUrl
+      );
+
+      if (image) {
+        return image;
+      }
+    }
+  }
+
+  return '';
+}
+
+function extractSynopsis(html: string) {
+  const patterns = [
+    /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
+
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i,
+
+    /<[^>]+class=["'][^"']*(?:synopsis|description|resume|résumé)[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i,
+  ];
+
+  for (const regex of patterns) {
+    const match = html.match(regex);
+
+    if (match?.[1]) {
+      const value = cleanText(match[1]);
+
+      if (value.length > 20) {
+        return value;
+      }
+    }
+  }
+
+  return '';
+}
+
+function extractGenres(html: string) {
+  const genres = new Set<string>();
+
+  const classPatterns = [
+    /class=["'][^"']*genre[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/gi,
+
+    /class=["'][^"']*genres[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/gi,
+  ];
+
+  for (const regex of classPatterns) {
+    for (const match of html.matchAll(regex)) {
+      const text = cleanText(match[1]);
+
+      if (!text) continue;
+
+      const parts = text
+        .split(/[,|/]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      for (const genre of parts) {
+        if (genre.length < 40) {
+          genres.add(genre);
+        }
+      }
+    }
+  }
+
+  return Array.from(genres).slice(0, 12);
+}
+
+function extractField(
+  html: string,
+  labels: string[]
+) {
+  for (const label of labels) {
+    const escaped =
+      label.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        '\\$&'
+      );
+
+    const patterns = [
+      new RegExp(
+        `${escaped}\\s*[:\\-]?\\s*([^<\\n]{1,100})`,
+        'i'
+      ),
+
+      new RegExp(
+        `${escaped}[\\s\\S]{0,150}?<[^>]+>([^<]{1,100})<`,
+        'i'
+      ),
+    ];
+
+    for (const regex of patterns) {
+      const match = html.match(regex);
+
+      if (match?.[1]) {
+        const value = cleanText(match[1]);
+
+        if (value) {
+          return value;
+        }
+      }
+    }
+  }
+
+  return '';
+}
+
+/* =========================================================
+   LECTEURS
+   ========================================================= */
+
 function getPlayerName(
   urls: string[],
   index: number
 ) {
-  const joined = urls.join(' ').toLowerCase();
+  const joined =
+    urls.join(' ').toLowerCase();
 
-  if (joined.includes('sibnet')) return 'Sibnet';
-  if (joined.includes('vidmoly')) return 'Vidmoly';
-  if (joined.includes('sendvid')) return 'Sendvid';
-  if (joined.includes('vk.com')) return 'VK';
+  if (joined.includes('sibnet')) {
+    return 'Sibnet';
+  }
+
+  if (joined.includes('vidmoly')) {
+    return 'Vidmoly';
+  }
+
+  if (joined.includes('sendvid')) {
+    return 'Sendvid';
+  }
+
+  if (joined.includes('vk.com')) {
+    return 'VK';
+  }
 
   return `Lecteur ${index + 1}`;
 }
 
-function parsePlayers(text: string): Player[] {
+function parsePlayers(
+  text: string
+): Player[] {
   const players: Player[] = [];
 
   const regex =
@@ -47,9 +346,10 @@ function parsePlayers(text: string): Player[] {
   for (const match of text.matchAll(regex)) {
     const content = match[2];
 
-    const matches = content.match(
-      /https?:\/\/[^"'`\s,\]]+/gi
-    );
+    const matches =
+      content.match(
+        /https?:\/\/[^"'`\s,\]]+/gi
+      );
 
     if (!matches) continue;
 
@@ -75,25 +375,38 @@ function parsePlayers(text: string): Player[] {
   return players;
 }
 
-async function fetchText(url: string) {
-  const controller = new AbortController();
+/* =========================================================
+   FETCH
+   ========================================================= */
+
+async function fetchText(
+  url: string
+) {
+  const controller =
+    new AbortController();
 
   const timeout = setTimeout(() => {
     controller.abort();
   }, 8000);
 
   try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      cache: 'no-store',
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
-        Accept:
-          'text/html,application/xhtml+xml,application/javascript,*/*',
-        Referer: `${BASE_URL}/`,
-      },
-    });
+    const response = await fetch(
+      url,
+      {
+        signal: controller.signal,
+        cache: 'no-store',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+
+          Accept:
+            'text/html,application/xhtml+xml,application/javascript,*/*',
+
+          Referer:
+            `${BASE_URL}/`,
+        },
+      }
+    );
 
     if (!response.ok) {
       return null;
@@ -107,93 +420,15 @@ async function fetchText(url: string) {
   }
 }
 
-function decodeHtml(value: string) {
-  return value
-    .replace(/&amp;/gi, '&')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .trim();
-}
+/* =========================================================
+   SAISONS
+   ========================================================= */
 
-function getMeta(
-  html: string,
-  property: string
+function parseSeasons(
+  html: string
 ) {
-  const regex = new RegExp(
-    `<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']*)["']`,
-    'i'
-  );
-
-  const reverseRegex = new RegExp(
-    `<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${property}["']`,
-    'i'
-  );
-
-  return (
-    html.match(regex)?.[1] ||
-    html.match(reverseRegex)?.[1] ||
-    ''
-  );
-}
-
-function extractText(
-  html: string,
-  patterns: RegExp[]
-) {
-  for (const regex of patterns) {
-    const match = html.match(regex);
-
-    if (match?.[1]) {
-      return decodeHtml(match[1]);
-    }
-  }
-
-  return '';
-}
-
-function parseGenres(html: string) {
-  const genres = new Set<string>();
-
-  const patterns = [
-    /(?:genre|genres)[^>]*>([\s\S]{0,500})</i,
-    /(?:Genre|Genres)\s*:?\s*([^<\n]{2,200})/i,
-  ];
-
-  for (const regex of patterns) {
-    const match = html.match(regex);
-
-    if (!match?.[1]) continue;
-
-    match[1]
-      .replace(/<[^>]+>/g, ',')
-      .split(/[,|•/]/)
-      .map((item) =>
-        decodeHtml(item)
-          .replace(
-            /^(genre|genres)\s*:?\s*/i,
-            ''
-          )
-          .trim()
-      )
-      .filter(
-        (item) =>
-          item.length >= 2 &&
-          item.length <= 40
-      )
-      .forEach((item) =>
-        genres.add(item)
-      );
-  }
-
-  return Array.from(genres).slice(0, 12);
-}
-
-function parseSeasons(html: string): number[] {
-  const seasons = new Set<number>();
+  const seasons =
+    new Set<number>();
 
   const patterns = [
     /saison\s*(\d+)/gi,
@@ -202,7 +437,8 @@ function parseSeasons(html: string): number[] {
 
   for (const regex of patterns) {
     for (const match of html.matchAll(regex)) {
-      const number = Number(match[1]);
+      const number =
+        Number(match[1]);
 
       if (
         Number.isInteger(number) &&
@@ -214,74 +450,16 @@ function parseSeasons(html: string): number[] {
     }
   }
 
-  return Array.from(seasons).sort(
+  return Array.from(
+    seasons
+  ).sort(
     (a, b) => a - b
   );
 }
 
-function parseAnimeInfo(
-  html: string,
-  slug: string
-): AnimeInfo {
-  const title =
-    decodeHtml(
-      getMeta(html, 'og:title')
-    ) ||
-    extractText(html, [
-      /<h1[^>]*>([\s\S]*?)<\/h1>/i,
-      /<title[^>]*>([\s\S]*?)<\/title>/i,
-    ]) ||
-    slug
-      .split('-')
-      .filter(Boolean)
-      .map(
-        (word) =>
-          word.charAt(0).toUpperCase() +
-          word.slice(1)
-      )
-      .join(' ');
-
-  const description =
-    decodeHtml(
-      getMeta(html, 'og:description')
-    ) ||
-    extractText(html, [
-      /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i,
-      /<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["']/i,
-    ]);
-
-  const image =
-    getMeta(html, 'og:image') ||
-    getMeta(html, 'twitter:image');
-
-  const genres = parseGenres(html);
-
-  const year = extractText(html, [
-    /(?:année|annee|year)\s*:?\s*<[^>]*>\s*(\d{4})/i,
-    /(?:année|annee|year)\s*:?\s*(\d{4})/i,
-    /\b(19\d{2}|20\d{2})\b/,
-  ]);
-
-  const status = extractText(html, [
-    /(?:statut|status)\s*:?\s*<[^>]*>\s*([^<]+)/i,
-    /(?:statut|status)\s*:?\s*([^<\n]+)/i,
-  ]);
-
-  const type = extractText(html, [
-    /(?:type)\s*:?\s*<[^>]*>\s*([^<]+)/i,
-    /(?:type)\s*:?\s*([^<\n]+)/i,
-  ]);
-
-  return {
-    title,
-    description,
-    image,
-    genres,
-    status,
-    year,
-    type,
-  };
-}
+/* =========================================================
+   ÉPISODES
+   ========================================================= */
 
 async function fetchEpisodes(
   slug: string,
@@ -297,31 +475,43 @@ async function fetchEpisodes(
   return fetchText(url);
 }
 
+/* =========================================================
+   API
+   ========================================================= */
+
 export async function GET(
   request: Request
 ) {
-  const { searchParams } =
-    new URL(request.url);
+  const {
+    searchParams,
+  } = new URL(request.url);
 
   const slug =
-    searchParams.get('slug')?.trim();
+    searchParams
+      .get('slug')
+      ?.trim();
 
   const lang =
-    searchParams.get('lang') === 'vf'
+    searchParams.get('lang') ===
+    'vf'
       ? 'vf'
       : 'vostfr';
 
-  const requestedSeason = Math.max(
-    1,
-    Number(
-      searchParams.get('saison')
-    ) || 1
-  );
+  const requestedSeason =
+    Math.max(
+      1,
+      Number(
+        searchParams.get(
+          'saison'
+        )
+      ) || 1
+    );
 
   if (!slug) {
     return NextResponse.json(
       {
-        error: 'Slug manquant',
+        error:
+          'Slug manquant',
       },
       {
         status: 400,
@@ -330,22 +520,24 @@ export async function GET(
   }
 
   try {
-    /*
-     * PAGE CATALOGUE
-     */
+    /* =====================================================
+       1. PAGE FICHE
+       ===================================================== */
 
     const catalogueUrl =
       `${BASE_URL}/catalogue/` +
       `${encodeURIComponent(slug)}/`;
 
     const catalogueHtml =
-      await fetchText(catalogueUrl);
+      await fetchText(
+        catalogueUrl
+      );
 
     if (!catalogueHtml) {
       return NextResponse.json(
         {
           error:
-            "Impossible de récupérer la page de l’anime",
+            'Impossible de récupérer la page de l’anime',
         },
         {
           status: 502,
@@ -353,24 +545,30 @@ export async function GET(
       );
     }
 
-    /*
-     * FICHE COMPLÈTE
-     */
+    /* =====================================================
+       2. INFORMATIONS
+       ===================================================== */
 
-    const info = parseAnimeInfo(
-      catalogueHtml,
-      slug
-    );
+    const animeInfo =
+      extractAnimeInfo(
+        catalogueHtml,
+        slug,
+        catalogueUrl
+      );
 
-    /*
-     * SAISONS
-     */
+    /* =====================================================
+       3. SAISONS
+       ===================================================== */
 
     let seasons =
-      parseSeasons(catalogueHtml);
+      parseSeasons(
+        catalogueHtml
+      );
 
     if (!seasons.length) {
-      seasons = [requestedSeason];
+      seasons = [
+        requestedSeason,
+      ];
     }
 
     if (
@@ -387,9 +585,9 @@ export async function GET(
       );
     }
 
-    /*
-     * ÉPISODES
-     */
+    /* =====================================================
+       4. ÉPISODES
+       ===================================================== */
 
     const episodesText =
       await fetchEpisodes(
@@ -403,12 +601,17 @@ export async function GET(
         {
           error:
             'Saison indisponible',
+
           slug,
+
           saison:
             requestedSeason,
+
           lang,
+
           seasons,
-          info,
+
+          ...animeInfo,
         },
         {
           status: 404,
@@ -421,9 +624,9 @@ export async function GET(
         episodesText
       );
 
-    /*
-     * VF
-     */
+    /* =====================================================
+       5. VF
+       ===================================================== */
 
     let hasVF = false;
 
@@ -435,23 +638,27 @@ export async function GET(
           'vf'
         );
 
-      hasVF = Boolean(vfText);
+      hasVF =
+        Boolean(vfText);
     } else {
       hasVF = true;
     }
 
-    /*
-     * LECTEUR PAR DÉFAUT
-     */
+    /* =====================================================
+       6. LECTEUR PAR DÉFAUT
+       ===================================================== */
 
-    let defaultPlayerIndex = 0;
+    let defaultPlayerIndex =
+      0;
 
     const sibnetIndex =
       players.findIndex(
         (player) =>
           player.name
             .toLowerCase()
-            .includes('sibnet')
+            .includes(
+              'sibnet'
+            )
       );
 
     if (sibnetIndex >= 0) {
@@ -466,13 +673,16 @@ export async function GET(
       players[0]?.urls.length ||
       0;
 
-    /*
-     * RÉPONSE
-     */
+    /* =====================================================
+       7. RÉPONSE
+       ===================================================== */
 
     return NextResponse.json(
       {
+        ...animeInfo,
+
         slug,
+
         saison:
           requestedSeason,
 
@@ -488,8 +698,6 @@ export async function GET(
         defaultPlayerIndex,
 
         totalEpisodes,
-
-        info,
       },
       {
         headers: {
