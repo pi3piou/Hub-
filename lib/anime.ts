@@ -1,10 +1,6 @@
 /*
  * =========================================================
  * OUTILS DE RÉCUPÉRATION ANIME-SAMA
- *
- * Fichier partagé par les routes API :
- *   /api/anime/info      → fiche + saisons
- *   /api/anime/episodes  → lecteurs + épisodes
  * =========================================================
  */
 
@@ -223,12 +219,6 @@ export function extractTitle(html: string) {
   return '';
 }
 
-/*
- * Titres alternatifs : Anime-Sama les place dans
- * un conteneur dédié, en général séparés par des
- * virgules. On retombe sur une recherche par
- * libellé si la structure change.
- */
 export function extractAltTitles(
   html: string,
   mainTitle: string
@@ -311,6 +301,7 @@ export function extractMainImage(
 
 export function extractSynopsis(html: string) {
   const patterns = [
+    /class=["'][^"']*synopsis-text[^"']*["'][^>]*>([\s\S]{20,4000}?)<\/(?:p|div|section)>/i,
     /Synopsis\s*<\/h[1-6]>([\s\S]{20,4000}?)<\/(?:p|div|section)>/i,
     /class=["'][^"']*(?:synopsis|description|resume|résumé)[^"']*["'][^>]*>([\s\S]{20,4000}?)<\/(?:p|div|section)>/i,
     /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
@@ -338,47 +329,126 @@ export function extractSynopsis(html: string) {
 }
 
 /* =========================================================
-   GENRES
+   MÉTADONNÉES
    ========================================================= */
+
+/*
+ * Anime-Sama présente ses métadonnées en paires
+ * .info-lbl (libellé) / .info-val (valeur).
+ */
+export function extractInfoPairs(raw: string) {
+  const html = stripScripts(raw);
+
+  const pairs = new Map<string, string>();
+
+  const regex =
+    /class=["'][^"']*info-(lbl|val)[^"']*["'][^>]*>([\s\S]{0,300}?)<\/(?:div|span|p|li|dt|dd)>/gi;
+
+  let label = '';
+
+  for (const match of html.matchAll(regex)) {
+    const kind = match[1].toLowerCase();
+    const text = cleanText(match[2]);
+
+    if (kind === 'lbl') {
+      label = text;
+    } else if (label && text) {
+      if (!pairs.has(label.toLowerCase())) {
+        pairs.set(label.toLowerCase(), text);
+      }
+
+      label = '';
+    }
+  }
+
+  return pairs;
+}
 
 export function extractGenres(raw: string) {
   const html = stripScripts(raw);
 
   const genres = new Set<string>();
 
-  /*
-   * Les lookbehind/lookahead évitent de matcher
-   * « genre-pill » ou « sous-genres ».
-   */
-  const patterns = [
-    /(?<![\w-])Genres?(?![\w-])\s*<\/h[1-6]>([\s\S]{1,600}?)<\/(?:p|div|section|ul)>/i,
-    /(?<![\w-])Genres?(?![\w-])\s*:\s*([^<\n]{1,300})/i,
-  ];
+  const add = (value: string) => {
+    const genre = cleanText(value).trim();
 
-  for (const regex of patterns) {
-    const match = html.match(regex);
+    if (GENRE_SHAPE.test(genre)) {
+      genres.add(genre);
+    }
+  };
 
-    if (!match?.[1]) continue;
+  /* 1. Chaque badge .genre-pill */
+  for (const match of html.matchAll(
+    /class=["'][^"']*genre-pill[^"']*["'][^>]*>([^<]{1,40})</gi
+  )) {
+    add(match[1]);
+  }
 
-    const text = cleanText(match[1]);
+  if (genres.size) {
+    return Array.from(genres).slice(0, 12);
+  }
 
-    for (const part of text.split(/[,;|]/)) {
-      const genre = part.trim();
+  /* 2. Contenu du conteneur .genres-wrap */
+  const wrap = html.match(
+    /class=["'][^"']*genres?-wrap[^"']*["'][^>]*>([\s\S]{1,1500}?)<\/(?:div|section|ul|p)>/i
+  );
 
-      if (GENRE_SHAPE.test(genre)) {
-        genres.add(genre);
+  if (wrap?.[1]) {
+    for (const match of wrap[1].matchAll(
+      />([^<>]{2,40})</g
+    )) {
+      add(match[1]);
+    }
+
+    if (!genres.size) {
+      for (const part of cleanText(
+        wrap[1]
+      ).split(/[,;|]/)) {
+        add(part);
       }
     }
 
-    if (genres.size) break;
+    if (genres.size) {
+      return Array.from(genres).slice(0, 12);
+    }
+  }
+
+  /* 3. Paire libellé / valeur */
+  const fromPairs = extractInfoPairs(html).get(
+    'genres'
+  );
+
+  if (fromPairs) {
+    for (const part of fromPairs.split(/[,;|]/)) {
+      add(part);
+    }
+  }
+
+  /* 4. Titre de section */
+  if (!genres.size) {
+    const heading = html.match(
+      /(?<![\w-])Genres?(?![\w-])\s*<\/h[1-6]>([\s\S]{1,600}?)<\/(?:p|div|section|ul)>/i
+    );
+
+    if (heading?.[1]) {
+      for (const match of heading[1].matchAll(
+        />([^<>]{2,40})</g
+      )) {
+        add(match[1]);
+      }
+
+      if (!genres.size) {
+        for (const part of cleanText(
+          heading[1]
+        ).split(/[,;|]/)) {
+          add(part);
+        }
+      }
+    }
   }
 
   return Array.from(genres).slice(0, 12);
 }
-
-/* =========================================================
-   CHAMPS LIBRES
-   ========================================================= */
 
 export function extractField(
   raw: string,
@@ -386,6 +456,18 @@ export function extractField(
 ) {
   const html = stripScripts(raw);
 
+  /* 1. Paires .info-lbl / .info-val */
+  const pairs = extractInfoPairs(html);
+
+  for (const label of labels) {
+    const direct = pairs.get(label.toLowerCase());
+
+    if (direct && !/[{}<>="]/.test(direct)) {
+      return direct;
+    }
+  }
+
+  /* 2. Motifs génériques */
   for (const label of labels) {
     const escaped = label.replace(
       /[.*+?^${}()|[\]\\]/g,
@@ -411,7 +493,6 @@ export function extractField(
 
       const value = cleanText(match[1]);
 
-      /* Un vrai champ ne contient pas de HTML ni de CSS */
       if (
         value &&
         value.length > 1 &&
@@ -431,14 +512,11 @@ export function extractYear(html: string) {
     'Annee',
     'Year',
     'Date de sortie',
+    'Sortie',
   ]);
 
   const match = labelled.match(/(19|20)\d{2}/);
 
-  /*
-   * Pas de balayage aveugle : mieux vaut aucune
-   * année qu'une année tirée au hasard dans la page.
-   */
   return match ? match[0] : '';
 }
 
@@ -510,11 +588,6 @@ export function extractAnimeInfo(
 
 /* =========================================================
    SAISONS
-   *
-   * Anime-Sama déclare ses saisons via des appels
-   * panneauAnime("Saison 1", "saison1/vostfr").
-   * C'est bien plus fiable que de scanner le HTML,
-   * qui contient aussi les recommandations.
    ========================================================= */
 
 export function parseSeasons(
@@ -529,7 +602,6 @@ export function parseSeasons(
     const label = match[1].trim();
     const path = match[2].trim();
 
-    /* Modèle laissé en commentaire par le site */
     if (
       !label ||
       !path ||
@@ -580,7 +652,6 @@ export function parseSeasons(
     );
   }
 
-  /* Repli : ancienne méthode par balayage */
   const fallback = new Set<number>();
 
   for (const match of html.matchAll(
