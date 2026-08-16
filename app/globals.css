@@ -1598,4 +1598,303 @@ a {
   margin-top: 16px;
 }
 
+/* =========================================================
+   FICHE ANIME
+   ========================================================= */
+
+.anime-hero {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(
+    150deg,
+    rgba(117, 99, 255, 0.14),
+    rgba(20, 20, 26, 0.72)
+  );
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.06),
+    0 20px 50px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(22px);
+}
+
+.anime-hero-cover {
+  flex: 0 0 132px;
+  width: 132px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--surface-solid);
+}
+
+.anime-hero-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.anime-hero-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.anime-hero-content h2 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+
+.alt-titles p {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.alt-titles p.is-open {
+  -webkit-line-clamp: unset;
+}
+
+.meta-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.meta-pills span {
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #c3c3cf;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.meta-pills span.is-status {
+  border-color: var(--accent-border);
+  background: var(--accent-tint);
+  color: var(--accent-light);
+}
+
+.hero-action {
+  display: flex;
+  width: 100%;
+  margin: 0 0 16px;
+  min-height: 48px;
+  font-size: 13px;
+  box-shadow: 0 12px 30px rgba(102, 89, 232, 0.35);
+}
+
+/* Genres */
+
+.genre-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.genre-badges span {
+  padding: 5px 11px;
+  border: 1px solid var(--accent-border);
+  border-radius: 99px;
+  background: var(--accent-tint);
+  color: var(--accent-light);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+/* Synopsis */
+
+.anime-synopsis {
+  padding: 16px;
+  margin-bottom: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  backdrop-filter: blur(18px);
+}
+
+.anime-synopsis p {
+  margin: 6px 0 0;
+  color: #c9c9d4;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.anime-synopsis p.is-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.text-button {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-light);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Cartes de saison */
+
+.season-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.season-card {
+  display: block;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: inherit;
+  backdrop-filter: blur(16px);
+  transition:
+    transform var(--ease),
+    border-color var(--ease),
+    background var(--ease);
+}
+
+.season-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-border);
+  background: rgba(117, 99, 255, 0.08);
+}
+
+.season-card.is-done {
+  border-color: var(--accent-border);
+}
+
+.season-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.season-card-top strong {
+  overflow: hidden;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.season-done {
+  display: grid;
+  place-items: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+}
+
+.season-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 8px 0 10px;
+  font-size: 11px;
+  opacity: 0.55;
+}
+
+.season-langs {
+  flex: 0 0 auto;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+}
+
+/* Squelettes */
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.09),
+    rgba(255, 255, 255, 0.04)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-cover {
+  flex: 0 0 132px;
+  width: 132px;
+  aspect-ratio: 16 / 9;
+}
+
+.skeleton-line {
+  height: 14px;
+  margin-bottom: 8px;
+}
+
+.skeleton-line.short {
+  width: 55%;
+}
+
+.skeleton-block {
+  height: 120px;
+  margin-top: 16px;
+}
+
+/* Tablette et desktop */
+
+@media (min-width: 700px) {
+  .anime-hero {
+    gap: 22px;
+    padding: 22px;
+  }
+
+  .anime-hero-cover,
+  .skeleton-cover {
+    flex-basis: 220px;
+    width: 220px;
+  }
+
+  .anime-hero-content h2 {
+    font-size: 24px;
+  }
+
+  .season-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .hero-action {
+    width: auto;
+    min-width: 260px;
+  }
+}
 
