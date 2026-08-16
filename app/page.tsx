@@ -412,15 +412,10 @@ export default function Home() {
                 .map((item) => (
                   <Link
                     key={`${item.slug}-${item.season}-${item.lang}`}
-                    href={`/anime/${encodeURIComponent(
+                      href={`/anime/${encodeURIComponent(
                       item.slug
-                    )}?saison=${
-                      item.season
-                    }&episode=${
-                      item.episode
-                    }&lang=${
-                      item.lang
-                    }`}
+                    )}/${item.season}`}
+
                     className="continue-card"
                   >
 
@@ -526,14 +521,9 @@ export default function Home() {
 
               <Link
                 href={`/anime/${encodeURIComponent(
-                  item.slug
-                )}?saison=${
-                  item.season
-                }&episode=${
-                  item.episode
-                }&lang=${
-                  item.lang
-                }`}
+                      item.slug
+                    )}/${item.season}`}
+
                 className="history-main"
               >
 
