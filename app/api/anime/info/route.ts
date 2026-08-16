@@ -43,6 +43,33 @@ export async function GET(request: Request) {
       );
     }
 
+    /*
+     * Sonde temporaire, à supprimer ensuite :
+     * /api/anime/info?slug=one-piece&debug=1
+     */
+    if (searchParams.get('debug')) {
+      const index = html.search(/genre/i);
+
+      return NextResponse.json(
+        {
+          found: index,
+          snippet:
+            index >= 0
+              ? html.slice(
+                  Math.max(0, index - 300),
+                  index + 700
+                )
+              : html.slice(0, 500),
+        },
+        {
+          headers: {
+            'Content-Type':
+              'application/json; charset=utf-8',
+          },
+        }
+      );
+    }
+
     const info = extractAnimeInfo(
       html,
       slug,
@@ -88,6 +115,9 @@ export async function GET(request: Request) {
       },
       {
         headers: {
+          'Content-Type':
+            'application/json; charset=utf-8',
+
           'Cache-Control':
             'public, s-maxage=3600, stale-while-revalidate=86400',
         },
