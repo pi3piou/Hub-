@@ -49,20 +49,45 @@ export async function GET(request: Request) {
       catalogueUrl
     );
 
-    const seasons = parseSeasons(html);
+    const entries = parseSeasons(html);
+
+    const seasonEntries = entries.length
+      ? entries
+      : [
+          {
+            number: 1,
+            label: 'Saison 1',
+            langs: [],
+          },
+        ];
+
+    /* Toutes les langues rencontrées, dédupliquées */
+    const langs = Array.from(
+      new Set(
+        seasonEntries.flatMap(
+          (item) => item.langs
+        )
+      )
+    );
 
     return NextResponse.json(
       {
         ...info,
-        seasons: seasons.length ? seasons : [1],
-        totalSeasons: seasons.length || 1,
+
+        /* Détail par saison : numéro, libellé, langues */
+        seasonEntries,
+
+        /* Conservé pour compatibilité */
+        seasons: seasonEntries.map(
+          (item) => item.number
+        ),
+
+        totalSeasons: seasonEntries.length,
+
+        langs,
       },
       {
         headers: {
-          /*
-           * Une fiche bouge très peu :
-           * 1 h de cache, 24 h de tolérance.
-           */
           'Cache-Control':
             'public, s-maxage=3600, stale-while-revalidate=86400',
         },
