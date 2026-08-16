@@ -19,38 +19,39 @@ export async function GET(request: Request) {
 
   /* Sonde : /api/anime/planning?debug=1 */
   if (searchParams.get('debug')) {
-    const positions: number[] = [];
+    const cards: unknown[] = [];
 
-    const regex = /\/catalogue\//gi;
+    const regex =
+      /<div class="([^"]*planning-card[^"]*)"([^>]*)>\s*<a href="([^"]+)"/gi;
 
-    let match;
+    for (const match of html.matchAll(regex)) {
+      const attrs = match[2];
 
-    while (
-      (match = regex.exec(html)) !== null &&
-      positions.length < 3
-    ) {
-      positions.push(match.index);
+      const ts = attrs.match(
+        /data-release-ts="(\d+)"/i
+      );
+
+      const dataTitle = attrs.match(
+        /data-title="([^"]*)"/i
+      );
+
+      cards.push({
+        classes: match[1],
+        href: match[3],
+        ts: ts ? Number(ts[1]) : null,
+        date: ts
+          ? new Date(
+              Number(ts[1]) * 1000
+            ).toISOString()
+          : null,
+        title: dataTitle?.[1] || null,
+      });
+
+      if (cards.length >= 6) break;
     }
 
-    const cible = positions[1] ?? positions[0] ?? 0;
-
     return NextResponse.json(
-      {
-        heures: (
-          html.match(/\d{1,2}h\d{2}/g) || []
-        ).slice(0, 8),
-
-        jours: (
-          html.match(
-            /(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)/gi
-          ) || []
-        ).slice(0, 10),
-
-        extrait: html.slice(
-          Math.max(0, cible - 900),
-          cible + 900
-        ),
-      },
+      { total: cards.length, cards },
       {
         headers: {
           'Content-Type':
@@ -59,6 +60,7 @@ export async function GET(request: Request) {
       }
     );
   }
+
 
 
   return NextResponse.json({ ok: true });
