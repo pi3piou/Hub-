@@ -10,6 +10,22 @@
 
 export const BASE_URL = 'https://anime-sama.to';
 
+/*
+ * Les balises <script> et <style> contiennent des
+ * sélecteurs comme « .genre-pill { padding: 4px } »
+ * qui piègent les extractions par libellé.
+ */
+function stripScripts(html: string) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ');
+}
+
+/* Un genre plausible : lettres, espaces, tirets */
+const GENRE_SHAPE =
+  /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' -]{1,24}$/;
+
+
 export interface Player {
   name: string;
   urls: string[];
@@ -326,28 +342,31 @@ export function extractSynopsis(html: string) {
    GENRES
    ========================================================= */
 
-export function extractGenres(html: string) {
+export function extractGenres(raw: string) {
+  const html = stripScripts(raw);
+
   const genres = new Set<string>();
 
-  const blockPatterns = [
-    /Genres?\s*<\/h[1-6]>([\s\S]{1,600}?)<\/(?:p|div|section)>/i,
-    /Genres?\s*[:\-]\s*([^<\n]{1,300})/i,
-    /class=["'][^"']*genres?[^"']*["'][^>]*>([\s\S]{1,600}?)<\/(?:p|div|section|ul)>/i,
+  /*
+   * Les lookbehind/lookahead évitent de matcher
+   * « genre-pill » ou « sous-genres ».
+   */
+  const patterns = [
+    /(?<![\w-])Genres?(?![\w-])\s*<\/h[1-6]>([\s\S]{1,600}?)<\/(?:p|div|section|ul)>/i,
+    /(?<![\w-])Genres?(?![\w-])\s*:\s*([^<\n]{1,300})/i,
   ];
 
-  for (const regex of blockPatterns) {
+  for (const regex of patterns) {
     const match = html.match(regex);
 
     if (!match?.[1]) continue;
 
     const text = cleanText(match[1]);
 
-    if (!text) continue;
-
-    for (const part of text.split(/[,;|/]/)) {
+    for (const part of text.split(/[,;|]/)) {
       const genre = part.trim();
 
-      if (genre.length > 1 && genre.length < 30) {
+      if (GENRE_SHAPE.test(genre)) {
         genres.add(genre);
       }
     }
@@ -358,14 +377,17 @@ export function extractGenres(html: string) {
   return Array.from(genres).slice(0, 12);
 }
 
+
 /* =========================================================
    CHAMPS LIBRES
    ========================================================= */
 
 export function extractField(
-  html: string,
+  raw: string,
   labels: string[]
 ) {
+  const html = stripScripts(raw);
+
   for (const label of labels) {
     const escaped = label.replace(
       /[.*+?^${}()|[\]\\]/g,
@@ -374,17 +396,12 @@ export function extractField(
 
     const patterns = [
       new RegExp(
-        `${escaped}\\s*<\\/h[1-6]>\\s*<[^>]*>([^<]{1,80})<`,
+        `(?<![\\w-])${escaped}(?![\\w-])\\s*<\\/h[1-6]>\\s*<[^>]*>([^<]{1,60})<`,
         'i'
       ),
 
       new RegExp(
-        `${escaped}\\s*[:\\-]\\s*([^<\\n]{1,80})`,
-        'i'
-      ),
-
-      new RegExp(
-        `${escaped}[\\s\\S]{0,150}?<[^>]+>([^<]{1,80})<`,
+        `(?<![\\w-])${escaped}(?![\\w-])\\s*:\\s*([^<\\n]{1,60})`,
         'i'
       ),
     ];
@@ -392,18 +409,24 @@ export function extractField(
     for (const regex of patterns) {
       const match = html.match(regex);
 
-      if (match?.[1]) {
-        const value = cleanText(match[1]);
+      if (!match?.[1]) continue;
 
-        if (value && value.length > 1) {
-          return value;
-        }
+      const value = cleanText(match[1]);
+
+      /* Un vrai champ ne contient pas de HTML ni de CSS */
+      if (
+        value &&
+        value.length > 1 &&
+        !/[{}<>="]/.test(value)
+      ) {
+        return value;
       }
     }
   }
 
   return '';
 }
+
 
 /*
  * L'année n'est pas toujours étiquetée : à défaut,
@@ -417,16 +440,15 @@ export function extractYear(html: string) {
     'Date de sortie',
   ]);
 
-  const fromLabel = labelled.match(/(19|20)\d{2}/);
+  const match = labelled.match(/(19|20)\d{2}/);
 
-  if (fromLabel) return fromLabel[0];
-
-  const match = html.match(
-    /\b(19[7-9]\d|20[0-4]\d)\b/
-  );
-
+  /*
+   * Pas de balayage aveugle : mieux vaut aucune
+   * année qu'une année tirée au hasard dans la page.
+   */
   return match ? match[0] : '';
 }
+
 
 export function extractType(html: string) {
   const value = extractField(html, [
@@ -434,26 +456,26 @@ export function extractType(html: string) {
     'Format',
   ]);
 
-  if (value) {
-    const upper = value.toUpperCase();
+  if (!value) return '';
 
-    for (const known of [
-      'OVA',
-      'ONA',
-      'FILM',
-      'MOVIE',
-      'SPECIAL',
-      'TV',
-    ]) {
-      if (upper.includes(known)) {
-        return known === 'MOVIE'
-          ? 'Film'
-          : known;
-      }
+  const upper = value.toUpperCase();
+
+  for (const known of [
+    'OVA',
+    'ONA',
+    'FILM',
+    'MOVIE',
+    'SPECIAL',
+    'TV',
+  ]) {
+    if (upper.includes(known)) {
+      return known === 'MOVIE' ? 'Film' : known;
     }
-
-    return value;
   }
+
+  return value;
+}
+
 
   return 'Série';
 }
@@ -492,7 +514,6 @@ export function extractAnimeInfo(
 
     year: extractYear(html),
 
-    type: extractType(html),
 
     slug,
   };
