@@ -34,18 +34,28 @@ export interface EpisodesData {
 }
 
 
+export interface SeasonEntry {
+  number: number;
+  label: string;
+  langs: string[];
+}
+
 export interface AnimeInfoData {
   slug: string;
   name: string;
+  altTitles: string[];
   image: string;
   synopsis: string;
   genres: string[];
   status: string;
   year: string;
   type: string;
+  seasonEntries: SeasonEntry[];
   seasons: number[];
   totalSeasons: number;
+  langs: string[];
 }
+
 
 interface Entry<T> {
   value: T;
