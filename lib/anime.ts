@@ -25,7 +25,6 @@ function stripScripts(html: string) {
 const GENRE_SHAPE =
   /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ' -]{1,24}$/;
 
-
 export interface Player {
   name: string;
   urls: string[];
@@ -377,7 +376,6 @@ export function extractGenres(raw: string) {
   return Array.from(genres).slice(0, 12);
 }
 
-
 /* =========================================================
    CHAMPS LIBRES
    ========================================================= */
@@ -427,11 +425,6 @@ export function extractField(
   return '';
 }
 
-
-/*
- * L'année n'est pas toujours étiquetée : à défaut,
- * on cherche une année plausible dans la page.
- */
 export function extractYear(html: string) {
   const labelled = extractField(html, [
     'Année',
@@ -448,7 +441,6 @@ export function extractYear(html: string) {
    */
   return match ? match[0] : '';
 }
-
 
 export function extractType(html: string) {
   const value = extractField(html, [
@@ -475,7 +467,6 @@ export function extractType(html: string) {
 
   return value;
 }
-
 
 /* =========================================================
    FICHE COMPLÈTE
@@ -511,6 +502,7 @@ export function extractAnimeInfo(
 
     year: extractYear(html),
 
+    type: extractType(html),
 
     slug,
   };
