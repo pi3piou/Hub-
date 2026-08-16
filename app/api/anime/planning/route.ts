@@ -19,34 +19,37 @@ export async function GET(request: Request) {
 
   /* Sonde : /api/anime/planning?debug=1 */
   if (searchParams.get('debug')) {
-    const count = (marker: string) =>
-      (
-        html.match(
-          new RegExp(marker, 'gi')
-        ) || []
-      ).length;
+    const positions: number[] = [];
 
-    const index = html.search(
-      /cartePlanningAnime|cartePlanning|planning-/i
-    );
+    const regex = /\/catalogue\//gi;
+
+    let match;
+
+    while (
+      (match = regex.exec(html)) !== null &&
+      positions.length < 3
+    ) {
+      positions.push(match.index);
+    }
+
+    const cible = positions[1] ?? positions[0] ?? 0;
 
     return NextResponse.json(
       {
-        taille: html.length,
+        heures: (
+          html.match(/\d{1,2}h\d{2}/g) || []
+        ).slice(0, 8),
 
-        marqueurs: {
-          cartePlanningAnime: count(
-            'cartePlanningAnime'
-          ),
-          cartePlanning: count('cartePlanning'),
-          catalogue: count('/catalogue/'),
-          lundi: count('lundi'),
-        },
+        jours: (
+          html.match(
+            /(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)/gi
+          ) || []
+        ).slice(0, 10),
 
-        extrait:
-          index >= 0
-            ? html.slice(index, index + 1200)
-            : html.slice(0, 800),
+        extrait: html.slice(
+          Math.max(0, cible - 900),
+          cible + 900
+        ),
       },
       {
         headers: {
@@ -56,6 +59,7 @@ export async function GET(request: Request) {
       }
     );
   }
+
 
   return NextResponse.json({ ok: true });
 }
