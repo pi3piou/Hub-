@@ -7,6 +7,16 @@ interface Player {
   urls: string[];
 }
 
+interface AnimeInfo {
+  title: string;
+  description: string;
+  image: string;
+  genres: string[];
+  status: string;
+  year: string;
+  type: string;
+}
+
 function cleanUrl(value: string) {
   return value
     .trim()
@@ -14,7 +24,10 @@ function cleanUrl(value: string) {
     .replace(/['"`;,]+$/, '');
 }
 
-function getPlayerName(urls: string[], index: number) {
+function getPlayerName(
+  urls: string[],
+  index: number
+) {
   const joined = urls.join(' ').toLowerCase();
 
   if (joined.includes('sibnet')) return 'Sibnet';
@@ -41,13 +54,20 @@ function parsePlayers(text: string): Player[] {
     if (!matches) continue;
 
     const urls = Array.from(
-      new Set(matches.map(cleanUrl).filter(Boolean))
+      new Set(
+        matches
+          .map(cleanUrl)
+          .filter(Boolean)
+      )
     );
 
     if (!urls.length) continue;
 
     players.push({
-      name: getPlayerName(urls, players.length),
+      name: getPlayerName(
+        urls,
+        players.length
+      ),
       urls,
     });
   }
@@ -87,19 +107,91 @@ async function fetchText(url: string) {
   }
 }
 
-/**
- * Récupère les saisons directement depuis la page catalogue.
- *
- * Exemple de contenu Anime-Sama :
- *
- * saison1
- * saison2
- * saison3
- * saison4
- *
- * On ne fait donc plus 20 requêtes pour essayer de deviner
- * combien de saisons existent.
- */
+function decodeHtml(value: string) {
+  return value
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+}
+
+function getMeta(
+  html: string,
+  property: string
+) {
+  const regex = new RegExp(
+    `<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']*)["']`,
+    'i'
+  );
+
+  const reverseRegex = new RegExp(
+    `<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${property}["']`,
+    'i'
+  );
+
+  return (
+    html.match(regex)?.[1] ||
+    html.match(reverseRegex)?.[1] ||
+    ''
+  );
+}
+
+function extractText(
+  html: string,
+  patterns: RegExp[]
+) {
+  for (const regex of patterns) {
+    const match = html.match(regex);
+
+    if (match?.[1]) {
+      return decodeHtml(match[1]);
+    }
+  }
+
+  return '';
+}
+
+function parseGenres(html: string) {
+  const genres = new Set<string>();
+
+  const patterns = [
+    /(?:genre|genres)[^>]*>([\s\S]{0,500})</i,
+    /(?:Genre|Genres)\s*:?\s*([^<\n]{2,200})/i,
+  ];
+
+  for (const regex of patterns) {
+    const match = html.match(regex);
+
+    if (!match?.[1]) continue;
+
+    match[1]
+      .replace(/<[^>]+>/g, ',')
+      .split(/[,|•/]/)
+      .map((item) =>
+        decodeHtml(item)
+          .replace(
+            /^(genre|genres)\s*:?\s*/i,
+            ''
+          )
+          .trim()
+      )
+      .filter(
+        (item) =>
+          item.length >= 2 &&
+          item.length <= 40
+      )
+      .forEach((item) =>
+        genres.add(item)
+      );
+  }
+
+  return Array.from(genres).slice(0, 12);
+}
+
 function parseSeasons(html: string): number[] {
   const seasons = new Set<number>();
 
@@ -122,7 +214,73 @@ function parseSeasons(html: string): number[] {
     }
   }
 
-  return Array.from(seasons).sort((a, b) => a - b);
+  return Array.from(seasons).sort(
+    (a, b) => a - b
+  );
+}
+
+function parseAnimeInfo(
+  html: string,
+  slug: string
+): AnimeInfo {
+  const title =
+    decodeHtml(
+      getMeta(html, 'og:title')
+    ) ||
+    extractText(html, [
+      /<h1[^>]*>([\s\S]*?)<\/h1>/i,
+      /<title[^>]*>([\s\S]*?)<\/title>/i,
+    ]) ||
+    slug
+      .split('-')
+      .filter(Boolean)
+      .map(
+        (word) =>
+          word.charAt(0).toUpperCase() +
+          word.slice(1)
+      )
+      .join(' ');
+
+  const description =
+    decodeHtml(
+      getMeta(html, 'og:description')
+    ) ||
+    extractText(html, [
+      /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i,
+      /<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["']/i,
+    ]);
+
+  const image =
+    getMeta(html, 'og:image') ||
+    getMeta(html, 'twitter:image');
+
+  const genres = parseGenres(html);
+
+  const year = extractText(html, [
+    /(?:année|annee|year)\s*:?\s*<[^>]*>\s*(\d{4})/i,
+    /(?:année|annee|year)\s*:?\s*(\d{4})/i,
+    /\b(19\d{2}|20\d{2})\b/,
+  ]);
+
+  const status = extractText(html, [
+    /(?:statut|status)\s*:?\s*<[^>]*>\s*([^<]+)/i,
+    /(?:statut|status)\s*:?\s*([^<\n]+)/i,
+  ]);
+
+  const type = extractText(html, [
+    /(?:type)\s*:?\s*<[^>]*>\s*([^<]+)/i,
+    /(?:type)\s*:?\s*([^<\n]+)/i,
+  ]);
+
+  return {
+    title,
+    description,
+    image,
+    genres,
+    status,
+    year,
+    type,
+  };
 }
 
 async function fetchEpisodes(
@@ -130,17 +288,23 @@ async function fetchEpisodes(
   season: number,
   lang: string
 ) {
-  const url = `${BASE_URL}/catalogue/${encodeURIComponent(
-    slug
-  )}/saison${season}/${lang}/episodes.js`;
+  const url =
+    `${BASE_URL}/catalogue/` +
+    `${encodeURIComponent(slug)}/` +
+    `saison${season}/` +
+    `${lang}/episodes.js`;
 
   return fetchText(url);
 }
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+export async function GET(
+  request: Request
+) {
+  const { searchParams } =
+    new URL(request.url);
 
-  const slug = searchParams.get('slug')?.trim();
+  const slug =
+    searchParams.get('slug')?.trim();
 
   const lang =
     searchParams.get('lang') === 'vf'
@@ -149,7 +313,9 @@ export async function GET(request: Request) {
 
   const requestedSeason = Math.max(
     1,
-    Number(searchParams.get('saison')) || 1
+    Number(
+      searchParams.get('saison')
+    ) || 1
   );
 
   if (!slug) {
@@ -165,14 +331,12 @@ export async function GET(request: Request) {
 
   try {
     /*
-     * -------------------------------------------------------
-     * 1. PAGE CATALOGUE
-     * -------------------------------------------------------
+     * PAGE CATALOGUE
      */
 
-    const catalogueUrl = `${BASE_URL}/catalogue/${encodeURIComponent(
-      slug
-    )}/`;
+    const catalogueUrl =
+      `${BASE_URL}/catalogue/` +
+      `${encodeURIComponent(slug)}/`;
 
     const catalogueHtml =
       await fetchText(catalogueUrl);
@@ -180,7 +344,8 @@ export async function GET(request: Request) {
     if (!catalogueHtml) {
       return NextResponse.json(
         {
-          error: 'Impossible de récupérer la page de l’anime',
+          error:
+            "Impossible de récupérer la page de l’anime",
         },
         {
           status: 502,
@@ -189,46 +354,61 @@ export async function GET(request: Request) {
     }
 
     /*
-     * -------------------------------------------------------
-     * 2. SAISONS
-     * -------------------------------------------------------
+     * FICHE COMPLÈTE
      */
 
-    let seasons = parseSeasons(catalogueHtml);
+    const info = parseAnimeInfo(
+      catalogueHtml,
+      slug
+    );
 
     /*
-     * Si Anime-Sama ne met pas les saisons dans le HTML
-     * récupéré, on garde au minimum la saison demandée.
+     * SAISONS
      */
+
+    let seasons =
+      parseSeasons(catalogueHtml);
+
     if (!seasons.length) {
       seasons = [requestedSeason];
     }
 
-    if (!seasons.includes(requestedSeason)) {
-      seasons.push(requestedSeason);
-      seasons.sort((a, b) => a - b);
+    if (
+      !seasons.includes(
+        requestedSeason
+      )
+    ) {
+      seasons.push(
+        requestedSeason
+      );
+
+      seasons.sort(
+        (a, b) => a - b
+      );
     }
 
     /*
-     * -------------------------------------------------------
-     * 3. ÉPISODES DE LA SAISON DEMANDÉE
-     * -------------------------------------------------------
+     * ÉPISODES
      */
 
-    const episodesText = await fetchEpisodes(
-      slug,
-      requestedSeason,
-      lang
-    );
+    const episodesText =
+      await fetchEpisodes(
+        slug,
+        requestedSeason,
+        lang
+      );
 
     if (!episodesText) {
       return NextResponse.json(
         {
-          error: 'Saison indisponible',
+          error:
+            'Saison indisponible',
           slug,
-          saison: requestedSeason,
+          saison:
+            requestedSeason,
           lang,
           seasons,
+          info,
         },
         {
           status: 404,
@@ -236,22 +416,24 @@ export async function GET(request: Request) {
       );
     }
 
-    const players = parsePlayers(episodesText);
+    const players =
+      parsePlayers(
+        episodesText
+      );
 
     /*
-     * -------------------------------------------------------
-     * 4. VF DISPONIBLE ?
-     * -------------------------------------------------------
+     * VF
      */
 
     let hasVF = false;
 
     if (lang === 'vostfr') {
-      const vfText = await fetchEpisodes(
-        slug,
-        requestedSeason,
-        'vf'
-      );
+      const vfText =
+        await fetchEpisodes(
+          slug,
+          requestedSeason,
+          'vf'
+        );
 
       hasVF = Boolean(vfText);
     } else {
@@ -259,44 +441,45 @@ export async function GET(request: Request) {
     }
 
     /*
-     * -------------------------------------------------------
-     * 5. LECTEUR PAR DÉFAUT
-     * -------------------------------------------------------
+     * LECTEUR PAR DÉFAUT
      */
 
     let defaultPlayerIndex = 0;
 
-    const sibnetIndex = players.findIndex((player) =>
-      player.name.toLowerCase().includes('sibnet')
-    );
+    const sibnetIndex =
+      players.findIndex(
+        (player) =>
+          player.name
+            .toLowerCase()
+            .includes('sibnet')
+      );
 
     if (sibnetIndex >= 0) {
-      defaultPlayerIndex = sibnetIndex;
+      defaultPlayerIndex =
+        sibnetIndex;
     }
 
     const totalEpisodes =
-      players[defaultPlayerIndex]?.urls.length ||
+      players[
+        defaultPlayerIndex
+      ]?.urls.length ||
       players[0]?.urls.length ||
       0;
 
     /*
-     * -------------------------------------------------------
-     * 6. RÉPONSE
-     * -------------------------------------------------------
+     * RÉPONSE
      */
 
     return NextResponse.json(
       {
         slug,
-        saison: requestedSeason,
+        saison:
+          requestedSeason,
 
-        /*
-         * Exemple :
-         * [1, 2, 3, 4]
-         */
         seasons,
 
-        totalSeasons: seasons.length,
+        totalSeasons:
+          seasons.length,
 
         hasVF,
 
@@ -305,6 +488,8 @@ export async function GET(request: Request) {
         defaultPlayerIndex,
 
         totalEpisodes,
+
+        info,
       },
       {
         headers: {
@@ -321,7 +506,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       {
-        error: 'Erreur serveur',
+        error:
+          'Erreur serveur',
       },
       {
         status: 500,
