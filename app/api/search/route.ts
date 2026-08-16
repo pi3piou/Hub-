@@ -8,13 +8,16 @@ interface SearchResult {
   image: string;
 }
 
-function slugToName(slug: string) {
+function slugToName(
+  slug: string
+) {
   return slug
     .split('-')
     .filter(Boolean)
     .map(
       (word) =>
-        word.charAt(0).toUpperCase() + word.slice(1)
+        word.charAt(0).toUpperCase() +
+        word.slice(1)
     )
     .join(' ');
 }
@@ -24,7 +27,10 @@ function absoluteUrl(
   base: string
 ) {
   try {
-    return new URL(value, base).toString();
+    return new URL(
+      value,
+      base
+    ).toString();
   } catch {
     return '';
   }
@@ -34,11 +40,11 @@ function cleanImageUrl(
   value: string,
   base: string
 ) {
-  let url = value.trim();
-
-  url = url
-    .replace(/^['"`]/, '')
-    .replace(/['"`;,]+$/, '');
+  let url =
+    value
+      .trim()
+      .replace(/^['"`]/, '')
+      .replace(/['"`;,]+$/, '');
 
   if (
     !url ||
@@ -48,32 +54,38 @@ function cleanImageUrl(
     return '';
   }
 
-  return absoluteUrl(url, base);
+  return absoluteUrl(
+    url,
+    base
+  );
 }
 
 function extractImageFromBlock(
   block: string,
   pageUrl: string
 ) {
-  /*
-   * Priorité aux vraies images <img>.
-   */
-
   const imgPatterns = [
     /<img[^>]+src\s*=\s*["']([^"']+)["']/i,
+
     /<img[^>]+data-src\s*=\s*["']([^"']+)["']/i,
+
     /<img[^>]+data-lazy-src\s*=\s*["']([^"']+)["']/i,
+
     /<img[^>]+data-original\s*=\s*["']([^"']+)["']/i,
   ];
 
-  for (const regex of imgPatterns) {
-    const match = block.match(regex);
+  for (
+    const regex of imgPatterns
+  ) {
+    const match =
+      block.match(regex);
 
     if (match?.[1]) {
-      const image = cleanImageUrl(
-        match[1],
-        pageUrl
-      );
+      const image =
+        cleanImageUrl(
+          match[1],
+          pageUrl
+        );
 
       if (image) {
         return image;
@@ -81,20 +93,17 @@ function extractImageFromBlock(
     }
   }
 
-  /*
-   * Certains éléments utilisent background-image.
-   */
-
   const background =
     block.match(
-      /background-image\s*:\s*url\(\s*["']?([^"')]+)["']?\s*\)/i
+      /background-image\s*:\s*url$begin:math:text$\\s\*\[\"\'\]\?\(\[\^\"\'\)\]\+\)\[\"\'\]\?\\s\*$end:math:text$/i
     );
 
   if (background?.[1]) {
-    const image = cleanImageUrl(
-      background[1],
-      pageUrl
-    );
+    const image =
+      cleanImageUrl(
+        background[1],
+        pageUrl
+      );
 
     if (image) {
       return image;
@@ -108,43 +117,47 @@ function extractResults(
   html: string,
   pageUrl: string
 ): SearchResult[] {
-  const results: SearchResult[] = [];
-  const seen = new Set<string>();
+  const results: SearchResult[] =
+    [];
 
-  /*
-   * On cherche les liens vers :
-   *
-   * /catalogue/nom-de-l-anime/
-   */
+  const seen =
+    new Set<string>();
 
   const linkRegex =
     /<a\b[^>]*href\s*=\s*["']([^"']*\/catalogue\/([^"'/?#]+)\/?[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
 
-  for (const match of html.matchAll(linkRegex)) {
-    const href = match[1];
-    const slug = decodeURIComponent(
-      match[2]
-    ).trim();
+  for (
+    const match of html.matchAll(
+      linkRegex
+    )
+  ) {
+    const href =
+      match[1];
 
-    const block = match[3];
+    const slug =
+      decodeURIComponent(
+        match[2]
+      ).trim();
 
-    if (!slug || seen.has(slug)) {
+    const block =
+      match[3];
+
+    if (
+      !slug ||
+      seen.has(slug)
+    ) {
       continue;
     }
 
-    /*
-     * Évite de récupérer des pages qui ne sont
-     * pas des fiches anime.
-     */
-
-    const ignored = new Set([
-      'catalogue',
-      'planning',
-      'connexion',
-      'inscription',
-      'recherche',
-      'page',
-    ]);
+    const ignored =
+      new Set([
+        'catalogue',
+        'planning',
+        'connexion',
+        'inscription',
+        'recherche',
+        'page',
+      ]);
 
     if (
       ignored.has(
@@ -154,29 +167,34 @@ function extractResults(
       continue;
     }
 
-    /*
-     * On récupère le bloc HTML autour du lien
-     * pour retrouver l'affiche correspondante.
-     */
-
     const linkPosition =
       match.index ?? -1;
 
-    let surroundingBlock = block;
+    let surroundingBlock =
+      block;
 
-    if (linkPosition >= 0) {
-      const start = Math.max(
-        0,
-        linkPosition - 2500
-      );
+    if (
+      linkPosition >= 0
+    ) {
+      const start =
+        Math.max(
+          0,
+          linkPosition -
+            2500
+        );
 
-      const end = Math.min(
-        html.length,
-        linkPosition + 2500
-      );
+      const end =
+        Math.min(
+          html.length,
+          linkPosition +
+            2500
+        );
 
       surroundingBlock =
-        html.slice(start, end);
+        html.slice(
+          start,
+          end
+        );
     }
 
     let image =
@@ -185,27 +203,29 @@ function extractResults(
         pageUrl
       );
 
-    /*
-     * Si l'affiche n'a pas été trouvée dans le bloc,
-     * on essaie de retrouver l'image à partir du slug.
-     */
-
     if (!image) {
-      const imageRegex = new RegExp(
-        `<img[^>]+(?:src|data-src|data-lazy-src|data-original)\\s*=\\s*["'][^"']*${slug}[^"']*["']`,
-        'i'
-      );
+      const imageRegex =
+        new RegExp(
+          `<img[^>]+(?:src|data-src|data-lazy-src|data-original)\\s*=\\s*["'][^"']*${slug}[^"']*["']`,
+          'i'
+        );
 
       const imageMatch =
-        html.match(imageRegex);
+        html.match(
+          imageRegex
+        );
 
-      if (imageMatch) {
+      if (
+        imageMatch
+      ) {
         const srcMatch =
           imageMatch[0].match(
             /(?:src|data-src|data-lazy-src|data-original)\s*=\s*["']([^"']+)["']/i
           );
 
-        if (srcMatch?.[1]) {
+        if (
+          srcMatch?.[1]
+        ) {
           image =
             cleanImageUrl(
               srcMatch[1],
@@ -215,13 +235,6 @@ function extractResults(
       }
     }
 
-    /*
-     * Dernier fallback :
-     * on utilise l'URL d'image générée par
-     * Anime-Sama uniquement si aucune vraie URL
-     * n'a été trouvée.
-     */
-
     if (!image) {
       image =
         `https://cdn.statically.io/gh/anime-sama/assets/main/catalogue/${slug}/cover.jpg`;
@@ -230,12 +243,19 @@ function extractResults(
     seen.add(slug);
 
     results.push({
-      name: slugToName(slug),
+      name:
+        slugToName(
+          slug
+        ),
+
       slug,
+
       image,
     });
 
-    if (results.length >= 30) {
+    if (
+      results.length >= 30
+    ) {
       break;
     }
   }
@@ -246,13 +266,21 @@ function extractResults(
 export async function GET(
   request: Request
 ) {
-  const { searchParams } =
-    new URL(request.url);
+  const {
+    searchParams,
+  } = new URL(
+    request.url
+  );
 
   const query =
-    searchParams.get('q')?.trim();
+    searchParams
+      .get('q')
+      ?.trim();
 
-  if (!query || query.length < 2) {
+  if (
+    !query ||
+    query.length < 2
+  ) {
     return NextResponse.json({
       results: [],
     });
@@ -261,7 +289,9 @@ export async function GET(
   try {
     const url =
       `${BASE_URL}/catalogue/?search=` +
-      encodeURIComponent(query);
+      encodeURIComponent(
+        query
+      );
 
     const controller =
       new AbortController();
@@ -274,22 +304,37 @@ export async function GET(
     let response: Response;
 
     try {
-      response = await fetch(url, {
-        signal: controller.signal,
-        cache: 'no-store',
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
-          Accept:
-            'text/html,application/xhtml+xml,application/javascript,*/*',
-          Referer: `${BASE_URL}/`,
-        },
-      });
+      response =
+        await fetch(
+          url,
+          {
+            signal:
+              controller.signal,
+
+            cache:
+              'no-store',
+
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+
+              Accept:
+                'text/html,application/xhtml+xml,application/javascript,*/*',
+
+              Referer:
+                `${BASE_URL}/`,
+            },
+          }
+        );
     } finally {
-      clearTimeout(timeout);
+      clearTimeout(
+        timeout
+      );
     }
 
-    if (!response.ok) {
+    if (
+      !response.ok
+    ) {
       return NextResponse.json({
         results: [],
       });
