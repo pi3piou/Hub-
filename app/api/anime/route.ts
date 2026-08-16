@@ -596,28 +596,20 @@ export async function GET(
         lang
       );
 
-    if (!episodesText) {
-      return NextResponse.json(
-        {
-          error:
-            'Saison indisponible',
-
-          slug,
-
-          saison:
-            requestedSeason,
-
-          lang,
-
-          seasons,
-
-          ...animeInfo,
-        },
-        {
-          status: 404,
-        }
-      );
+ if (!episodesText) {
+  return NextResponse.json(
+    {
+      error: 'Saison indisponible',
+      slug,
+      saison: requestedSeason,
+      lang,
+      seasons,
+    },
+    {
+      status: 404,
     }
+  );
+}
 
     const players =
       parsePlayers(
