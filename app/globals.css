@@ -1505,3 +1505,97 @@ a {
   margin-top: 16px;
 }
 
+/* =========================================================
+   CARTES DE SAISON
+   ========================================================= */
+
+.season-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.season-card {
+  display: block;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: inherit;
+  transition:
+    transform var(--ease),
+    border-color var(--ease);
+}
+
+.season-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-border);
+}
+
+.season-card.is-done {
+  border-color: var(--accent-border);
+  background: var(--accent-tint);
+}
+
+.season-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.season-card-top span {
+  font-size: 11px;
+  opacity: 0.55;
+}
+
+.resume-button {
+  display: flex;
+  width: 100%;
+  margin-bottom: 22px;
+}
+
+/* =========================================================
+   SQUELETTES
+   ========================================================= */
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0.09),
+    rgba(255, 255, 255, 0.04)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-cover {
+  flex: 0 0 140px;
+  width: 140px;
+  aspect-ratio: 16 / 9;
+}
+
+.skeleton-line {
+  height: 14px;
+  margin-bottom: 8px;
+}
+
+.skeleton-line.short {
+  width: 55%;
+}
+
+.skeleton-block {
+  height: 90px;
+  margin-top: 16px;
+}
+
+
