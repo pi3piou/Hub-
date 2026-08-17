@@ -19,7 +19,14 @@ import {
 
 import { readMergedProgress } from '@/lib/watchState';
 
-type Status = 'watching' | 'todo' | 'done';
+/*
+ * watching   → il reste des épisodes disponibles à voir
+ * upToDate   → tout ce qui est sorti a été vu, mais la
+ *              série n'est pas déclarée terminée
+ * done       → la fiche indique explicitement une fin
+ * todo       → jamais commencé
+ */
+type Status = 'watching' | 'todo' | 'upToDate' | 'done';
 
 type Filter = Status | 'all';
 
@@ -43,6 +50,34 @@ interface LibraryItem {
   seasons: number;
   lastActivity: number;
   nextRelease: PlanningItem | null;
+}
+
+/*
+ * Mots-clés indiquant une fin de série déclarée.
+ * On ne se fie qu'à un champ status explicite,
+ * jamais à l'absence de données pour deviner.
+ */
+const FINISHED_KEYWORDS = [
+  'terminé',
+  'termine',
+  'fini',
+  'complet',
+  'complété',
+  'complete',
+  'ended',
+  'finished',
+];
+
+function isExplicitlyFinished(
+  status: string | undefined
+) {
+  if (!status) return false;
+
+  const value = status.toLowerCase();
+
+  return FINISHED_KEYWORDS.some((keyword) =>
+    value.includes(keyword)
+  );
 }
 
 function readFavorites() {
@@ -150,6 +185,7 @@ function formatDate(timestamp: number) {
 const STATUS_LABEL: Record<Status, string> = {
   watching: 'En cours',
   todo: 'À voir',
+  upToDate: 'À jour',
   done: 'Terminé',
 };
 
@@ -226,18 +262,15 @@ export default function LibraryPage() {
 
             let watched = 0;
             let total = 0;
-            let everyComplete = true;
 
+            /*
+             * Une saison compte comme suivie dès
+             * qu'elle a un total connu, même
+             * partiellement vue.
+             */
             merged.forEach((entry) => {
               watched += entry.watched;
               total += entry.total;
-
-              if (
-                entry.total === 0 ||
-                entry.watched < entry.total
-              ) {
-                everyComplete = false;
-              }
             });
 
             const seasons =
@@ -256,20 +289,32 @@ export default function LibraryPage() {
                     a.releaseTs - b.releaseTs
                 )[0] || null;
 
-            const allTracked =
-              seasons > 0 &&
-              merged.size >= seasons;
+            /*
+             * A-t-on vu tout ce qui est
+             * actuellement disponible ?
+             */
+            const hasKnownTotal = total > 0;
+
+            const caughtUp =
+              hasKnownTotal &&
+              watched >= total;
 
             let status: Status = 'watching';
 
             if (merged.size === 0) {
               status = 'todo';
             } else if (
-              allTracked &&
-              everyComplete &&
-              !nextRelease
+              caughtUp &&
+              isExplicitlyFinished(info?.status)
             ) {
+              /* La fiche déclare la fin de la série */
               status = 'done';
+            } else if (caughtUp) {
+              /*
+               * Tout vu, mais rien ne confirme
+               * une fin : on ne prétend pas savoir.
+               */
+              status = 'upToDate';
             }
 
             const lastActivity =
@@ -313,6 +358,9 @@ export default function LibraryPage() {
       ).length,
       todo: items.filter(
         (item) => item.status === 'todo'
+      ).length,
+      upToDate: items.filter(
+        (item) => item.status === 'upToDate'
       ).length,
       done: items.filter(
         (item) => item.status === 'done'
@@ -363,6 +411,7 @@ export default function LibraryPage() {
         {(
           [
             ['watching', 'En cours'],
+            ['upToDate', 'À jour'],
             ['todo', 'À voir'],
             ['done', 'Terminés'],
             ['all', 'Tous'],
@@ -497,6 +546,12 @@ export default function LibraryPage() {
                   ) : item.status === 'done' ? (
                     <small className="library-next">
                       Série terminée
+                    </small>
+                  ) : item.status ===
+                    'upToDate' ? (
+                    <small className="library-next">
+                      À jour, prochaine sortie
+                      inconnue
                     </small>
                   ) : null}
 
