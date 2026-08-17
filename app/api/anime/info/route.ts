@@ -59,7 +59,7 @@ export async function GET(request: Request) {
           totalMatches: matches.length,
           extrait:
             index >= 0
-              ? html.slice(index, index + 2500)
+              ? html.slice(index, index + 12500)
               : 'introuvable',
         },
         {
