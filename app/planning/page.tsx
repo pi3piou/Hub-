@@ -8,7 +8,9 @@ import {
   formatPlanningDay,
   formatPlanningTime,
   getPlanningDayKey,
+  loadPlanning,
 } from '@/lib/planning';
+
 
 const CACHE_KEY = 'anime_planning_cache';
 const CACHE_TTL = 24 * 60 * 60 * 1000;
