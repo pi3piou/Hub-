@@ -2052,3 +2052,32 @@ a {
   opacity: 0.45;
 }
 
+.mark-button {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--accent-light);
+  font-size: 10px;
+  font-weight: 700;
+  backdrop-filter: blur(14px);
+  transition: border-color var(--ease);
+}
+
+.mark-button:hover {
+  border-color: var(--accent-border);
+}
+
+.episode-hint {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+/* Évite la sélection et le menu iOS à l'appui long */
+.episode {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
