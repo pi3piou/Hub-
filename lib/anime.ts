@@ -270,11 +270,11 @@ export function extractMainImage(
   pageUrl: string
 ) {
   const patterns = [
-    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
-    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+    /id=["']imgOeuvre["'][^>]+src=["']([^"']+)["']/i,
     /<img[^>]+class=["'][^"']*(?:cover|poster|image)[^"']*["'][^>]+src=["']([^"']+)["']/i,
     /<img[^>]+src=["']([^"']+)["'][^>]+class=["'][^"']*(?:cover|poster|image)[^"']*["']/i,
-    /<img[^>]+src=["']([^"']+)["']/i,
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
   ];
 
   for (const regex of patterns) {
@@ -294,6 +294,7 @@ export function extractMainImage(
 
   return '';
 }
+
 
 /* =========================================================
    SYNOPSIS
