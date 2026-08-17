@@ -2048,3 +2048,7 @@ a {
   }
 }
 
+.planning-day.is-past {
+  opacity: 0.45;
+}
+
