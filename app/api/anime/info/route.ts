@@ -82,7 +82,7 @@ export async function GET(request: Request) {
                   Math.max(0, index - 300),
                   index + 700
                 )
-              : html.slice(0, 550),
+              : html.slice(0, 500),
         },
         {
           headers: {
