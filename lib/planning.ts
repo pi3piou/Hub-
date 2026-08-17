@@ -170,11 +170,34 @@ export function formatPlanningDay(key: string) {
    ========================================================= */
 
 const PLANNING_CACHE_KEY = 'anime_planning_cache';
-const PLANNING_TTL = 24 * 60 * 60 * 1000;
+
+/* Filet de sécurité si le planning paraît en retard */
+const PLANNING_RETRY = 2 * 60 * 60 * 1000;
 
 interface PlanningCache {
   items: PlanningItem[];
   savedAt: number;
+}
+
+/*
+ * Le planning est publié le lundi pour la semaine.
+ * Une durée de vie en heures est donc inadaptée :
+ * ce qui compte, c'est le passage au lundi suivant.
+ */
+function getWeekStart() {
+  const now = new Date();
+
+  /* getDay : 0 = dimanche, 1 = lundi */
+  const daysSinceMonday = (now.getDay() + 6) % 7;
+
+  const monday = new Date(now);
+
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(
+    monday.getDate() - daysSinceMonday
+  );
+
+  return monday.getTime();
 }
 
 export function readPlanningCache():
@@ -191,8 +214,28 @@ export function readPlanningCache():
 
     if (
       !entry?.savedAt ||
-      Date.now() - entry.savedAt > PLANNING_TTL ||
       !Array.isArray(entry.items)
+    ) {
+      return null;
+    }
+
+    /* Enregistré avant le lundi en cours : périmé */
+    if (entry.savedAt < getWeekStart()) {
+      return null;
+    }
+
+    /*
+     * Plus aucune sortie à venir : soit la semaine
+     * se termine, soit la publication a du retard.
+     * On retente au bout de deux heures.
+     */
+    const hasFuture = entry.items.some(
+      (item) => item.releaseTs * 1000 > Date.now()
+    );
+
+    if (
+      !hasFuture &&
+      Date.now() - entry.savedAt > PLANNING_RETRY
     ) {
       return null;
     }
@@ -220,8 +263,7 @@ function writePlanningCache(
 }
 
 /*
- * Un seul appel réseau par 24 h, quel que soit
- * le nombre de visites.
+ * Un seul appel réseau par semaine en régime normal.
  */
 export async function loadPlanning(): Promise<
   PlanningItem[]
@@ -267,4 +309,3 @@ export function findNextRelease(
       )[0] || null
   );
 }
-
