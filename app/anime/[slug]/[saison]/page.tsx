@@ -20,6 +20,15 @@ import {
   prefetchEpisodes,
 } from '@/lib/animeCache';
 
+import {
+  clearSeason,
+  getWatchKey,
+  markEpisodesUpTo,
+  readProgress,
+  readWatched,
+  writeSeasonProgress,
+} from '@/lib/watchState';
+
 interface ContinueItem {
   slug: string;
   name: string;
@@ -39,21 +48,7 @@ interface SeasonProgress {
 }
 
 const WATCH_DELAY = 60000;
-
-function getWatchKey(
-  slug: string,
-  season: number,
-  lang: string
-) {
-  return `anime_watched_${slug}_s${season}_${lang}`;
-}
-
-function getProgressKey(
-  slug: string,
-  lang: string
-) {
-  return `anime_progress_${slug}_${lang}`;
-}
+const LONG_PRESS = 550;
 
 function getContinueKey(slug: string) {
   return `anime_continue_${slug}`;
@@ -111,6 +106,10 @@ export default function AnimeSeasonPage({
   const [globalProgress, setGlobalProgress] =
     useState({ watched: 0, total: 0 });
 
+  /* Appui long */
+  const pressTimer = useRef<number | null>(null);
+  const longPressed = useRef(false);
+
   /*
    * =======================================================
    * ÉPISODES
@@ -130,9 +129,6 @@ export default function AnimeSeasonPage({
   /*
    * =======================================================
    * LANGUE ET ÉPISODE DE DÉPART
-   *
-   * Si une lecture est en cours sur cette saison,
-   * on reprend la langue et l'épisode enregistrés.
    * =======================================================
    */
 
@@ -149,7 +145,7 @@ export default function AnimeSeasonPage({
 
   /*
    * =======================================================
-   * FICHE (titre, saisons)
+   * FICHE
    * =======================================================
    */
 
@@ -189,10 +185,6 @@ export default function AnimeSeasonPage({
     );
 
     if (cached) {
-      /*
-       * Déjà préchargé depuis la fiche :
-       * aucun écran d'attente.
-       */
       setData(cached);
       setPlayer(cached.defaultPlayerIndex || 0);
       setLoading(false);
@@ -229,6 +221,20 @@ export default function AnimeSeasonPage({
 
   /*
    * =======================================================
+   * BASCULE AUTOMATIQUE DE LANGUE
+   * =======================================================
+   */
+
+  useEffect(() => {
+    if (!data) return;
+
+    if (data.lang && data.lang !== lang) {
+      setLang(data.lang);
+    }
+  }, [data, lang]);
+
+  /*
+   * =======================================================
    * PRÉCHARGEMENT DES VOISINS
    * =======================================================
    */
@@ -248,25 +254,6 @@ export default function AnimeSeasonPage({
       prefetchEpisodes(slug, season + 1, lang);
     }
   }, [data, info, slug, season, lang]);
-
-  /*
-   * =======================================================
-   * BASCULE AUTOMATIQUE DE LANGUE
-   *
-   * Certains animes n'existent qu'en VF : l'API nous
-   * renvoie alors la langue disponible.
-   * =======================================================
-   */
-
-  useEffect(() => {
-    if (!data) return;
-
-    if (data.lang && data.lang !== lang) {
-      setLang(data.lang);
-    }
-  }, [data, lang]);
-
-
 
   /*
    * =======================================================
@@ -335,64 +322,6 @@ export default function AnimeSeasonPage({
 
   /*
    * =======================================================
-   * PROGRESSION SAISON
-   * =======================================================
-   */
-
-  const updateSeasonProgress = (
-    episodeNumber: number,
-    watchedEpisodes: number[]
-  ) => {
-    try {
-      const key = getProgressKey(slug, lang);
-
-      const raw = localStorage.getItem(key);
-
-      let progress: SeasonProgress[] = raw
-        ? JSON.parse(raw)
-        : [];
-
-      if (!Array.isArray(progress)) {
-        progress = [];
-      }
-
-      const updated: SeasonProgress = {
-        season,
-        watched: watchedEpisodes.length,
-        total: episodes.length,
-        lastEpisode: episodeNumber,
-        updatedAt: Date.now(),
-      };
-
-      const exists = progress.some(
-        (item) => item.season === season
-      );
-
-      progress = exists
-        ? progress.map((item) =>
-            item.season === season
-              ? updated
-              : item
-          )
-        : [...progress, updated];
-
-      progress.sort(
-        (a, b) => a.season - b.season
-      );
-
-      localStorage.setItem(
-        key,
-        JSON.stringify(progress)
-      );
-
-      setSeasonProgress(progress);
-    } catch {
-      // localStorage indisponible
-    }
-  };
-
-  /*
-   * =======================================================
    * MARQUER VU
    * =======================================================
    */
@@ -421,7 +350,15 @@ export default function AnimeSeasonPage({
       // localStorage indisponible
     }
 
-    updateSeasonProgress(episodeIndex, next);
+    writeSeasonProgress(slug, lang, {
+      season,
+      watched: next.length,
+      total: episodes.length,
+      lastEpisode: episodeIndex,
+      updatedAt: Date.now(),
+    });
+
+    setSeasonProgress(readProgress(slug, lang));
 
     saveContinue(episodeIndex);
   };
@@ -434,39 +371,105 @@ export default function AnimeSeasonPage({
 
   /*
    * =======================================================
+   * MARQUAGE MANUEL
+   * =======================================================
+   */
+
+  const markUpTo = (index: number) => {
+    if (episodes.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Marquer les épisodes 1 à ${
+        index + 1
+      } comme vus ?`
+    );
+
+    if (!confirmed) return;
+
+    const next = markEpisodesUpTo(
+      slug,
+      season,
+      lang,
+      index,
+      episodes.length
+    );
+
+    setWatched(next);
+    setSeasonProgress(readProgress(slug, lang));
+  };
+
+  const toggleWholeSeason = () => {
+    if (episodes.length === 0) return;
+
+    const isComplete =
+      watched.length >= episodes.length;
+
+    if (isComplete) {
+      if (
+        !window.confirm(
+          'Retirer la progression de cette saison ?'
+        )
+      ) {
+        return;
+      }
+
+      clearSeason(slug, season, lang);
+
+      setWatched([]);
+      setSeasonProgress(readProgress(slug, lang));
+
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Marquer les ${episodes.length} épisodes comme vus ?`
+      )
+    ) {
+      return;
+    }
+
+    const next = markEpisodesUpTo(
+      slug,
+      season,
+      lang,
+      episodes.length - 1,
+      episodes.length
+    );
+
+    setWatched(next);
+    setSeasonProgress(readProgress(slug, lang));
+  };
+
+  const startPress = (index: number) => {
+    longPressed.current = false;
+
+    pressTimer.current = window.setTimeout(() => {
+      longPressed.current = true;
+
+      markUpTo(index);
+    }, LONG_PRESS);
+  };
+
+  const cancelPress = () => {
+    if (pressTimer.current !== null) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => cancelPress();
+  }, []);
+
+  /*
+   * =======================================================
    * ÉPISODES VUS
    * =======================================================
    */
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(
-        getWatchKey(slug, season, lang)
-      );
-
-      if (!raw) {
-        setWatched([]);
-        return;
-      }
-
-      const parsed = JSON.parse(raw);
-
-      if (Array.isArray(parsed)) {
-        setWatched(
-          parsed
-            .map(Number)
-            .filter(
-              (number) =>
-                Number.isInteger(number) &&
-                number >= 0
-            )
-        );
-      } else {
-        setWatched([]);
-      }
-    } catch {
-      setWatched([]);
-    }
+    setWatched(readWatched(slug, season, lang));
   }, [slug, season, lang]);
 
   /*
@@ -476,24 +479,7 @@ export default function AnimeSeasonPage({
    */
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(
-        getProgressKey(slug, lang)
-      );
-
-      if (!raw) {
-        setSeasonProgress([]);
-        return;
-      }
-
-      const parsed = JSON.parse(raw);
-
-      setSeasonProgress(
-        Array.isArray(parsed) ? parsed : []
-      );
-    } catch {
-      setSeasonProgress([]);
-    }
+    setSeasonProgress(readProgress(slug, lang));
   }, [slug, lang]);
 
   /*
@@ -552,6 +538,10 @@ export default function AnimeSeasonPage({
   const seasons = info?.seasons?.length
     ? info.seasons
     : [season];
+
+  const isSeasonComplete =
+    episodes.length > 0 &&
+    watched.length >= episodes.length;
 
   /*
    * =======================================================
@@ -617,9 +607,7 @@ export default function AnimeSeasonPage({
 
       </header>
 
-      {/* ===================================================
-          LECTEUR
-          =================================================== */}
+      {/* LECTEUR */}
 
       <section className="player-container">
 
@@ -653,9 +641,7 @@ export default function AnimeSeasonPage({
 
       </section>
 
-      {/* ===================================================
-          PROGRESSION
-          =================================================== */}
+      {/* PROGRESSION */}
 
       <section className="anime-progress">
 
@@ -711,15 +697,13 @@ export default function AnimeSeasonPage({
 
       </section>
 
-      {/* ===================================================
-          CONTRÔLES
-          =================================================== */}
+      {/* CONTRÔLES */}
 
       <section className="episode-controls">
 
         <div className="control-row">
 
-                <div className="segmented">
+          <div className="segmented">
 
             {data?.hasVOSTFR !== false && (
               <button
@@ -746,7 +730,6 @@ export default function AnimeSeasonPage({
             )}
 
           </div>
-
 
           <select
             value={season}
@@ -804,9 +787,7 @@ export default function AnimeSeasonPage({
 
       </section>
 
-      {/* ===================================================
-          ÉPISODES
-          =================================================== */}
+      {/* ÉPISODES */}
 
       <section className="episodes-section">
 
@@ -822,11 +803,23 @@ export default function AnimeSeasonPage({
 
           </div>
 
-          <span className="episode-count">
-            {episodes.length}
-          </span>
+          {episodes.length > 0 && (
+            <button
+              className="mark-button"
+              onClick={toggleWholeSeason}
+            >
+              {isSeasonComplete
+                ? 'Tout décocher'
+                : 'Tout marquer'}
+            </button>
+          )}
 
         </div>
+
+        <p className="episode-hint">
+          Appui long sur un épisode pour marquer
+          tous les précédents comme vus.
+        </p>
 
         <div className="episode-grid">
 
@@ -847,7 +840,22 @@ export default function AnimeSeasonPage({
                 ]
                   .filter(Boolean)
                   .join(' ')}
+                onPointerDown={() =>
+                  startPress(index)
+                }
+                onPointerUp={cancelPress}
+                onPointerLeave={cancelPress}
+                onPointerCancel={cancelPress}
+                onContextMenu={(event) =>
+                  event.preventDefault()
+                }
                 onClick={() => {
+                  /* Un appui long ne lance pas la lecture */
+                  if (longPressed.current) {
+                    longPressed.current = false;
+                    return;
+                  }
+
                   setEpisode(index);
 
                   saveContinue(index);
