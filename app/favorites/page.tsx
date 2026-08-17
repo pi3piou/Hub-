@@ -4,8 +4,11 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import {
+  AniListData,
   getAnimeName,
+  getCachedAniList,
   getCachedInfo,
+  loadAniList,
   loadAnimeInfo,
 } from '@/lib/animeCache';
 
@@ -21,9 +24,9 @@ import { readMergedProgress } from '@/lib/watchState';
 
 /*
  * watching   → il reste des épisodes disponibles à voir
- * upToDate   → tout ce qui est sorti a été vu, mais la
- *              série n'est pas déclarée terminée
- * done       → la fiche indique explicitement une fin
+ * upToDate   → tout ce qui est sorti a été vu, mais rien
+ *              ne confirme que la série est terminée
+ * done       → AniList confirme FINISHED et tu es à jour
  * todo       → jamais commencé
  */
 type Status = 'watching' | 'todo' | 'upToDate' | 'done';
@@ -50,34 +53,7 @@ interface LibraryItem {
   seasons: number;
   lastActivity: number;
   nextRelease: PlanningItem | null;
-}
-
-/*
- * Mots-clés indiquant une fin de série déclarée.
- * On ne se fie qu'à un champ status explicite,
- * jamais à l'absence de données pour deviner.
- */
-const FINISHED_KEYWORDS = [
-  'terminé',
-  'termine',
-  'fini',
-  'complet',
-  'complété',
-  'complete',
-  'ended',
-  'finished',
-];
-
-function isExplicitlyFinished(
-  status: string | undefined
-) {
-  if (!status) return false;
-
-  const value = status.toLowerCase();
-
-  return FINISHED_KEYWORDS.some((keyword) =>
-    value.includes(keyword)
-  );
+  anilistEpisodes: number | null;
 }
 
 function readFavorites() {
@@ -189,6 +165,20 @@ const STATUS_LABEL: Record<Status, string> = {
   done: 'Terminé',
 };
 
+/*
+ * En dessous de ce seuil, la correspondance AniList
+ * est trop incertaine pour qu'on s'y fie.
+ */
+const ANILIST_CONFIDENCE_MIN = 0.5;
+
+function trustAniList(anilist: AniListData | null) {
+  return Boolean(
+    anilist?.matched &&
+      (anilist.confidence ?? 0) >=
+        ANILIST_CONFIDENCE_MIN
+  );
+}
+
 export default function LibraryPage() {
   const [items, setItems] = useState<
     LibraryItem[]
@@ -257,6 +247,25 @@ export default function LibraryPage() {
               }
             }
 
+            /*
+             * AniList : source du statut fiable et
+             * du total d'épisodes officiel. Simple
+             * enrichissement, jamais bloquant.
+             */
+            let anilist = getCachedAniList(slug);
+
+            if (!anilist) {
+              try {
+                anilist = await loadAniList(
+                  slug,
+                  info?.name || meta.name,
+                  info?.altTitles || []
+                );
+              } catch {
+                anilist = null;
+              }
+            }
+
             const merged =
               readMergedProgress(slug);
 
@@ -304,10 +313,14 @@ export default function LibraryPage() {
             if (merged.size === 0) {
               status = 'todo';
             } else if (
-              caughtUp &&
-              isExplicitlyFinished(info?.status)
+              trustAniList(anilist) &&
+              anilist!.status === 'FINISHED' &&
+              caughtUp
             ) {
-              /* La fiche déclare la fin de la série */
+              /*
+               * AniList confirme la fin de série,
+               * et tu as vu tout ce qui existe.
+               */
               status = 'done';
             } else if (caughtUp) {
               /*
@@ -332,6 +345,8 @@ export default function LibraryPage() {
               seasons,
               lastActivity,
               nextRelease,
+              anilistEpisodes:
+                anilist?.episodes ?? null,
             } as LibraryItem;
           })
       );
@@ -509,6 +524,8 @@ export default function LibraryPage() {
                   <span className="library-meta">
                     {item.total > 0
                       ? `${item.watched} / ${item.total} épisodes`
+                      : item.anilistEpisodes
+                      ? `${item.anilistEpisodes} épisodes au total`
                       : 'Pas encore commencé'}
 
                     {item.seasons > 1 && (
