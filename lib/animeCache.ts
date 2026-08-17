@@ -267,3 +267,63 @@ export function prefetchAnimeInfo(slug: string) {
     // Rien
   });
 }
+
+/* =========================================================
+   ANILIST — STATUT ET TOTAL D'ÉPISODES
+   ========================================================= */
+
+export interface AniListData {
+  matched: boolean;
+  reason?: string;
+  confidence?: number;
+  status?:
+    | 'FINISHED'
+    | 'RELEASING'
+    | 'NOT_YET_RELEASED'
+    | 'CANCELLED'
+    | 'HIATUS'
+    | null;
+  statusLabel?: string | null;
+  episodes?: number | null;
+  anilistId?: number;
+}
+
+const ANILIST_TTL = 24 * 60 * 60 * 1000;
+
+function anilistKey(slug: string) {
+  return `techfeed_anilist_${slug}`;
+}
+
+export function getCachedAniList(slug: string) {
+  return readEntry<AniListData>(anilistKey(slug));
+}
+
+export function loadAniList(
+  slug: string,
+  name: string,
+  altTitles: string[] = []
+) {
+  const params = new URLSearchParams({ name });
+
+  if (altTitles.length) {
+    params.set('alt', altTitles.join('|'));
+  }
+
+  return request<AniListData>(
+    `/api/anime/anilist?${params.toString()}`,
+    anilistKey(slug),
+    ANILIST_TTL
+  );
+}
+
+export function prefetchAniList(
+  slug: string,
+  name: string,
+  altTitles: string[] = []
+) {
+  if (getCachedAniList(slug)) return;
+
+  loadAniList(slug, name, altTitles).catch(() => {
+    // Rien : simple enrichissement, pas bloquant
+  });
+}
