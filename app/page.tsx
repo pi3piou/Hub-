@@ -545,128 +545,22 @@ export default function Home() {
 
       {/* HISTORIQUE */}
 
-      {mounted && history.length > 0 && (
-        <section className="section">
+           {mounted && resume.length === 0 && (
+        <div className="empty-card">
 
-          <div className="section-header">
+          <div className="empty-icon">▶</div>
 
-            <div>
-              <span className="section-eyebrow">
-                HISTORIQUE
-              </span>
+          <h3>Rien en cours</h3>
 
-              <h2>Récemment regardés</h2>
-            </div>
+          <p>
+            Recherche un anime pour commencer à
+            le suivre.
+          </p>
 
-            <button
-              className="clear-history"
-              onClick={() => {
-                if (
-                  !window.confirm(
-                    'Effacer tout l’historique ?'
-                  )
-                ) {
-                  return;
-                }
-
-                localStorage.removeItem(
-                  'anime_history'
-                );
-
-                setHistory([]);
-                setResume([]);
-              }}
-            >
-              Effacer
-            </button>
-
-          </div>
-
-          <div className="history-list">
-
-            {history.slice(0, 10).map((item) => (
-              <div
-                className="history-card"
-                key={`${item.slug}-${item.season}-${item.lang}`}
-              >
-
-                <Link
-                  href={`/anime/${encodeURIComponent(
-                    item.slug
-                  )}/${item.season}`}
-                  className="history-main"
-                >
-
-                  <div className="history-cover">
-                    {item.image && (
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        loading="lazy"
-                      />
-                    )}
-                  </div>
-
-                  <div className="history-info">
-
-                    <strong>{item.name}</strong>
-
-                    <span>
-                      Saison {item.season}
-                      {' • '}
-                      Épisode {item.episode + 1}
-                    </span>
-
-                    <small>
-                      {formatHistoryDate(
-                        item.updatedAt
-                      )}
-                    </small>
-
-                  </div>
-
-                </Link>
-
-                <button
-                  className="history-delete"
-                  aria-label={`Supprimer ${item.name} de l’historique`}
-                  onClick={() => {
-                    const next = history.filter(
-                      (entry) =>
-                        !(
-                          entry.slug ===
-                            item.slug &&
-                          entry.season ===
-                            item.season &&
-                          entry.lang === item.lang
-                        )
-                    );
-
-                    localStorage.setItem(
-                      'anime_history',
-                      JSON.stringify(next)
-                    );
-
-                    setHistory(next);
-
-                    setResume((current) =>
-                      current.filter(
-                        (entry) =>
-                          entry.slug !== item.slug
-                      )
-                    );
-                  }}
-                >
-                  ×
-                </button>
-
-              </div>
-            ))}
-
-          </div>
-
-        </section>
+        </div>
       )}
+
+               
 
       {/* AUCUNE ACTIVITÉ */}
 
