@@ -43,6 +43,26 @@ export async function GET(request: Request) {
       );
     }
 
+    if (searchParams.get('debug') === 'status') {
+      const index = html.search(/info-lbl/i);
+
+      return NextResponse.json(
+        {
+          extrait:
+            index >= 0
+              ? html.slice(index, index + 2000)
+              : 'introuvable',
+        },
+        {
+          headers: {
+            'Content-Type':
+              'application/json; charset=utf-8',
+          },
+        }
+      );
+    }
+
+
     /*
      * Sonde image : /api/anime/info?slug=x&debug=img
      */
