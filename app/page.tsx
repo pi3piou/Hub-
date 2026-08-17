@@ -37,51 +37,13 @@ interface ContinueItem {
   updatedAt: number;
 }
 
-/* Élément prêt à afficher, éventuellement redirigé */
+/* Élément prêt à afficher, avec sa progression */
 interface ResumeItem extends ContinueItem {
   targetSeason: number;
   targetEpisode: number;
   isNextSeason: boolean;
-}
-
-function readFavorites(): AnimeItem[] {
-  try {
-    const raw = localStorage.getItem(
-      'anime_favorites'
-    );
-
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw);
-
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .map((item) => {
-        if (typeof item === 'string') {
-          return { name: item, slug: item };
-        }
-
-        if (item && typeof item === 'object') {
-          const slug = String(item.slug || '');
-
-          if (!slug) return null;
-
-          return {
-            name: String(item.name || slug),
-            slug,
-            image: item.image
-              ? String(item.image)
-              : undefined,
-          };
-        }
-
-        return null;
-      })
-      .filter(Boolean) as AnimeItem[];
-  } catch {
-    return [];
-  }
+  watchedCount: number;
+  totalCount: number;
 }
 
 function readHistory(): ContinueItem[] {
@@ -142,10 +104,8 @@ function formatHistoryDate(timestamp: number) {
  * DÉCISION D'AFFICHAGE
  *
  * Un anime quitte la file d'attente quand sa saison
- * est terminée. Trois issues possibles :
- *   - saison suivante disponible → on bascule dessus
- *   - un épisode est sorti depuis → on revérifie le total
- *   - sinon → on masque jusqu'à la prochaine sortie
+ * est terminée, sauf si une saison suivante existe
+ * ou si un nouvel épisode vient de sortir.
  * =========================================================
  */
 async function resolveResume(
@@ -158,19 +118,21 @@ async function resolveResume(
     item.lang
   );
 
-  /* Saison en cours : rien à changer */
+  /* Saison en cours */
   if (!isSeasonComplete(progress)) {
     return {
       ...item,
       targetSeason: item.season,
       targetEpisode: item.episode,
       isNextSeason: false,
+      watchedCount: progress?.watched ?? 0,
+      totalCount: progress?.total ?? 0,
     };
   }
 
   /*
-   * Une sortie a eu lieu récemment pour cette
-   * saison : le total stocké est peut-être périmé.
+   * Une sortie a eu lieu : le total stocké
+   * est peut-être périmé.
    */
   const release = planning.find(
     (entry) =>
@@ -216,14 +178,16 @@ async function resolveResume(
             total - 1
           ),
           isNextSeason: false,
+          watchedCount: watched.length,
+          totalCount: total,
         };
       }
     } catch {
-      // On garde le comportement par défaut
+      // Comportement par défaut
     }
   }
 
-  /* Existe-t-il une saison suivante ? */
+  /* Saison suivante ? */
   let info = getCachedInfo(item.slug);
 
   if (!info) {
@@ -245,7 +209,6 @@ async function resolveResume(
       item.lang
     );
 
-    /* Saison suivante déjà terminée : on masque */
     if (isSeasonComplete(nextProgress)) {
       return null;
     }
@@ -256,10 +219,12 @@ async function resolveResume(
       targetEpisode:
         nextProgress?.lastEpisode ?? 0,
       isNextSeason: !nextProgress,
+      watchedCount: nextProgress?.watched ?? 0,
+      totalCount: nextProgress?.total ?? 0,
     };
   }
 
-  /* À jour, plus rien à regarder pour l'instant */
+  /* À jour */
   return null;
 }
 
@@ -267,10 +232,6 @@ export default function Home() {
   const [query, setQuery] = useState('');
 
   const [results, setResults] = useState<
-    AnimeItem[]
-  >([]);
-
-  const [favorites, setFavorites] = useState<
     AnimeItem[]
   >([]);
 
@@ -288,8 +249,6 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setFavorites(readFavorites());
-
     const entries = readHistory();
 
     setHistory(entries);
@@ -398,8 +357,8 @@ export default function Home() {
           <h1>Regarde ton anime.</h1>
 
           <p>
-            Recherche un titre et retrouve
-            rapidement tes favoris.
+            Reprends là où tu t’es arrêté, ou
+            cherche un nouveau titre.
           </p>
         </div>
 
@@ -509,52 +468,75 @@ export default function Home() {
 
           <div className="continue-list">
 
-            {resume.slice(0, 5).map((item) => (
-              <Link
-                key={`${item.slug}-${item.targetSeason}-${item.lang}`}
-                href={`/anime/${encodeURIComponent(
-                  item.slug
-                )}/${item.targetSeason}`}
-                className="continue-card"
-              >
+            {resume.slice(0, 5).map((item) => {
 
-                <div className="continue-cover">
-                  {item.image && (
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      loading="lazy"
-                    />
-                  )}
-                </div>
+              const percentage =
+                item.totalCount > 0
+                  ? Math.min(
+                      100,
+                      (item.watchedCount /
+                        item.totalCount) *
+                        100
+                    )
+                  : 0;
 
-                <div className="continue-info">
+              return (
+                <Link
+                  key={`${item.slug}-${item.targetSeason}-${item.lang}`}
+                  href={`/anime/${encodeURIComponent(
+                    item.slug
+                  )}/${item.targetSeason}`}
+                  className="continue-card"
+                >
 
-                  <strong>{item.name}</strong>
-
-                  <span>
-                    Saison {item.targetSeason}
-                    {' • '}
-                    Épisode{' '}
-                    {item.targetEpisode + 1}
-                  </span>
-
-                  <div className="continue-progress">
-                    <span />
+                  <div className="continue-cover">
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        loading="lazy"
+                      />
+                    )}
                   </div>
 
-                  <small>
-                    {item.isNextSeason
-                      ? '▶ Nouvelle saison'
-                      : '▶ Reprendre'}
-                  </small>
+                  <div className="continue-info">
 
-                </div>
+                    <strong>{item.name}</strong>
 
-                <span className="arrow">›</span>
+                    <span>
+                      Saison {item.targetSeason}
+                      {' • '}
+                      Épisode{' '}
+                      {item.targetEpisode + 1}
+                      {item.totalCount > 0 && (
+                        <>
+                          {' sur '}
+                          {item.totalCount}
+                        </>
+                      )}
+                    </span>
 
-              </Link>
-            ))}
+                    <div className="continue-progress">
+                      <span
+                        style={{
+                          width: `${percentage}%`,
+                        }}
+                      />
+                    </div>
+
+                    <small>
+                      {item.isNextSeason
+                        ? '▶ Nouvelle saison'
+                        : '▶ Reprendre'}
+                    </small>
+
+                  </div>
+
+                  <span className="arrow">›</span>
+
+                </Link>
+              );
+            })}
 
           </div>
 
@@ -686,104 +668,24 @@ export default function Home() {
         </section>
       )}
 
-      {/* CATALOGUE */}
+      {/* AUCUNE ACTIVITÉ */}
 
-      <section className="featured-card">
-
-        <div className="featured-glow" />
-
-        <div className="featured-content">
-
-          <span className="badge">CATALOGUE</span>
-
-          <h2>Découvre ton prochain anime</h2>
-
-          <p>
-            Recherche un titre pour accéder à ses
-            saisons et épisodes.
-          </p>
-
-          <div className="featured-icon">▶</div>
-
-        </div>
-
-      </section>
-
-      {/* FAVORIS */}
-
-      <section className="section">
-
-        <div className="section-header">
-
-          <div>
-
-            <span className="section-eyebrow">
-              BIBLIOTHÈQUE
-            </span>
-
-            <h2>Vos favoris</h2>
-
-          </div>
-
-          {mounted && favorites.length > 0 && (
-            <Link
-              href="/favorites"
-              className="see-all"
-            >
-              Tout voir
-            </Link>
-          )}
-
-        </div>
-
-        {!mounted ? (
-          <div className="empty-card">
-            <span className="loader" />
-          </div>
-        ) : favorites.length === 0 ? (
+      {mounted &&
+        resume.length === 0 &&
+        history.length === 0 && (
           <div className="empty-card">
 
-            <div className="empty-icon">★</div>
+            <div className="empty-icon">▶</div>
 
-            <h3>Aucun favori</h3>
+            <h3>Rien en cours</h3>
 
             <p>
-              Recherche un anime puis ajoute-le à
-              ta bibliothèque.
+              Recherche un anime pour commencer à
+              le suivre.
             </p>
 
           </div>
-        ) : (
-          <div className="anime-grid">
-
-            {favorites.slice(0, 4).map((item) => (
-              <Link
-                href={`/anime/${encodeURIComponent(
-                  item.slug
-                )}`}
-                key={item.slug}
-                className="anime-card"
-              >
-
-                <div className="anime-cover">
-                  {item.image && (
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      loading="lazy"
-                    />
-                  )}
-                </div>
-
-                <span>{item.name}</span>
-
-              </Link>
-            ))}
-
-          </div>
         )}
-
-      </section>
 
     </main>
   );
