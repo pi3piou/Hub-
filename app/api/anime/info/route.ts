@@ -43,6 +43,29 @@ export async function GET(request: Request) {
       );
     }
 
+    if (searchParams.get('debug') === 'img') {
+      const og = html.match(
+        /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i
+      )?.[1];
+
+      const imgTags = Array.from(
+        html.matchAll(/<img[^>]{0,300}>/gi)
+      )
+        .slice(0, 8)
+        .map((m) => m[0]);
+
+      return NextResponse.json(
+        { og, imgTags },
+        {
+          headers: {
+            'Content-Type':
+              'application/json; charset=utf-8',
+          },
+        }
+      );
+    }
+
+
     /*
      * Sonde temporaire, à supprimer ensuite :
      * /api/anime/info?slug=one-piece&debug=1
