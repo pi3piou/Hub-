@@ -9,7 +9,7 @@ import {
 
 /*
  * =========================================================
- * FICHE ANIME
+ * FICHE ANIME serie
  *
  * Une seule requête vers Anime-Sama : la page catalogue.
  * Ne touche jamais aux fichiers episodes.js.
