@@ -164,3 +164,107 @@ export function formatPlanningDay(key: string) {
     timeZone: 'UTC',
   });
 }
+
+/* =========================================================
+   CACHE CLIENT DU PLANNING
+   ========================================================= */
+
+const PLANNING_CACHE_KEY = 'anime_planning_cache';
+const PLANNING_TTL = 24 * 60 * 60 * 1000;
+
+interface PlanningCache {
+  items: PlanningItem[];
+  savedAt: number;
+}
+
+export function readPlanningCache():
+  | PlanningItem[]
+  | null {
+  try {
+    const raw = localStorage.getItem(
+      PLANNING_CACHE_KEY
+    );
+
+    if (!raw) return null;
+
+    const entry = JSON.parse(raw) as PlanningCache;
+
+    if (
+      !entry?.savedAt ||
+      Date.now() - entry.savedAt > PLANNING_TTL ||
+      !Array.isArray(entry.items)
+    ) {
+      return null;
+    }
+
+    return entry.items;
+  } catch {
+    return null;
+  }
+}
+
+function writePlanningCache(
+  items: PlanningItem[]
+) {
+  try {
+    localStorage.setItem(
+      PLANNING_CACHE_KEY,
+      JSON.stringify({
+        items,
+        savedAt: Date.now(),
+      } as PlanningCache)
+    );
+  } catch {
+    // Quota dépassé
+  }
+}
+
+/*
+ * Un seul appel réseau par 24 h, quel que soit
+ * le nombre de visites.
+ */
+export async function loadPlanning(): Promise<
+  PlanningItem[]
+> {
+  const cached = readPlanningCache();
+
+  if (cached) return cached;
+
+  const response = await fetch(
+    '/api/anime/planning'
+  );
+
+  const data = await response.json();
+
+  if (!Array.isArray(data.items)) {
+    throw new Error('Planning invalide');
+  }
+
+  writePlanningCache(data.items);
+
+  return data.items as PlanningItem[];
+}
+
+/* Prochaine sortie connue pour une saison */
+export function findNextRelease(
+  items: PlanningItem[],
+  slug: string,
+  season?: number
+) {
+  const now = Date.now();
+
+  return (
+    items
+      .filter(
+        (item) =>
+          item.slug === slug &&
+          (season === undefined ||
+            item.season === season) &&
+          item.releaseTs * 1000 > now
+      )
+      .sort(
+        (a, b) => a.releaseTs - b.releaseTs
+      )[0] || null
+  );
+}
+
