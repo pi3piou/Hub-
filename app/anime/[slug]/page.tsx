@@ -1,15 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   AnimeInfoData,
   getAnimeName,
+  getCachedAniList,
   getCachedInfo,
+  loadAniList,
   loadAnimeInfo,
+  loadEpisodes,
   prefetchEpisodes,
 } from '@/lib/animeCache';
+
+import {
+  getSeasonProgress,
+  markEpisodesUpTo,
+  readMergedProgress,
+} from '@/lib/watchState';
 
 interface ContinueItem {
   slug: string;
@@ -36,6 +45,7 @@ interface SeasonProgress {
 }
 
 const SYNOPSIS_LIMIT = 260;
+const LONG_PRESS = 550;
 
 function readFavorites(): FavoriteItem[] {
   try {
@@ -86,44 +96,6 @@ function readFavorites(): FavoriteItem[] {
   }
 }
 
-/*
- * La progression est stockée par langue.
- * Sur la fiche, on retient la meilleure des deux.
- * La logique de stockage n'est pas modifiée.
- */
-function readMergedProgress(slug: string) {
-  const merged = new Map<number, SeasonProgress>();
-
-  for (const lang of ['vostfr', 'vf']) {
-    try {
-      const raw = localStorage.getItem(
-        `anime_progress_${slug}_${lang}`
-      );
-
-      if (!raw) continue;
-
-      const parsed = JSON.parse(raw);
-
-      if (!Array.isArray(parsed)) continue;
-
-      for (const item of parsed as SeasonProgress[]) {
-        const existing = merged.get(item.season);
-
-        if (
-          !existing ||
-          item.watched > existing.watched
-        ) {
-          merged.set(item.season, item);
-        }
-      }
-    } catch {
-      // Rien
-    }
-  }
-
-  return merged;
-}
-
 export default function AnimeInfoPage({
   params,
 }: {
@@ -148,6 +120,13 @@ export default function AnimeInfoPage({
 
   const [expanded, setExpanded] = useState(false);
   const [showAlt, setShowAlt] = useState(false);
+
+  /* Appui long sur une carte de saison */
+  const [markingSeason, setMarkingSeason] =
+    useState<number | null>(null);
+
+  const pressTimer = useRef<number | null>(null);
+  const longPressed = useRef(false);
 
   /*
    * =======================================================
@@ -233,14 +212,22 @@ export default function AnimeInfoPage({
       target,
       continueItem?.lang || 'vostfr'
     );
+
+    /* AniList : statut et total, en tâche de fond */
+    if (!getCachedAniList(slug)) {
+      loadAniList(
+        slug,
+        info.name,
+        info.altTitles || []
+      ).catch(() => {
+        // Simple enrichissement, pas bloquant
+      });
+    }
   }, [info, continueItem, slug]);
 
   /*
    * =======================================================
    * TOTAUX CONNUS
-   *
-   * Aucun appel réseau : uniquement les totaux déjà
-   * enregistrés par les saisons visitées.
    * =======================================================
    */
 
@@ -255,6 +242,115 @@ export default function AnimeInfoPage({
 
     return { watched, episodes };
   }, [progress]);
+
+  /*
+   * =======================================================
+   * MARQUAGE MANUEL D'UNE SAISON
+   *
+   * Le total d'épisodes vient d'AniList quand la série
+   * ne fait qu'une saison (correspondance directe).
+   * Sinon — cas des sagas multi-saisons comme One
+   * Piece — le total AniList couvre toute la série et
+   * ne dit rien sur une saison précise : il faut alors
+   * charger le episodes.js de cette saison.
+   * =======================================================
+   */
+
+  const resolveSeasonTotal = async (
+    seasonNumber: number
+  ): Promise<number | null> => {
+    const existing = progress.get(seasonNumber);
+
+    if (existing?.total) {
+      return existing.total;
+    }
+
+    const isSingleSeason =
+      (info?.seasons?.length || 0) <= 1;
+
+    if (isSingleSeason) {
+      const anilist = getCachedAniList(slug);
+
+      if (anilist?.matched && anilist.episodes) {
+        return anilist.episodes;
+      }
+    }
+
+    try {
+      const data = await loadEpisodes(
+        slug,
+        seasonNumber,
+        'vostfr'
+      );
+
+      const total =
+        data.players[data.defaultPlayerIndex]
+          ?.urls.length || data.totalEpisodes;
+
+      return total || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const markSeasonAsWatched = async (
+    seasonNumber: number
+  ) => {
+    setMarkingSeason(seasonNumber);
+
+    try {
+      const total = await resolveSeasonTotal(
+        seasonNumber
+      );
+
+      if (!total) {
+        window.alert(
+          'Nombre d’épisodes introuvable pour cette saison.'
+        );
+
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `Marquer les ${total} épisodes de cette saison comme vus ?`
+      );
+
+      if (!confirmed) return;
+
+      markEpisodesUpTo(
+        slug,
+        seasonNumber,
+        'vostfr',
+        total - 1,
+        total
+      );
+
+      setProgress(readMergedProgress(slug));
+    } finally {
+      setMarkingSeason(null);
+    }
+  };
+
+  const startPress = (seasonNumber: number) => {
+    longPressed.current = false;
+
+    pressTimer.current = window.setTimeout(() => {
+      longPressed.current = true;
+
+      markSeasonAsWatched(seasonNumber);
+    }, LONG_PRESS);
+  };
+
+  const cancelPress = () => {
+    if (pressTimer.current !== null) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => cancelPress();
+  }, []);
 
   /*
    * =======================================================
@@ -606,6 +702,11 @@ export default function AnimeInfoPage({
 
         </div>
 
+        <p className="episode-hint">
+          Appui long sur une saison pour la marquer
+          entièrement comme vue.
+        </p>
+
         <div className="season-cards">
 
           {seasonEntries.map((entry) => {
@@ -632,6 +733,9 @@ export default function AnimeInfoPage({
               totalCount > 0 &&
               watchedCount >= totalCount;
 
+            const isMarking =
+              markingSeason === entry.number;
+
             return (
               <Link
                 key={entry.number}
@@ -649,22 +753,35 @@ export default function AnimeInfoPage({
                     entry.number
                   )
                 }
-                onTouchStart={() =>
-                  prefetchEpisodes(
-                    slug,
-                    entry.number
-                  )
+                onPointerDown={() =>
+                  startPress(entry.number)
                 }
+                onPointerUp={cancelPress}
+                onPointerLeave={cancelPress}
+                onPointerCancel={cancelPress}
+                onContextMenu={(event) =>
+                  event.preventDefault()
+                }
+                onClick={(event) => {
+                  if (longPressed.current) {
+                    event.preventDefault();
+                    longPressed.current = false;
+                  }
+                }}
               >
 
                 <div className="season-card-top">
 
                   <strong>{entry.label}</strong>
 
-                  {isDone && (
-                    <span className="season-done">
-                      ✓
-                    </span>
+                  {isMarking ? (
+                    <span className="loader" />
+                  ) : (
+                    isDone && (
+                      <span className="season-done">
+                        ✓
+                      </span>
+                    )
                   )}
 
                 </div>
