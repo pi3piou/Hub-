@@ -1,118 +1,354 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-interface Favorite {
-  name: string;
+import {
+  getAnimeName,
+  getCachedInfo,
+  loadAnimeInfo,
+} from '@/lib/animeCache';
+
+import {
+  PlanningItem,
+  formatPlanningDay,
+  formatPlanningTime,
+  getPlanningDayKey,
+  loadPlanning,
+} from '@/lib/planning';
+
+import { readMergedProgress } from '@/lib/watchState';
+
+type Status = 'watching' | 'todo' | 'done';
+
+type Filter = Status | 'all';
+
+interface HistoryItem {
   slug: string;
+  name: string;
   image?: string;
+  season: number;
+  episode: number;
+  lang: 'vostfr' | 'vf';
+  updatedAt: number;
 }
 
-export default function FavoritesPage() {
-  const [favorites, setFavorites] =
-    useState<Favorite[]>([]);
+interface LibraryItem {
+  slug: string;
+  name: string;
+  image?: string;
+  status: Status;
+  watched: number;
+  total: number;
+  seasons: number;
+  lastActivity: number;
+  nextRelease: PlanningItem | null;
+}
 
-  const [mounted, setMounted] =
-    useState(false);
+function readFavorites() {
+  try {
+    const raw = localStorage.getItem(
+      'anime_favorites'
+    );
+
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item) => {
+        if (typeof item === 'string') {
+          return {
+            slug: item,
+            name: getAnimeName(item),
+            image: undefined as
+              | string
+              | undefined,
+          };
+        }
+
+        if (item && typeof item === 'object') {
+          const slug = String(item.slug || '');
+
+          if (!slug) return null;
+
+          return {
+            slug,
+            name: String(
+              item.name || getAnimeName(slug)
+            ),
+            image: item.image
+              ? String(item.image)
+              : undefined,
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean) as {
+      slug: string;
+      name: string;
+      image?: string;
+    }[];
+  } catch {
+    return [];
+  }
+}
+
+function readHistory(): HistoryItem[] {
+  try {
+    const raw = localStorage.getItem(
+      'anime_history'
+    );
+
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter(
+        (item) =>
+          item &&
+          item.slug &&
+          Number.isInteger(item.season)
+      )
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch {
+    return [];
+  }
+}
+
+function formatDate(timestamp: number) {
+  const diff = Date.now() - timestamp;
+
+  const minutes = Math.floor(diff / 60000);
+
+  if (minutes < 60) {
+    return `Il y a ${Math.max(1, minutes)} min`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+
+  if (hours < 24) return `Il y a ${hours} h`;
+
+  const days = Math.floor(hours / 24);
+
+  if (days === 1) return 'Hier';
+
+  if (days < 7) return `Il y a ${days} jours`;
+
+  return new Date(timestamp).toLocaleDateString(
+    'fr-FR',
+    { day: 'numeric', month: 'short' }
+  );
+}
+
+const STATUS_LABEL: Record<Status, string> = {
+  watching: 'En cours',
+  todo: 'À voir',
+  done: 'Terminé',
+};
+
+export default function LibraryPage() {
+  const [items, setItems] = useState<
+    LibraryItem[]
+  >([]);
+
+  const [history, setHistory] = useState<
+    HistoryItem[]
+  >([]);
+
+  const [filter, setFilter] =
+    useState<Filter>('watching');
+
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const raw =
-        localStorage.getItem(
-          'anime_favorites'
-        );
+    let active = true;
 
-      if (raw) {
-        const parsed =
-          JSON.parse(raw);
+    (async () => {
+      const favorites = readFavorites();
 
-        if (Array.isArray(parsed)) {
-          setFavorites(
-            parsed
-              .map((item) => {
-                if (
-                  typeof item ===
-                  'string'
-                ) {
-                  return {
-                    name: item,
-                    slug: item,
-                  };
-                }
+      const historyItems = readHistory();
 
-                if (
-                  item &&
-                  typeof item ===
-                    'object' &&
-                  item.slug
-                ) {
-                  return {
-                    name: String(
-                      item.name ||
-                        item.slug
-                    ),
-                    slug: String(
-                      item.slug
-                    ),
-                    image: item.image
-                      ? String(
-                          item.image
-                        )
-                      : undefined,
-                  };
-                }
+      setHistory(historyItems);
 
-                return null;
-              })
-              .filter(
-                Boolean
-              ) as Favorite[]
-          );
+      /* Favoris + animes déjà regardés */
+      const known = new Map<
+        string,
+        { name: string; image?: string }
+      >();
+
+      for (const item of favorites) {
+        known.set(item.slug, {
+          name: item.name,
+          image: item.image,
+        });
+      }
+
+      for (const item of historyItems) {
+        if (!known.has(item.slug)) {
+          known.set(item.slug, {
+            name: item.name,
+            image: item.image,
+          });
         }
       }
-    } catch {
-      setFavorites([]);
-    }
 
-    setMounted(true);
-  }, []);
+      let planning: PlanningItem[] = [];
 
-  const removeFavorite = (
-    slug: string
-  ) => {
-    const next =
-      favorites.filter(
-        (item) =>
-          item.slug !== slug
+      try {
+        planning = await loadPlanning();
+      } catch {
+        planning = [];
+      }
+
+      const entries = await Promise.all(
+        Array.from(known.entries())
+          .slice(0, 40)
+          .map(async ([slug, meta]) => {
+            let info = getCachedInfo(slug);
+
+            if (!info) {
+              try {
+                info = await loadAnimeInfo(slug);
+              } catch {
+                info = null;
+              }
+            }
+
+            const merged =
+              readMergedProgress(slug);
+
+            let watched = 0;
+            let total = 0;
+            let everyComplete = true;
+
+            merged.forEach((entry) => {
+              watched += entry.watched;
+              total += entry.total;
+
+              if (
+                entry.total === 0 ||
+                entry.watched < entry.total
+              ) {
+                everyComplete = false;
+              }
+            });
+
+            const seasons =
+              info?.seasons?.length || 0;
+
+            const nextRelease =
+              planning
+                .filter(
+                  (entry) =>
+                    entry.slug === slug &&
+                    entry.releaseTs * 1000 >
+                      Date.now()
+                )
+                .sort(
+                  (a, b) =>
+                    a.releaseTs - b.releaseTs
+                )[0] || null;
+
+            const allTracked =
+              seasons > 0 &&
+              merged.size >= seasons;
+
+            let status: Status = 'watching';
+
+            if (merged.size === 0) {
+              status = 'todo';
+            } else if (
+              allTracked &&
+              everyComplete &&
+              !nextRelease
+            ) {
+              status = 'done';
+            }
+
+            const lastActivity =
+              historyItems.find(
+                (entry) => entry.slug === slug
+              )?.updatedAt || 0;
+
+            return {
+              slug,
+              name: info?.name || meta.name,
+              image: info?.image || meta.image,
+              status,
+              watched,
+              total,
+              seasons,
+              lastActivity,
+              nextRelease,
+            } as LibraryItem;
+          })
       );
 
-    setFavorites(next);
+      if (!active) return;
 
-    localStorage.setItem(
-      'anime_favorites',
-      JSON.stringify(next)
+      entries.sort(
+        (a, b) => b.lastActivity - a.lastActivity
+      );
+
+      setItems(entries);
+      setLoading(false);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const counts = useMemo(() => {
+    return {
+      watching: items.filter(
+        (item) => item.status === 'watching'
+      ).length,
+      todo: items.filter(
+        (item) => item.status === 'todo'
+      ).length,
+      done: items.filter(
+        (item) => item.status === 'done'
+      ).length,
+      all: items.length,
+    };
+  }, [items]);
+
+  const visible = useMemo(() => {
+    if (filter === 'all') return items;
+
+    return items.filter(
+      (item) => item.status === filter
     );
-  };
+  }, [items, filter]);
 
   return (
     <main className="page">
 
       <header className="simple-header">
 
-        <span className="section-eyebrow">
-          BIBLIOTHÈQUE
-        </span>
-
         <div className="title-row">
 
-          <h1>
-            Favoris
-          </h1>
+          <div>
 
-          {mounted && (
+            <span className="eyebrow">
+              MES ANIMES
+            </span>
+
+            <h1>Bibliothèque</h1>
+
+          </div>
+
+          {items.length > 0 && (
             <span className="count-badge">
-              {favorites.length}
+              {items.length}
             </span>
           )}
 
@@ -120,96 +356,274 @@ export default function FavoritesPage() {
 
       </header>
 
-      {!mounted ? (
-        <div className="empty-card">
-          <span className="loader" />
+      {/* FILTRES */}
+
+      <div className="library-filters">
+
+        {(
+          [
+            ['watching', 'En cours'],
+            ['todo', 'À voir'],
+            ['done', 'Terminés'],
+            ['all', 'Tous'],
+          ] as [Filter, string][]
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            className={
+              filter === key
+                ? 'filter-chip is-active'
+                : 'filter-chip'
+            }
+            onClick={() => setFilter(key)}
+          >
+            {label}
+            <span>{counts[key]}</span>
+          </button>
+        ))}
+
+      </div>
+
+      {loading && (
+        <div className="library-list">
+
+          <div className="skeleton skeleton-block" />
+
         </div>
-      ) : favorites.length === 0 ? (
+      )}
+
+      {!loading && visible.length === 0 && (
         <div className="empty-card">
 
-          <div className="empty-icon">
-            ★
-          </div>
+          <div className="empty-icon">★</div>
 
-          <h3>
-            Ta bibliothèque est vide
-          </h3>
+          <h3>Rien ici</h3>
 
           <p>
-            Les animes que tu ajoutes
-            en favoris apparaîtront ici.
+            {filter === 'todo'
+              ? 'Ajoute un anime en favori pour le retrouver ici.'
+              : 'Commence un anime pour le voir apparaître.'}
           </p>
 
-          <Link
-            href="/"
-            className="primary-button"
-          >
-            Rechercher un anime
-          </Link>
+        </div>
+      )}
+
+      {/* LISTE */}
+
+      {!loading && visible.length > 0 && (
+        <div className="library-list">
+
+          {visible.map((item) => {
+
+            const percentage =
+              item.total > 0
+                ? Math.min(
+                    100,
+                    (item.watched / item.total) *
+                      100
+                  )
+                : 0;
+
+            return (
+              <Link
+                key={item.slug}
+                href={`/anime/${encodeURIComponent(
+                  item.slug
+                )}`}
+                className="library-card"
+              >
+
+                <div className="library-cover">
+                  {item.image && (
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      loading="lazy"
+                    />
+                  )}
+                </div>
+
+                <div className="library-info">
+
+                  <div className="library-top">
+
+                    <strong>{item.name}</strong>
+
+                    <span
+                      className={`library-status is-${item.status}`}
+                    >
+                      {STATUS_LABEL[item.status]}
+                    </span>
+
+                  </div>
+
+                  <span className="library-meta">
+                    {item.total > 0
+                      ? `${item.watched} / ${item.total} épisodes`
+                      : 'Pas encore commencé'}
+
+                    {item.seasons > 1 && (
+                      <>
+                        {' · '}
+                        {item.seasons} saisons
+                      </>
+                    )}
+                  </span>
+
+                  {item.total > 0 && (
+                    <div className="library-track">
+                      <span
+                        style={{
+                          width: `${percentage}%`,
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {item.nextRelease ? (
+                    <small className="library-next">
+                      Épisode{' '}
+                      {formatPlanningDay(
+                        getPlanningDayKey(
+                          item.nextRelease
+                            .releaseTs
+                        )
+                      )}
+                      {' · '}
+                      {formatPlanningTime(
+                        item.nextRelease.releaseTs
+                      )}
+                    </small>
+                  ) : item.status === 'done' ? (
+                    <small className="library-next">
+                      Série terminée
+                    </small>
+                  ) : null}
+
+                </div>
+
+                <span className="arrow">›</span>
+
+              </Link>
+            );
+          })}
 
         </div>
-      ) : (
-        <div className="favorite-grid">
+      )}
 
-          {favorites.map(
-            (item) => (
+      {/* HISTORIQUE */}
+
+      {history.length > 0 && (
+        <section className="section">
+
+          <div className="section-header">
+
+            <div>
+              <span className="section-eyebrow">
+                HISTORIQUE
+              </span>
+
+              <h2>Récemment regardés</h2>
+            </div>
+
+            <button
+              className="clear-history"
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    'Effacer tout l’historique ?'
+                  )
+                ) {
+                  return;
+                }
+
+                localStorage.removeItem(
+                  'anime_history'
+                );
+
+                setHistory([]);
+              }}
+            >
+              Effacer
+            </button>
+
+          </div>
+
+          <div className="history-list">
+
+            {history.slice(0, 12).map((item) => (
               <div
-                className="favorite-card"
-                key={item.slug}
+                className="history-card"
+                key={`${item.slug}-${item.season}-${item.lang}`}
               >
 
                 <Link
                   href={`/anime/${encodeURIComponent(
                     item.slug
-                  )}`}
+                  )}/${item.season}`}
+                  className="history-main"
                 >
 
-                  <div className="favorite-cover">
-  {item.image && (
-    <img
-      src={item.image}
-      alt={item.name}
-      loading="lazy"
-      onError={(event) => {
-        event.currentTarget.style.display =
-          'none';
-      }}
-    />
-  )}
-</div>
+                  <div className="history-cover">
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
+
+                  <div className="history-info">
+
+                    <strong>{item.name}</strong>
+
+                    <span>
+                      Saison {item.season}
+                      {' • '}
+                      Épisode {item.episode + 1}
+                    </span>
+
+                    <small>
+                      {formatDate(item.updatedAt)}
+                    </small>
+
+                  </div>
 
                 </Link>
 
-                <div className="favorite-info">
+                <button
+                  className="history-delete"
+                  aria-label={`Supprimer ${item.name}`}
+                  onClick={() => {
+                    const next = history.filter(
+                      (entry) =>
+                        !(
+                          entry.slug ===
+                            item.slug &&
+                          entry.season ===
+                            item.season &&
+                          entry.lang === item.lang
+                        )
+                    );
 
-                  <Link
-                    href={`/anime/${encodeURIComponent(
-                      item.slug
-                    )}`}
-                  >
-                    <strong>
-                      {item.name}
-                    </strong>
-                  </Link>
+                    localStorage.setItem(
+                      'anime_history',
+                      JSON.stringify(next)
+                    );
 
-                  <button
-                    onClick={() =>
-                      removeFavorite(
-                        item.slug
-                      )
-                    }
-                    className="remove-button"
-                  >
-                    Retirer
-                  </button>
-
-                </div>
+                    setHistory(next);
+                  }}
+                >
+                  ×
+                </button>
 
               </div>
-            )
-          )}
+            ))}
 
-        </div>
+          </div>
+
+        </section>
       )}
 
     </main>
