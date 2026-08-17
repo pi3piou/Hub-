@@ -16,7 +16,7 @@ const items = [
   },
   {
     href: '/favorites',
-    label: 'Favoris',
+    label: 'Biblio',
     icon: '★',
   },
 ];
