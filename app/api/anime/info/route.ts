@@ -9,7 +9,7 @@ import {
 
 /*
  * =========================================================
- * FICHE ANIME serie
+ * FICHE ANIME
  *
  * Une seule requête vers Anime-Sama : la page catalogue.
  * Ne touche jamais aux fichiers episodes.js.
@@ -43,6 +43,9 @@ export async function GET(request: Request) {
       );
     }
 
+    /*
+     * Sonde image : /api/anime/info?slug=x&debug=img
+     */
     if (searchParams.get('debug') === 'img') {
       const og = html.match(
         /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i
@@ -65,10 +68,8 @@ export async function GET(request: Request) {
       );
     }
 
-
     /*
-     * Sonde temporaire, à supprimer ensuite :
-     * /api/anime/info?slug=one-piece&debug=1
+     * Sonde générique : /api/anime/info?slug=x&debug=1
      */
     if (searchParams.get('debug')) {
       const index = html.search(/genre/i);
@@ -111,7 +112,6 @@ export async function GET(request: Request) {
           },
         ];
 
-    /* Toutes les langues rencontrées, dédupliquées */
     const langs = Array.from(
       new Set(
         seasonEntries.flatMap(
@@ -123,17 +123,11 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         ...info,
-
-        /* Détail par saison : numéro, libellé, langues */
         seasonEntries,
-
-        /* Conservé pour compatibilité */
         seasons: seasonEntries.map(
           (item) => item.number
         ),
-
         totalSeasons: seasonEntries.length,
-
         langs,
       },
       {
