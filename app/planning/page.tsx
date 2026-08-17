@@ -11,51 +11,6 @@ import {
   loadPlanning,
 } from '@/lib/planning';
 
-
-const CACHE_KEY = 'anime_planning_cache';
-const CACHE_TTL = 24 * 60 * 60 * 1000;
-
-interface CacheEntry {
-  items: PlanningItem[];
-  savedAt: number;
-}
-
-function readCache(): PlanningItem[] | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-
-    if (!raw) return null;
-
-    const entry = JSON.parse(raw) as CacheEntry;
-
-    if (
-      !entry?.savedAt ||
-      Date.now() - entry.savedAt > CACHE_TTL ||
-      !Array.isArray(entry.items)
-    ) {
-      return null;
-    }
-
-    return entry.items;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(items: PlanningItem[]) {
-  try {
-    localStorage.setItem(
-      CACHE_KEY,
-      JSON.stringify({
-        items,
-        savedAt: Date.now(),
-      } as CacheEntry)
-    );
-  } catch {
-    // Quota dépassé
-  }
-}
-
 /* Slugs déjà suivis : favoris + historique */
 function readFollowed(): Set<string> {
   const slugs = new Set<string>();
@@ -109,25 +64,9 @@ export default function PlanningPage() {
 
     let active = true;
 
-    const cached = readCache();
-
-    if (cached) {
-      setItems(cached);
-      setLoading(false);
-      return;
-    }
-
-    fetch('/api/anime/planning')
-      .then((response) => response.json())
+    loadPlanning()
       .then((data) => {
-        if (!active) return;
-
-        if (!Array.isArray(data.items)) {
-          throw new Error('Réponse invalide');
-        }
-
-        setItems(data.items);
-        writeCache(data.items);
+        if (active) setItems(data);
       })
       .catch(() => {
         if (active) setError(true);
@@ -144,12 +83,10 @@ export default function PlanningPage() {
   /*
    * Regroupement par jour, à partir de
    * l'horodatage de chaque sortie.
+   * La semaine complète est affichée, les jours
+   * écoulés restent visibles mais estompés.
    */
   const days = useMemo(() => {
-    const today = new Date()
-      .toISOString()
-      .slice(0, 10);
-
     const groups = new Map<
       string,
       PlanningItem[]
@@ -167,9 +104,6 @@ export default function PlanningPage() {
         item.releaseTs
       );
 
-      /* On n'affiche pas les jours passés */
-      if (key < today) continue;
-
       const list = groups.get(key) || [];
 
       list.push(item);
@@ -181,6 +115,10 @@ export default function PlanningPage() {
       (a, b) => (a[0] < b[0] ? -1 : 1)
     );
   }, [items, onlyFollowed, followed]);
+
+  const today = new Date()
+    .toISOString()
+    .slice(0, 10);
 
   return (
     <main className="page">
@@ -269,7 +207,11 @@ export default function PlanningPage() {
 
       {days.map(([key, list]) => (
         <section
-          className="planning-day"
+          className={
+            key < today
+              ? 'planning-day is-past'
+              : 'planning-day'
+          }
           key={key}
         >
 
