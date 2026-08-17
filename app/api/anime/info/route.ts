@@ -43,14 +43,23 @@ export async function GET(request: Request) {
       );
     }
 
-    if (searchParams.get('debug') === 'status') {
-      const index = html.search(/info-lbl/i);
+     if (searchParams.get('debug') === 'status') {
+      const matches = [
+        ...html.matchAll(/info-lbl["'][^>]*>/gi),
+      ];
+
+      const target = matches[1] || matches[0];
+
+      const index = target
+        ? (target.index ?? 0)
+        : -1;
 
       return NextResponse.json(
         {
+          totalMatches: matches.length,
           extrait:
             index >= 0
-              ? html.slice(index, index + 2000)
+              ? html.slice(index, index + 2500)
               : 'introuvable',
         },
         {
