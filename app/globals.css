@@ -2254,3 +2254,10 @@ a {
   background: rgba(88, 160, 220, 0.12);
   color: #6fb8e0;
 }
+
+.season-card {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+}
