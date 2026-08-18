@@ -72,33 +72,6 @@ function readHistory(): ContinueItem[] {
   }
 }
 
-function formatHistoryDate(timestamp: number) {
-  const date = new Date(timestamp);
-
-  const diff = Date.now() - date.getTime();
-
-  const minutes = Math.floor(diff / 60000);
-
-  if (minutes < 1) return 'À l’instant';
-
-  if (minutes < 60) return `Il y a ${minutes} min`;
-
-  const hours = Math.floor(minutes / 60);
-
-  if (hours < 24) return `Il y a ${hours} h`;
-
-  const days = Math.floor(hours / 24);
-
-  if (days === 1) return 'Hier';
-
-  if (days < 7) return `Il y a ${days} jours`;
-
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-  });
-}
-
 /*
  * =========================================================
  * DÉCISION D'AFFICHAGE
@@ -235,10 +208,6 @@ export default function Home() {
     AnimeItem[]
   >([]);
 
-  const [history, setHistory] = useState<
-    ContinueItem[]
-  >([]);
-
   const [resume, setResume] = useState<
     ResumeItem[]
   >([]);
@@ -251,7 +220,6 @@ export default function Home() {
   useEffect(() => {
     const entries = readHistory();
 
-    setHistory(entries);
     setMounted(true);
 
     let active = true;
@@ -543,9 +511,9 @@ export default function Home() {
         </section>
       )}
 
-      {/* HISTORIQUE */}
+      {/* AUCUNE ACTIVITÉ */}
 
-           {mounted && resume.length === 0 && (
+      {mounted && resume.length === 0 && (
         <div className="empty-card">
 
           <div className="empty-icon">▶</div>
@@ -559,27 +527,6 @@ export default function Home() {
 
         </div>
       )}
-
-               
-
-      {/* AUCUNE ACTIVITÉ */}
-
-      {mounted &&
-        resume.length === 0 &&
-        history.length === 0 && (
-          <div className="empty-card">
-
-            <div className="empty-icon">▶</div>
-
-            <h3>Rien en cours</h3>
-
-            <p>
-              Recherche un anime pour commencer à
-              le suivre.
-            </p>
-
-          </div>
-        )}
 
     </main>
   );
