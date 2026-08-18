@@ -327,3 +327,72 @@ export function prefetchAniList(
     // Rien : simple enrichissement, pas bloquant
   });
 }
+
+/* =========================================================
+   TMDB — STATUT ET ÉPISODES PAR SAISON
+   ========================================================= */
+
+export interface TMDBSeason {
+  seasonNumber: number;
+  episodeCount: number;
+  name?: string;
+}
+
+export interface TMDBData {
+  matched: boolean;
+  reason?: string;
+  confidence?: number;
+  status?: string | null;
+  statusLabel?: string | null;
+  episodes?: number | null;
+  seasons?: TMDBSeason[] | null;
+  tmdbId?: number;
+}
+
+const TMDB_TTL = 24 * 60 * 60 * 1000;
+
+function tmdbKey(slug: string) {
+  return `techfeed_tmdb_${slug}`;
+}
+
+export function getCachedTMDB(slug: string) {
+  return readEntry<TMDBData>(tmdbKey(slug));
+}
+
+export function loadTMDB(
+  slug: string,
+  name: string,
+  altTitles: string[] = [],
+  seasonCount = 0
+) {
+  const params = new URLSearchParams({ name });
+
+  if (altTitles.length) {
+    params.set('alt', altTitles.join('|'));
+  }
+
+  if (seasonCount > 0) {
+    params.set('seasons', String(seasonCount));
+  }
+
+  return request<TMDBData>(
+    `/api/anime/tmdb?${params.toString()}`,
+    tmdbKey(slug),
+    TMDB_TTL
+  );
+}
+
+export function prefetchTMDB(
+  slug: string,
+  name: string,
+  altTitles: string[] = [],
+  seasonCount = 0
+) {
+  if (getCachedTMDB(slug)) return;
+
+  loadTMDB(slug, name, altTitles, seasonCount).catch(
+    () => {
+      // Simple enrichissement, pas bloquant
+    }
+  );
+}
