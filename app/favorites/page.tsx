@@ -5,12 +5,16 @@ import { useEffect, useMemo, useState } from 'react';
 
 import {
   AniListData,
+  TMDBData,
   getAnimeName,
   getCachedAniList,
   getCachedInfo,
+  getCachedTMDB,
   loadAniList,
   loadAnimeInfo,
+  loadTMDB,
 } from '@/lib/animeCache';
+
 
 import {
   PlanningItem,
@@ -179,6 +183,15 @@ function trustAniList(anilist: AniListData | null) {
   );
 }
 
+function trustTMDB(tmdb: TMDBData | null) {
+  return Boolean(
+    tmdb?.matched &&
+      (tmdb.confidence ?? 0) >=
+        ANILIST_CONFIDENCE_MIN
+  );
+}
+
+
 export default function LibraryPage() {
   const [items, setItems] = useState<
     LibraryItem[]
@@ -266,6 +279,22 @@ export default function LibraryPage() {
               }
             }
 
+            let tmdb = getCachedTMDB(slug);
+
+            if (!tmdb) {
+              try {
+                tmdb = await loadTMDB(
+                  slug,
+                  info?.name || meta.name,
+                  info?.altTitles || [],
+                  info?.seasons?.length || 0
+                );
+              } catch {
+                tmdb = null;
+              }
+            }
+
+
             const merged =
               readMergedProgress(slug);
 
@@ -308,15 +337,22 @@ export default function LibraryPage() {
               hasKnownTotal &&
               watched >= total;
 
-            let status: Status = 'watching';
+                       let status: Status = 'watching';
+
+            const isFinished =
+              (trustTMDB(tmdb) &&
+                tmdb!.status === 'Ended') ||
+              (trustAniList(anilist) &&
+                anilist!.status === 'FINISHED');
 
             if (merged.size === 0) {
               status = 'todo';
-            } else if (
-              trustAniList(anilist) &&
-              anilist!.status === 'FINISHED' &&
-              caughtUp
-            ) {
+            } else if (isFinished && caughtUp) {
+              status = 'done';
+            } else if (caughtUp) {
+              status = 'upToDate';
+            }
+
               /*
                * AniList confirme la fin de série,
                * et tu as vu tout ce qui existe.
@@ -346,7 +382,10 @@ export default function LibraryPage() {
               lastActivity,
               nextRelease,
               anilistEpisodes:
-                anilist?.episodes ?? null,
+                tmdb?.episodes ??
+                anilist?.episodes ??
+                null,
+
             } as LibraryItem;
           })
       );
