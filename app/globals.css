@@ -2054,3 +2054,10 @@ a {
     font-size: 38px;
   }
 }
+
+.profile-gate-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+}
