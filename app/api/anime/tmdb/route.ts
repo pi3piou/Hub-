@@ -4,8 +4,13 @@ import { NextResponse } from 'next/server';
  * =========================================================
  * TMDB — STATUT ET ÉPISODES PAR SAISON
  *
- * Source prioritaire : donne à la fois un statut fiable
- * (Ended, Returning Series...) et le détail par saison.
+ * Comparer uniquement le titre affiché (souvent traduit,
+ * ex: "Moi, quand je me réincarne en Slime" pour "Tensei
+ * Shitara Slime Datta Ken") fait rater des correspondances
+ * pourtant correctes. On récupère donc aussi les titres
+ * alternatifs TMDB (romanisations, abréviations comme
+ * "TenSura") pour les meilleurs candidats, et on compare
+ * contre ce pool enrichi plutôt qu'un seul titre.
  *
  * Le détail par saison n'est renvoyé que si le nombre
  * de saisons TMDB correspond exactement au nombre de
@@ -19,6 +24,9 @@ import { NextResponse } from 'next/server';
  */
 
 const TMDB_BASE = 'https://api.themoviedb.org/3';
+
+/* Nombre de résultats de recherche à approfondir */
+const CANDIDATES_TO_CHECK = 3;
 
 type TMDBStatus =
   | 'Ended'
@@ -49,6 +57,9 @@ function normalize(value: string) {
 function similarity(a: string, b: string) {
   const wordsA = new Set(normalize(a).split(' '));
   const wordsB = new Set(normalize(b).split(' '));
+
+  wordsA.delete('');
+  wordsB.delete('');
 
   if (wordsA.size === 0 || wordsB.size === 0) {
     return 0;
@@ -99,6 +110,30 @@ async function tmdbFetch(path: string) {
   }
 }
 
+/*
+ * Titres alternatifs TMDB pour une série : romanisations,
+ * abréviations, titres régionaux. C'est ce pool qui permet
+ * de retrouver "TenSura" ou "Tensei Shitara Slime Datta
+ * Ken" même quand le titre affiché est traduit en français.
+ */
+async function fetchAlternativeTitles(id: number) {
+  const data = await tmdbFetch(
+    `/tv/${id}/alternative_titles`
+  );
+
+  const results = data?.results as
+    | { title?: string }[]
+    | undefined;
+
+  if (!Array.isArray(results)) return [];
+
+  return results
+    .map((item) => item.title)
+    .filter((title): title is string =>
+      Boolean(title)
+    );
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
@@ -135,12 +170,15 @@ export async function GET(request: Request) {
     const search = await tmdbFetch(
       `/search/tv?query=${encodeURIComponent(
         name
-      )}&language=fr-FR`
+      )}`
     );
 
-    const candidate = search?.results?.[0];
+    const results = (search?.results || []).slice(
+      0,
+      CANDIDATES_TO_CHECK
+    );
 
-    if (!candidate) {
+    if (!results.length) {
       return NextResponse.json(
         { matched: false, reason: 'not_found' },
         {
@@ -152,31 +190,69 @@ export async function GET(request: Request) {
       );
     }
 
+    /*
+     * Tous les titres du côté Anime-Sama : nom
+     * principal et titres alternatifs connus.
+     */
     const searchTitles = [name, ...altTitles];
 
-    const candidateTitles = [
-      candidate.name,
-      candidate.original_name,
-    ].filter(Boolean) as string[];
+    let best: {
+      id: number;
+      score: number;
+    } | null = null;
 
-    let bestScore = 0;
+    for (const candidate of results) {
+      /*
+       * Pool de comparaison pour ce candidat :
+       * nom localisé, nom original, et tous ses
+       * titres alternatifs TMDB.
+       */
+      const altFromTMDB =
+        await fetchAlternativeTitles(candidate.id);
 
-    for (const ct of candidateTitles) {
-      for (const st of searchTitles) {
-        const score = similarity(ct, st);
+      const candidateTitles = [
+        candidate.name,
+        candidate.original_name,
+        ...altFromTMDB,
+      ].filter(Boolean) as string[];
 
-        if (score > bestScore) bestScore = score;
+      let candidateScore = 0;
+
+      for (const ct of candidateTitles) {
+        for (const st of searchTitles) {
+          const score = similarity(ct, st);
+
+          if (score > candidateScore) {
+            candidateScore = score;
+          }
+        }
       }
+
+      if (!best || candidateScore > best.score) {
+        best = { id: candidate.id, score: candidateScore };
+      }
+    }
+
+    if (!best) {
+      return NextResponse.json(
+        { matched: false, reason: 'not_found' },
+        {
+          headers: {
+            'Cache-Control':
+              'public, s-maxage=86400',
+          },
+        }
+      );
     }
 
     const CONFIDENCE_THRESHOLD = 0.5;
 
-    if (bestScore < CONFIDENCE_THRESHOLD) {
+    if (best.score < CONFIDENCE_THRESHOLD) {
       return NextResponse.json(
         {
           matched: false,
           reason: 'low_confidence',
-          bestScore,
+          bestScore: best.score,
         },
         {
           headers: {
@@ -188,7 +264,7 @@ export async function GET(request: Request) {
     }
 
     const details = await tmdbFetch(
-      `/tv/${candidate.id}?language=fr-FR`
+      `/tv/${best.id}?language=fr-FR`
     );
 
     if (!details) {
@@ -232,14 +308,14 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         matched: true,
-        confidence: bestScore,
+        confidence: best.score,
         status: status || null,
         statusLabel: status
           ? STATUS_LABEL[status] || status
           : null,
         episodes: details.number_of_episodes ?? null,
         seasons,
-        tmdbId: candidate.id,
+        tmdbId: best.id,
       },
       {
         headers: {
