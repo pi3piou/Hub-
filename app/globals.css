@@ -107,6 +107,10 @@ a {
   padding: 25px 4px 24px;
 }
 
+.hero-mini {
+  padding: 4px 4px 14px;
+}
+
 .simple-header {
   padding: 20px 4px 25px;
 }
@@ -149,9 +153,6 @@ a {
 .search-section {
   position: relative;
   z-index: 20;
-}
-
-.search-section {
   margin-bottom: 22px;
 }
 
@@ -314,85 +315,6 @@ a {
   height: 100%;
   object-fit: cover;
   object-position: center;
-}
-
-
-/* =========================================================
-   MISE EN AVANT
-   ========================================================= */
-
-.featured-card {
-  position: relative;
-  min-height: 190px;
-  margin-top: 22px;
-  overflow: hidden;
-  border: 1px solid var(--accent-border);
-  border-radius: 27px;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(69, 56, 170, 0.34),
-      rgba(25, 25, 34, 0.8)
-    );
-  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.25);
-}
-
-.featured-glow {
-  position: absolute;
-  top: -80px;
-  right: -90px;
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  background: rgba(117, 99, 255, 0.25);
-  filter: blur(35px);
-}
-
-.featured-content {
-  position: relative;
-  padding: 24px;
-}
-
-.featured-content h2 {
-  max-width: 260px;
-  margin: 13px 0 6px;
-  font-size: 22px;
-  line-height: 1.1;
-  letter-spacing: -0.03em;
-}
-
-.featured-content p {
-  max-width: 280px;
-  margin: 0;
-  color: #92929d;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.featured-icon {
-  position: absolute;
-  right: 25px;
-  bottom: 24px;
-  display: grid;
-  place-items: center;
-  width: 55px;
-  height: 55px;
-  border: 1px solid var(--border-strong);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 18px;
-}
-
-.badge {
-  display: inline-block;
-  padding: 6px 9px;
-  border: 1px solid rgba(117, 99, 255, 0.16);
-  border-radius: 8px;
-  background: var(--accent-tint);
-  color: #aaa2ff;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
 }
 
 /* =========================================================
@@ -652,7 +574,6 @@ a {
   transition: width 0.35s ease;
 }
 
-
 .continue-card .arrow {
   flex: 0 0 auto;
   font-size: 25px;
@@ -829,6 +750,7 @@ a {
   position: relative;
   width: calc(100% + var(--page-pad) * 2);
   margin-inline: calc(var(--page-pad) * -1);
+  margin-top: 16px;
   aspect-ratio: 16 / 9;
   max-height: 70vh;
   overflow: hidden;
@@ -915,7 +837,7 @@ a {
   font-weight: 600;
 }
 
-/* Saisons */
+/* Ancien sélecteur de saison sur la page lecteur */
 
 .season-progress-list {
   display: flex;
@@ -967,6 +889,10 @@ a {
   font-weight: 650;
 }
 
+/*
+ * Barre fine réutilisée par le sélecteur de saison
+ * ci-dessus ET par les cartes de saison de la fiche.
+ */
 .season-progress-track {
   width: 100%;
   height: 3px;
@@ -1075,7 +1001,7 @@ a {
 }
 
 /* =========================================================
-   ÉPISODES (définition unique)
+   ÉPISODES
    ========================================================= */
 
 .episodes-section {
@@ -1105,6 +1031,10 @@ a {
     opacity var(--ease),
     transform var(--ease),
     background var(--ease);
+  /* Évite la sélection et le menu iOS à l'appui long */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .episode:hover {
@@ -1143,6 +1073,28 @@ a {
 .episode.active.watched::after {
   background: #fff;
   color: var(--accent);
+}
+
+.episode-hint {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.mark-button {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--accent-light);
+  font-size: 10px;
+  font-weight: 700;
+  backdrop-filter: blur(14px);
+  transition: border-color var(--ease);
+}
+
+.mark-button:hover {
+  border-color: var(--accent-border);
 }
 
 /* =========================================================
@@ -1263,344 +1215,6 @@ a {
   .favorite-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
-}
-
-/* =========================================================
-   FICHE ANIME
-   ========================================================= */
-
-.anime-details {
-  display: flex;
-  gap: 15px;
-
-  margin: 20px 0 24px;
-  padding: 15px;
-
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-
-  background: var(--surface);
-
-  box-shadow:
-    0 15px 40px rgba(0, 0, 0, 0.18);
-}
-
-.anime-details-poster {
-  flex: 0 0 105px;
-
-  width: 105px;
-  height: 148px;
-
-  overflow: hidden;
-
-  border-radius: var(--radius-md);
-
-  background: var(--surface-solid);
-}
-
-.anime-details-poster img {
-  display: block;
-
-  width: 100%;
-  height: 100%;
-
-  object-fit: cover;
-}
-
-.anime-details-content {
-  min-width: 0;
-}
-
-.anime-details-content
-.section-eyebrow {
-  margin-bottom: 5px;
-}
-
-.anime-details-content h2 {
-  margin: 0;
-
-  overflow: hidden;
-
-  font-size: 18px;
-  line-height: 1.15;
-
-  letter-spacing: -0.025em;
-
-  text-overflow: ellipsis;
-}
-
-.anime-meta {
-  display: flex;
-  flex-wrap: wrap;
-
-  gap: 5px;
-
-  margin-top: 9px;
-}
-
-.anime-meta span {
-  padding: 4px 7px;
-
-  border-radius: 7px;
-
-  background: var(--accent-tint);
-
-  color: var(--accent-light);
-
-  font-size: 9px;
-  font-weight: 700;
-}
-
-.anime-genres {
-  display: flex;
-  flex-wrap: wrap;
-
-  gap: 5px;
-
-  margin-top: 9px;
-}
-
-.anime-genres span {
-  color: var(--text-muted);
-
-  font-size: 9px;
-}
-
-.anime-genres span:not(:last-child)::after {
-  content: " •";
-
-  margin-left: 5px;
-
-  color: var(--text-dim);
-}
-
-.anime-description {
-  display: -webkit-box;
-
-  margin: 10px 0 0;
-
-  overflow: hidden;
-
-  color: var(--text-muted);
-
-  font-size: 11px;
-  line-height: 1.5;
-
-  -webkit-line-clamp: 5;
-  -webkit-box-orient: vertical;
-}
-
-@media (max-width: 430px) {
-  .anime-details {
-    gap: 12px;
-    padding: 12px;
-  }
-
-  .anime-details-poster {
-    flex-basis: 90px;
-
-    width: 90px;
-    height: 127px;
-  }
-
-  .anime-details-content h2 {
-    font-size: 16px;
-  }
-}
-
-/* =========================================================
-   FICHE ANIME
-   ========================================================= */
-
-.anime-info {
-  margin-top: 28px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.18);
-}
-
-.anime-info-main {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.anime-info-cover {
-  flex: 0 0 105px;
-  width: 105px;
-  height: 148px;
-  object-fit: cover;
-  border-radius: var(--radius-md);
-  background: var(--surface-solid);
-}
-
-.anime-info-content {
-  min-width: 0;
-  flex: 1;
-}
-
-.anime-info-content h2 {
-  margin: 4px 0 10px;
-  font-size: 19px;
-  line-height: 1.15;
-  letter-spacing: -0.025em;
-}
-
-.anime-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.anime-meta span,
-.anime-genres span {
-  padding: 5px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-muted);
-  font-size: 9px;
-  font-weight: 700;
-}
-
-.anime-synopsis {
-  margin-top: 18px;
-}
-
-.anime-synopsis h3 {
-  margin: 0 0 7px;
-  font-size: 13px;
-}
-
-.anime-synopsis p {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.65;
-}
-
-.anime-genres {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 15px;
-}
-
-.anime-genres span {
-  border-color: var(--accent-border);
-  background: var(--accent-tint);
-  color: #aaa2ff;
-}
-
-@media (max-width: 420px) {
-  .anime-info-cover {
-    flex-basis: 90px;
-    width: 90px;
-    height: 127px;
-  }
-
-  .anime-info-content h2 {
-    font-size: 17px;
-  }
-}
-
-.player-container {
-  margin-top: 16px;
-}
-
-/* =========================================================
-   CARTES DE SAISON
-   ========================================================= */
-
-.season-cards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.season-card {
-  display: block;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: inherit;
-  transition:
-    transform var(--ease),
-    border-color var(--ease);
-}
-
-.season-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--accent-border);
-}
-
-.season-card.is-done {
-  border-color: var(--accent-border);
-  background: var(--accent-tint);
-}
-
-.season-card-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  font-size: 13px;
-}
-
-.season-card-top span {
-  font-size: 11px;
-  opacity: 0.55;
-}
-
-.resume-button {
-  display: flex;
-  width: 100%;
-  margin-bottom: 22px;
-}
-
-/* =========================================================
-   SQUELETTES
-   ========================================================= */
-
-.skeleton {
-  border-radius: var(--radius-sm);
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.04),
-    rgba(255, 255, 255, 0.09),
-    rgba(255, 255, 255, 0.04)
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s linear infinite;
-}
-
-@keyframes shimmer {
-  to {
-    background-position: -200% 0;
-  }
-}
-
-.skeleton-cover {
-  flex: 0 0 140px;
-  width: 140px;
-  aspect-ratio: 16 / 9;
-}
-
-.skeleton-line {
-  height: 14px;
-  margin-bottom: 8px;
-}
-
-.skeleton-line.short {
-  width: 55%;
-}
-
-.skeleton-block {
-  height: 90px;
-  margin-top: 16px;
 }
 
 /* =========================================================
@@ -1758,7 +1372,7 @@ a {
   font-weight: 700;
 }
 
-/* Cartes de saison */
+/* Cartes de saison (fiche anime) */
 
 .season-cards {
   display: grid;
@@ -1778,6 +1392,11 @@ a {
     transform var(--ease),
     border-color var(--ease),
     background var(--ease);
+  /* Évite l'aperçu natif iOS sur l'appui long */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
 }
 
 .season-card:hover {
@@ -1788,6 +1407,7 @@ a {
 
 .season-card.is-done {
   border-color: var(--accent-border);
+  background: var(--accent-tint);
 }
 
 .season-card-top {
@@ -1902,6 +1522,7 @@ a {
     min-width: 260px;
   }
 }
+
 /* =========================================================
    PLANNING
    ========================================================= */
@@ -1930,6 +1551,10 @@ a {
 
 .planning-day {
   margin-bottom: 26px;
+}
+
+.planning-day.is-past {
+  opacity: 0.45;
 }
 
 .planning-day-title {
@@ -2053,39 +1678,6 @@ a {
   }
 }
 
-.planning-day.is-past {
-  opacity: 0.45;
-}
-
-.mark-button {
-  padding: 7px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--accent-light);
-  font-size: 10px;
-  font-weight: 700;
-  backdrop-filter: blur(14px);
-  transition: border-color var(--ease);
-}
-
-.mark-button:hover {
-  border-color: var(--accent-border);
-}
-
-.episode-hint {
-  margin: 0 0 10px;
-  color: var(--text-dim);
-  font-size: 10px;
-}
-
-/* Évite la sélection et le menu iOS à l'appui long */
-.episode {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
 /* =========================================================
    BIBLIOTHÈQUE
    ========================================================= */
@@ -2206,6 +1798,11 @@ a {
   color: var(--text-muted);
 }
 
+.library-status.is-upToDate {
+  background: rgba(88, 160, 220, 0.12);
+  color: #6fb8e0;
+}
+
 .library-status.is-done {
   background: rgba(88, 200, 130, 0.12);
   color: #6fd39a;
@@ -2249,30 +1846,10 @@ a {
     gap: 10px;
   }
 }
-.library-status.is-upToDate {
-  background: rgba(88, 160, 220, 0.12);
-  color: #6fb8e0;
-}
-
-.library-status.is-upToDate {
-  background: rgba(88, 160, 220, 0.12);
-  color: #6fb8e0;
-}
-
-.season-card {
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-  cursor: pointer;
-}
 
 /* =========================================================
    ACCUEIL — HERO, STATS, DÉCOUVERTE
    ========================================================= */
-
-.hero-mini {
-  padding: 4px 4px 14px;
-}
 
 .home-hero {
   position: relative;
@@ -2403,85 +1980,6 @@ a {
 }
 
 .discovery-card {
-  flex: 0 0 128px;
-  color: inherit;
-}
-
-.discovery-cover {
-  width: 128px;
-  aspect-ratio: 16 / 9;
-  margin-bottom: 6px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-solid);
-}
-
-.discovery-cover img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.discovery-card strong {
-  display: block;
-  overflow: hidden;
-  font-size: 11px;
-  font-weight: 650;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.discovery-card span {
-  display: block;
-  margin-top: 2px;
-  color: var(--text-dim);
-  font-size: 9px;
-  font-weight: 650;
-}
-
-@media (min-width: 700px) {
-  .home-hero-visual {
-    min-height: 280px;
-  }
-
-  .home-hero-content h2 {
-    font-size: 30px;
-  }
-
-  .home-hero-content p {
-    font-size: 14px;
-  }
-
-  .home-stat strong {
-    font-size: 24px;
-  }
-
-  .discovery-card {
-    flex-basis: 170px;
-  }
-
-  .discovery-cover {
-    width: 170px;
-  }
-}
-
-@media (min-width: 1400px) {
-  :root {
-    --page-max: 960px;
-  }
-
-  .home-hero-visual {
-    min-height: 360px;
-  }
-
-  .home-hero-content h2 {
-    font-size: 38px;
-  }
-}
-
-.discovery-card {
   display: flex;
   flex-direction: column;
   flex: 0 0 220px;
@@ -2510,9 +2008,11 @@ a {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  color: var(--text);
   font-size: 13px;
   font-weight: 650;
   line-height: 1.3;
+  white-space: normal;
 }
 
 .discovery-card span {
@@ -2521,4 +2021,36 @@ a {
   color: var(--text-dim);
   font-size: 10px;
   font-weight: 650;
+}
+
+@media (min-width: 700px) {
+  .home-hero-visual {
+    min-height: 280px;
+  }
+
+  .home-hero-content h2 {
+    font-size: 30px;
+  }
+
+  .home-hero-content p {
+    font-size: 14px;
+  }
+
+  .home-stat strong {
+    font-size: 24px;
+  }
+}
+
+@media (min-width: 1400px) {
+  :root {
+    --page-max: 960px;
+  }
+
+  .home-hero-visual {
+    min-height: 360px;
+  }
+
+  .home-hero-content h2 {
+    font-size: 38px;
+  }
 }
