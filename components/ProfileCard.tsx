@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
+  checkProfileExists,
   clearProfileCode,
   generateProfileCode,
   getProfileCode,
+  normalizeProfileCode,
   pullProfile,
   pushProfile,
   setProfileCode,
@@ -18,7 +20,9 @@ export default function ProfileCard() {
     null
   );
 
-  const [joinInput, setJoinInput] = useState('');
+  const [identifierInput, setIdentifierInput] =
+    useState('');
+
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
@@ -45,15 +49,77 @@ export default function ProfileCard() {
     }, 3000);
   };
 
-  const handleCreate = async () => {
-    const newCode = generateProfileCode();
+  const normalizedPreview = normalizeProfileCode(
+    identifierInput
+  );
 
-    setProfileCode(newCode);
-    setCode(newCode);
+  /*
+   * Un seul champ, une seule action : si l'identifiant
+   * existe déjà, on rejoint ; sinon, on le crée avec
+   * l'état actuel de l'appareil.
+   */
+  const handleContinue = async () => {
+    const normalized = normalizedPreview;
+
+    if (normalized.length < 3) {
+      flashStatus(
+        'error',
+        'Identifiant trop court (3 caractères minimum).'
+      );
+
+      return;
+    }
 
     setStatus('working');
 
-    const ok = await pushProfile(newCode);
+    const exists = await checkProfileExists(
+      normalized
+    );
+
+    if (exists === null) {
+      flashStatus(
+        'error',
+        'Connexion impossible, réessaie.'
+      );
+
+      return;
+    }
+
+    setProfileCode(normalized);
+
+    if (exists) {
+      const ok = await pullProfile(normalized);
+
+      if (!ok) {
+        clearProfileCode();
+
+        flashStatus(
+          'error',
+          'Impossible de récupérer ce profil.'
+        );
+
+        return;
+      }
+
+      setCode(normalized);
+      flashStatus('success', 'Profil rejoint.');
+
+      /*
+       * Les données locales viennent d'être remplacées :
+       * un rechargement garantit que chaque page affiche
+       * le nouvel état.
+       */
+      window.setTimeout(
+        () => window.location.reload(),
+        600
+      );
+
+      return;
+    }
+
+    const ok = await pushProfile(normalized);
+
+    setCode(normalized);
 
     flashStatus(
       ok ? 'success' : 'error',
@@ -63,43 +129,8 @@ export default function ProfileCard() {
     );
   };
 
-  const handleJoin = async () => {
-    const value = joinInput.trim().toUpperCase();
-
-    if (!/^[A-Z0-9]{4,10}$/.test(value)) {
-      flashStatus('error', 'Code invalide.');
-      return;
-    }
-
-    setStatus('working');
-
-    setProfileCode(value);
-
-    const ok = await pullProfile(value);
-
-    if (!ok) {
-      clearProfileCode();
-
-      flashStatus(
-        'error',
-        'Impossible de récupérer ce profil.'
-      );
-
-      return;
-    }
-
-    flashStatus('success', 'Profil rejoint.');
-
-    /*
-     * Les données locales viennent d'être remplacées :
-     * un rechargement garantit que chaque page affiche
-     * le nouvel état plutôt qu'un état déjà lu en
-     * mémoire par des composants montés.
-     */
-    window.setTimeout(
-      () => window.location.reload(),
-      600
-    );
+  const handleSuggest = () => {
+    setIdentifierInput(generateProfileCode());
   };
 
   const handlePull = async () => {
@@ -150,6 +181,7 @@ export default function ProfileCard() {
 
     clearProfileCode();
     setCode(null);
+    setIdentifierInput('');
   };
 
   const handleCopy = async () => {
@@ -192,46 +224,54 @@ export default function ProfileCard() {
         <div className="profile-setup">
 
           <p>
-            Relie tes appareils pour retrouver la même
-            progression sur iPad et iPhone.
+            Choisis un identifiant pour relier tes
+            appareils — invente-le, ou retape celui
+            d'un autre appareil déjà lié.
           </p>
-
-          <button
-            className="primary-button profile-create"
-            onClick={handleCreate}
-          >
-            Créer un profil
-          </button>
-
-          <div className="profile-divider">
-            <span>ou</span>
-          </div>
 
           <div className="profile-join">
 
             <input
-              value={joinInput}
+              value={identifierInput}
               onChange={(event) =>
-                setJoinInput(
-                  event.target.value.toUpperCase()
+                setIdentifierInput(
+                  event.target.value
                 )
               }
-              placeholder="Code à 6 caractères"
-              maxLength={10}
-              autoCapitalize="characters"
+              placeholder="ex. pierre-ipad"
+              maxLength={30}
+              autoCapitalize="none"
               autoComplete="off"
               spellCheck={false}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  handleContinue();
+                }
+              }}
             />
 
             <button
               className="profile-join-button"
-              onClick={handleJoin}
+              onClick={handleContinue}
               disabled={status === 'working'}
             >
-              Rejoindre
+              Continuer
             </button>
 
           </div>
+
+          {identifierInput && (
+            <small className="profile-preview">
+              → {normalizedPreview || '…'}
+            </small>
+          )}
+
+          <button
+            className="text-button profile-suggest"
+            onClick={handleSuggest}
+          >
+            Suggérer un identifiant
+          </button>
 
         </div>
       ) : (
@@ -253,8 +293,8 @@ export default function ProfileCard() {
           </div>
 
           <p>
-            Saisis ce code sur ton autre appareil pour
-            les relier.
+            Retape cet identifiant sur ton autre
+            appareil pour les relier.
           </p>
 
           <div className="profile-actions">
