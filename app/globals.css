@@ -2162,12 +2162,13 @@ a {
   border-radius: var(--radius-md);
   background: var(--accent-tint);
   color: var(--accent-light);
-  font-size: 20px;
+  font-size: 15px;
   font-weight: 800;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.02em;
   text-align: center;
-  font-variant-numeric: tabular-nums;
+  word-break: break-all;
 }
+
 
 .profile-copy {
   flex: 0 0 auto;
@@ -2230,4 +2231,17 @@ a {
 
 .profile-status.is-error {
   color: #f27676;
+}
+
+.profile-preview {
+  display: block;
+  margin: -8px 0 12px;
+  color: var(--accent-light);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.profile-suggest {
+  display: block;
+  margin: 0 auto;
 }
