@@ -10,8 +10,7 @@ import { NextResponse } from 'next/server';
  *
  * Nécessite UPSTASH_REDIS_REST_URL et
  * UPSTASH_REDIS_REST_TOKEN sur Vercel — copie-les tels
- * quels depuis l'onglet ".env" du tableau de bord Upstash,
- * ce sont exactement les noms attendus ici.
+ * quels depuis l'onglet ".env" du tableau de bord Upstash.
  * =========================================================
  */
 
@@ -43,7 +42,21 @@ async function upstash(
   });
 
   if (!response.ok) {
-    throw new Error('Erreur Upstash');
+    /*
+     * On lit le corps de la réponse pour voir le
+     * vrai message d'Upstash (jeton invalide, URL
+     * incorrecte, etc.) plutôt qu'un statut nu.
+     */
+    const text = await response
+      .text()
+      .catch(() => '');
+
+    throw new Error(
+      `Upstash a répondu ${response.status} ${response.statusText} : ${text.slice(
+        0,
+        300
+      )}`
+    );
   }
 
   const json = await response.json();
@@ -86,7 +99,13 @@ export async function GET(request: Request) {
     console.error('Profile GET error:', error);
 
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      {
+        error: 'Erreur serveur',
+        detail:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
       { status: 500 }
     );
   }
@@ -135,7 +154,13 @@ export async function PUT(request: Request) {
     console.error('Profile PUT error:', error);
 
     return NextResponse.json(
-      { error: 'Erreur serveur' },
+      {
+        error: 'Erreur serveur',
+        detail:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
       { status: 500 }
     );
   }
