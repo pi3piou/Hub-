@@ -8,6 +8,11 @@
  * pousse son état local vers le serveur. Le dernier
  * appareil qui pousse a raison, point final.
  *
+ * L'identifiant est choisi librement par l'utilisateur
+ * (pseudo, "pierre-ipad", etc.) plutôt qu'un code imposé
+ * à retenir. Il est normalisé en un format simple pour
+ * servir de clé de stockage.
+ *
  * Ce qui est synchronisé : favoris, historique, reprise
  * de lecture, épisodes vus, progression par saison.
  * Ce qui NE l'est PAS : les caches (fiches, épisodes,
@@ -34,8 +39,24 @@ function isSyncedKey(key: string) {
 }
 
 /* =========================================================
-   CODE DE PROFIL
+   IDENTIFIANT DE PROFIL
    ========================================================= */
+
+/*
+ * Transforme un texte libre en identifiant sûr pour servir
+ * de clé de stockage : minuscules, sans accents, espaces
+ * et ponctuation remplacés par des tirets.
+ */
+export function normalizeProfileCode(input: string) {
+  return input
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
+}
 
 export function getProfileCode(): string | null {
   try {
@@ -45,12 +66,14 @@ export function getProfileCode(): string | null {
   }
 }
 
+/*
+ * Enregistre l'identifiant tel quel, sans le renormaliser :
+ * un identifiant déjà lié (créé avant ce changement, par
+ * exemple) continue de fonctionner sans migration.
+ */
 export function setProfileCode(code: string) {
   try {
-    localStorage.setItem(
-      PROFILE_CODE_KEY,
-      code.trim().toUpperCase()
-    );
+    localStorage.setItem(PROFILE_CODE_KEY, code.trim());
   } catch {
     // Rien
   }
@@ -65,22 +88,51 @@ export function clearProfileCode() {
 }
 
 /*
- * Lettres et chiffres sans ambiguïté visuelle
- * (pas de 0/O, pas de 1/I/L).
+ * Suggestion pour qui ne veut pas choisir : lettres et
+ * chiffres sans ambiguïté visuelle (pas de 0/o, 1/i/l).
  */
-const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const SUGGESTION_CHARS =
+  'abcdefghjkmnpqrstuvwxyz23456789';
 
 export function generateProfileCode() {
   let code = '';
 
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 8; i++) {
     code +=
-      CODE_CHARS[
-        Math.floor(Math.random() * CODE_CHARS.length)
+      SUGGESTION_CHARS[
+        Math.floor(
+          Math.random() * SUGGESTION_CHARS.length
+        )
       ];
   }
 
   return code;
+}
+
+/* =========================================================
+   EXISTENCE D'UN PROFIL
+   ========================================================= */
+
+/*
+ * true si le profil existe déjà sur le serveur, false s'il
+ * est libre, null si la vérification a échoué (réseau).
+ */
+export async function checkProfileExists(
+  code: string
+): Promise<boolean | null> {
+  try {
+    const response = await fetch(
+      `/api/profile?code=${encodeURIComponent(code)}`
+    );
+
+    if (!response.ok) return null;
+
+    const json = await response.json();
+
+    return json.data !== null && json.data !== undefined;
+  } catch {
+    return null;
+  }
 }
 
 /* =========================================================
