@@ -4,9 +4,14 @@ import { NextResponse } from 'next/server';
  * =========================================================
  * PROFIL — STOCKAGE UPSTASH REDIS
  *
- * Un seul blob JSON par code de profil. Pas de fusion,
- * pas d'historique de versions : chaque écriture remplace
- * entièrement la précédente.
+ * Un seul blob JSON par identifiant de profil. Pas de
+ * fusion, pas d'historique de versions : chaque écriture
+ * remplace entièrement la précédente.
+ *
+ * La validation accepte majuscules ET minuscules : les
+ * identifiants créés avant le passage aux pseudos libres
+ * (des codes générés en majuscules) continuent de
+ * fonctionner sans migration.
  *
  * Nécessite UPSTASH_REDIS_REST_URL et
  * UPSTASH_REDIS_REST_TOKEN sur Vercel — copie-les tels
@@ -19,7 +24,9 @@ const MAX_PAYLOAD_SIZE = 200_000; // 200 Ko, large marge
 function isValidCode(
   code: string | null
 ): code is string {
-  return Boolean(code && /^[A-Z0-9]{4,10}$/.test(code));
+  return Boolean(
+    code && /^[a-zA-Z0-9_-]{3,24}$/.test(code)
+  );
 }
 
 async function upstash(
@@ -42,11 +49,6 @@ async function upstash(
   });
 
   if (!response.ok) {
-    /*
-     * On lit le corps de la réponse pour voir le
-     * vrai message d'Upstash (jeton invalide, URL
-     * incorrecte, etc.) plutôt qu'un statut nu.
-     */
     const text = await response
       .text()
       .catch(() => '');
@@ -71,7 +73,7 @@ export async function GET(request: Request) {
 
   if (!isValidCode(code)) {
     return NextResponse.json(
-      { error: 'Code invalide' },
+      { error: 'Identifiant invalide' },
       { status: 400 }
     );
   }
@@ -119,7 +121,7 @@ export async function PUT(request: Request) {
 
     if (!isValidCode(code)) {
       return NextResponse.json(
-        { error: 'Code invalide' },
+        { error: 'Identifiant invalide' },
         { status: 400 }
       );
     }
