@@ -1,5 +1,6 @@
 'use client';
 
+import ProfileCard from '@/components/ProfileCard';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -730,6 +731,7 @@ export default function LibraryPage() {
 
         </section>
       )}
+      <ProfileCard />
 
     </main>
   );
