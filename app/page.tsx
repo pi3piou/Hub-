@@ -11,12 +11,15 @@ import {
 
 import {
   PlanningItem,
+  formatPlanningDay,
+  formatPlanningTime,
   loadPlanning,
 } from '@/lib/planning';
 
 import {
   getSeasonProgress,
   isSeasonComplete,
+  readMergedProgress,
   readWatched,
   writeSeasonProgress,
 } from '@/lib/watchState';
@@ -46,6 +49,12 @@ interface ResumeItem extends ContinueItem {
   totalCount: number;
 }
 
+interface HomeStats {
+  totalWatched: number;
+  seriesTracked: number;
+  favoritesCount: number;
+}
+
 function readHistory(): ContinueItem[] {
   try {
     const raw = localStorage.getItem(
@@ -72,9 +81,91 @@ function readHistory(): ContinueItem[] {
   }
 }
 
+/* Slugs seulement : suffisant pour les stats et l'exclusion */
+function readFavoriteSlugs(): string[] {
+  try {
+    const raw = localStorage.getItem(
+      'anime_favorites'
+    );
+
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item) =>
+        typeof item === 'string'
+          ? item
+          : item?.slug
+      )
+      .filter(Boolean) as string[];
+  } catch {
+    return [];
+  }
+}
+
+/*
+ * Stats calculées uniquement à partir du localStorage :
+ * aucune requête réseau, donc disponibles instantanément
+ * au chargement de la page.
+ */
+function computeStats(
+  slugs: string[],
+  favoritesCount: number
+): HomeStats {
+  let totalWatched = 0;
+  let seriesTracked = 0;
+
+  for (const slug of slugs) {
+    const merged = readMergedProgress(slug);
+
+    if (merged.size > 0) seriesTracked++;
+
+    merged.forEach((item) => {
+      totalWatched += item.watched;
+    });
+  }
+
+  return { totalWatched, seriesTracked, favoritesCount };
+}
+
+/*
+ * Un anime par carte : la sortie la plus proche parmi
+ * celles à venir, en excluant ce que tu suis déjà.
+ */
+function buildDiscovery(
+  planning: PlanningItem[],
+  excludeSlugs: Set<string>
+) {
+  const now = Date.now();
+
+  const bySlug = new Map<string, PlanningItem>();
+
+  for (const item of planning) {
+    if (excludeSlugs.has(item.slug)) continue;
+
+    if (item.releaseTs * 1000 <= now) continue;
+
+    const existing = bySlug.get(item.slug);
+
+    if (
+      !existing ||
+      item.releaseTs < existing.releaseTs
+    ) {
+      bySlug.set(item.slug, item);
+    }
+  }
+
+  return Array.from(bySlug.values())
+    .sort((a, b) => a.releaseTs - b.releaseTs)
+    .slice(0, 8);
+}
+
 /*
  * =========================================================
- * DÉCISION D'AFFICHAGE
+ * DÉCISION D'AFFICHAGE (Continuer la lecture)
  *
  * Un anime quitte la file d'attente quand sa saison
  * est terminée, sauf si une saison suivante existe
@@ -91,7 +182,6 @@ async function resolveResume(
     item.lang
   );
 
-  /* Saison en cours */
   if (!isSeasonComplete(progress)) {
     return {
       ...item,
@@ -103,10 +193,6 @@ async function resolveResume(
     };
   }
 
-  /*
-   * Une sortie a eu lieu : le total stocké
-   * est peut-être périmé.
-   */
   const release = planning.find(
     (entry) =>
       entry.slug === item.slug &&
@@ -160,7 +246,6 @@ async function resolveResume(
     }
   }
 
-  /* Saison suivante ? */
   let info = getCachedInfo(item.slug);
 
   if (!info) {
@@ -197,7 +282,6 @@ async function resolveResume(
     };
   }
 
-  /* À jour */
   return null;
 }
 
@@ -212,6 +296,13 @@ export default function Home() {
     ResumeItem[]
   >([]);
 
+  const [discovery, setDiscovery] = useState<
+    PlanningItem[]
+  >([]);
+
+  const [stats, setStats] =
+    useState<HomeStats | null>(null);
+
   const [searching, setSearching] =
     useState(false);
 
@@ -220,7 +311,21 @@ export default function Home() {
   useEffect(() => {
     const entries = readHistory();
 
+    const favoriteSlugs = readFavoriteSlugs();
+
     setMounted(true);
+
+    /* Stats : synchrone, aucun réseau */
+    const allSlugs = Array.from(
+      new Set([
+        ...favoriteSlugs,
+        ...entries.map((item) => item.slug),
+      ])
+    );
+
+    setStats(
+      computeStats(allSlugs, favoriteSlugs.length)
+    );
 
     let active = true;
 
@@ -249,6 +354,13 @@ export default function Home() {
         resolved.filter(
           (item): item is ResumeItem =>
             item !== null
+        )
+      );
+
+      setDiscovery(
+        buildDiscovery(
+          planning,
+          new Set(allSlugs)
         )
       );
     })();
@@ -312,24 +424,28 @@ export default function Home() {
     };
   }, [query]);
 
+  const heroItem = resume[0] || null;
+
+  const restOfResume = resume.slice(1, 5);
+
+  const showStats = Boolean(
+    stats &&
+      (stats.favoritesCount > 0 ||
+        stats.seriesTracked > 0)
+  );
+
+  const nothingAtAll =
+    mounted &&
+    resume.length === 0 &&
+    discovery.length === 0;
+
   return (
     <main className="page">
 
-      <header className="hero">
-
-        <div>
-          <div className="eyebrow">
-            ANIME STREAM
-          </div>
-
-          <h1>Regarde ton anime.</h1>
-
-          <p>
-            Reprends là où tu t’es arrêté, ou
-            cherche un nouveau titre.
-          </p>
-        </div>
-
+      <header className="hero-mini">
+        <span className="eyebrow">
+          ANIME STREAM
+        </span>
       </header>
 
       {/* RECHERCHE */}
@@ -415,9 +531,114 @@ export default function Home() {
 
       </section>
 
-      {/* CONTINUER */}
+      {/* HERO */}
 
-      {mounted && resume.length > 0 && (
+      {mounted && heroItem ? (
+        <section className="home-hero">
+
+          <div
+            className="home-hero-visual"
+            style={
+              heroItem.image
+                ? {
+                    backgroundImage: `url(${heroItem.image})`,
+                  }
+                : undefined
+            }
+          >
+
+            <div className="home-hero-overlay" />
+
+            <div className="home-hero-content">
+
+              <span className="section-eyebrow">
+                REPRENDRE
+              </span>
+
+              <h2>{heroItem.name}</h2>
+
+              <p>
+                Saison {heroItem.targetSeason}
+                {' · '}
+                Épisode{' '}
+                {heroItem.targetEpisode + 1}
+                {heroItem.totalCount > 0 && (
+                  <>
+                    {' sur '}
+                    {heroItem.totalCount}
+                  </>
+                )}
+              </p>
+
+              <Link
+                href={`/anime/${encodeURIComponent(
+                  heroItem.slug
+                )}/${heroItem.targetSeason}`}
+                className="primary-button hero-cta"
+              >
+                {heroItem.isNextSeason
+                  ? '▶ Nouvelle saison'
+                  : '▶ Continuer'}
+              </Link>
+
+            </div>
+
+          </div>
+
+        </section>
+      ) : (
+        mounted && (
+          <section className="home-hero">
+
+            <div className="home-hero-empty">
+
+              <span className="eyebrow">
+                BIENVENUE
+              </span>
+
+              <h1>Regarde ton anime.</h1>
+
+              <p>
+                Cherche un titre pour commencer à
+                le suivre.
+              </p>
+
+            </div>
+
+          </section>
+        )
+      )}
+
+      {/* STATS */}
+
+      {mounted && showStats && stats && (
+        <div className="home-stats">
+
+          <div className="home-stat">
+            <strong>{stats.totalWatched}</strong>
+            <span>épisodes vus</span>
+          </div>
+
+          <div className="home-stat">
+            <strong>
+              {stats.seriesTracked}
+            </strong>
+            <span>séries suivies</span>
+          </div>
+
+          <div className="home-stat">
+            <strong>
+              {stats.favoritesCount}
+            </strong>
+            <span>favoris</span>
+          </div>
+
+        </div>
+      )}
+
+      {/* SUITE DE LA LISTE CONTINUER */}
+
+      {mounted && restOfResume.length > 0 && (
         <section className="section">
 
           <div className="section-header">
@@ -428,7 +649,7 @@ export default function Home() {
                 REPRENDRE
               </span>
 
-              <h2>Continuer la lecture</h2>
+              <h2>Aussi en cours</h2>
 
             </div>
 
@@ -436,7 +657,7 @@ export default function Home() {
 
           <div className="continue-list">
 
-            {resume.slice(0, 5).map((item) => {
+            {restOfResume.map((item) => {
 
               const percentage =
                 item.totalCount > 0
@@ -511,14 +732,85 @@ export default function Home() {
         </section>
       )}
 
-      {/* AUCUNE ACTIVITÉ */}
+      {/* DÉCOUVERTE */}
 
-      {mounted && resume.length === 0 && (
+      {mounted && discovery.length > 0 && (
+        <section className="section">
+
+          <div className="section-header">
+
+            <div>
+
+              <span className="section-eyebrow">
+                DÉCOUVRIR
+              </span>
+
+              <h2>Prochaines sorties</h2>
+
+            </div>
+
+            <Link
+              href="/planning"
+              className="see-all"
+            >
+              Tout voir
+            </Link>
+
+          </div>
+
+          <div className="discovery-scroll">
+
+            {discovery.map((item) => (
+              <Link
+                key={`${item.slug}-${item.season}-${item.lang}-${item.releaseTs}`}
+                href={`/anime/${encodeURIComponent(
+                  item.slug
+                )}/${item.season}`}
+                className="discovery-card"
+              >
+
+                <div className="discovery-cover">
+                  {item.image && (
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      loading="lazy"
+                    />
+                  )}
+                </div>
+
+                <strong>{item.title}</strong>
+
+                <span>
+                  {formatPlanningDay(
+                    new Date(
+                      item.releaseTs * 1000
+                    )
+                      .toISOString()
+                      .slice(0, 10)
+                  )}
+                  {' · '}
+                  {formatPlanningTime(
+                    item.releaseTs
+                  )}
+                </span>
+
+              </Link>
+            ))}
+
+          </div>
+
+        </section>
+      )}
+
+      {/* ULTIME FILET DE SÉCURITÉ */}
+
+      {nothingAtAll && (
         <div className="empty-card">
 
           <div className="empty-icon">▶</div>
 
-          <h3>Rien en cours</h3>
+          <h3>Rien à afficher</h3>
 
           <p>
             Recherche un anime pour commencer à
