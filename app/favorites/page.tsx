@@ -15,7 +15,6 @@ import {
   loadTMDB,
 } from '@/lib/animeCache';
 
-
 import {
   PlanningItem,
   formatPlanningDay,
@@ -30,7 +29,8 @@ import { readMergedProgress } from '@/lib/watchState';
  * watching   → il reste des épisodes disponibles à voir
  * upToDate   → tout ce qui est sorti a été vu, mais rien
  *              ne confirme que la série est terminée
- * done       → AniList confirme FINISHED et tu es à jour
+ * done       → TMDB ou AniList confirme la fin, et tu
+ *              es à jour
  * todo       → jamais commencé
  */
 type Status = 'watching' | 'todo' | 'upToDate' | 'done';
@@ -170,27 +170,25 @@ const STATUS_LABEL: Record<Status, string> = {
 };
 
 /*
- * En dessous de ce seuil, la correspondance AniList
- * est trop incertaine pour qu'on s'y fie.
+ * En dessous de ce seuil, la correspondance externe
+ * (TMDB ou AniList) est trop incertaine pour qu'on
+ * s'y fie.
  */
-const ANILIST_CONFIDENCE_MIN = 0.5;
+const CONFIDENCE_MIN = 0.5;
 
 function trustAniList(anilist: AniListData | null) {
   return Boolean(
     anilist?.matched &&
-      (anilist.confidence ?? 0) >=
-        ANILIST_CONFIDENCE_MIN
+      (anilist.confidence ?? 0) >= CONFIDENCE_MIN
   );
 }
 
 function trustTMDB(tmdb: TMDBData | null) {
   return Boolean(
     tmdb?.matched &&
-      (tmdb.confidence ?? 0) >=
-        ANILIST_CONFIDENCE_MIN
+      (tmdb.confidence ?? 0) >= CONFIDENCE_MIN
   );
 }
-
 
 export default function LibraryPage() {
   const [items, setItems] = useState<
@@ -261,24 +259,11 @@ export default function LibraryPage() {
             }
 
             /*
-             * AniList : source du statut fiable et
-             * du total d'épisodes officiel. Simple
+             * TMDB en priorité : donne le statut et
+             * le détail par saison. AniList en repli
+             * si TMDB ne matche pas. Simple
              * enrichissement, jamais bloquant.
              */
-            let anilist = getCachedAniList(slug);
-
-            if (!anilist) {
-              try {
-                anilist = await loadAniList(
-                  slug,
-                  info?.name || meta.name,
-                  info?.altTitles || []
-                );
-              } catch {
-                anilist = null;
-              }
-            }
-
             let tmdb = getCachedTMDB(slug);
 
             if (!tmdb) {
@@ -294,6 +279,19 @@ export default function LibraryPage() {
               }
             }
 
+            let anilist = getCachedAniList(slug);
+
+            if (!anilist) {
+              try {
+                anilist = await loadAniList(
+                  slug,
+                  info?.name || meta.name,
+                  info?.altTitles || []
+                );
+              } catch {
+                anilist = null;
+              }
+            }
 
             const merged =
               readMergedProgress(slug);
@@ -337,26 +335,23 @@ export default function LibraryPage() {
               hasKnownTotal &&
               watched >= total;
 
-                       let status: Status = 'watching';
-
+            /*
+             * La fin de série est confirmée si TMDB
+             * dit "Ended", ou à défaut si AniList dit
+             * "FINISHED" — les deux avec une
+             * confiance suffisante.
+             */
             const isFinished =
               (trustTMDB(tmdb) &&
                 tmdb!.status === 'Ended') ||
               (trustAniList(anilist) &&
                 anilist!.status === 'FINISHED');
 
+            let status: Status = 'watching';
+
             if (merged.size === 0) {
               status = 'todo';
             } else if (isFinished && caughtUp) {
-              status = 'done';
-            } else if (caughtUp) {
-              status = 'upToDate';
-            }
-
-              /*
-               * AniList confirme la fin de série,
-               * et tu as vu tout ce qui existe.
-               */
               status = 'done';
             } else if (caughtUp) {
               /*
@@ -385,7 +380,6 @@ export default function LibraryPage() {
                 tmdb?.episodes ??
                 anilist?.episodes ??
                 null,
-
             } as LibraryItem;
           })
       );
