@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import Navbar from '@/components/Navbar';
+import ProfileGate from '@/components/ProfileGate';
 
 export const metadata: Metadata = {
   title: 'Anime Stream',
@@ -22,8 +23,10 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body>
-        {children}
-        <Navbar />
+        <ProfileGate>
+          {children}
+          <Navbar />
+        </ProfileGate>
       </body>
     </html>
   );
