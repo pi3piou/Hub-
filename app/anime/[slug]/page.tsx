@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -8,14 +9,15 @@ import {
   getAnimeName,
   getCachedAniList,
   getCachedInfo,
+  getCachedTMDB,
   loadAniList,
   loadAnimeInfo,
   loadEpisodes,
+  loadTMDB,
   prefetchEpisodes,
 } from '@/lib/animeCache';
 
 import {
-  getSeasonProgress,
   markEpisodesUpTo,
   readMergedProgress,
 } from '@/lib/watchState';
@@ -101,6 +103,8 @@ export default function AnimeInfoPage({
 }: {
   params: { slug: string };
 }) {
+  const router = useRouter();
+
   const slug = decodeURIComponent(params.slug);
 
   const [info, setInfo] =
@@ -213,7 +217,21 @@ export default function AnimeInfoPage({
       continueItem?.lang || 'vostfr'
     );
 
-    /* AniList : statut et total, en tâche de fond */
+    /*
+     * TMDB en priorité (statut + détail par saison),
+     * AniList en repli si TMDB ne matche pas.
+     */
+    if (!getCachedTMDB(slug)) {
+      loadTMDB(
+        slug,
+        info.name,
+        info.altTitles || [],
+        info.seasons?.length || 0
+      ).catch(() => {
+        // Simple enrichissement, pas bloquant
+      });
+    }
+
     if (!getCachedAniList(slug)) {
       loadAniList(
         slug,
@@ -247,12 +265,13 @@ export default function AnimeInfoPage({
    * =======================================================
    * MARQUAGE MANUEL D'UNE SAISON
    *
-   * Le total d'épisodes vient d'AniList quand la série
-   * ne fait qu'une saison (correspondance directe).
-   * Sinon — cas des sagas multi-saisons comme One
-   * Piece — le total AniList couvre toute la série et
-   * ne dit rien sur une saison précise : il faut alors
-   * charger le episodes.js de cette saison.
+   * Ordre de résolution du total :
+   *   1. déjà connu localement (progression existante)
+   *   2. TMDB, si son découpage en saisons correspond
+   *      exactement à celui d'Anime-Sama
+   *   3. AniList, si la série ne fait qu'une saison
+   *   4. en dernier recours, chargement du episodes.js
+   *      réel de cette saison
    * =======================================================
    */
 
@@ -263,6 +282,19 @@ export default function AnimeInfoPage({
 
     if (existing?.total) {
       return existing.total;
+    }
+
+    const tmdb = getCachedTMDB(slug);
+
+    if (tmdb?.matched && tmdb.seasons) {
+      const match = tmdb.seasons.find(
+        (season) =>
+          season.seasonNumber === seasonNumber
+      );
+
+      if (match?.episodeCount) {
+        return match.episodeCount;
+      }
     }
 
     const isSingleSeason =
@@ -331,6 +363,17 @@ export default function AnimeInfoPage({
     }
   };
 
+  /*
+   * =======================================================
+   * APPUI LONG
+   *
+   * Les cartes de saison sont des <div>, pas des <Link>,
+   * pour éviter le menu d'aperçu natif iOS ("Peek & Pop")
+   * qui se déclenche sur l'appui long d'un lien et coupe
+   * court à la détection du geste.
+   * =======================================================
+   */
+
   const startPress = (seasonNumber: number) => {
     longPressed.current = false;
 
@@ -346,6 +389,21 @@ export default function AnimeInfoPage({
       window.clearTimeout(pressTimer.current);
       pressTimer.current = null;
     }
+  };
+
+  const handleSeasonClick = (
+    seasonNumber: number
+  ) => {
+    if (longPressed.current) {
+      longPressed.current = false;
+      return;
+    }
+
+    router.push(
+      `/anime/${encodeURIComponent(
+        slug
+      )}/${seasonNumber}`
+    );
   };
 
   useEffect(() => {
@@ -737,11 +795,10 @@ export default function AnimeInfoPage({
               markingSeason === entry.number;
 
             return (
-              <Link
+              <div
                 key={entry.number}
-                href={`/anime/${encodeURIComponent(
-                  slug
-                )}/${entry.number}`}
+                role="button"
+                tabIndex={0}
                 className={
                   isDone
                     ? 'season-card is-done'
@@ -762,10 +819,12 @@ export default function AnimeInfoPage({
                 onContextMenu={(event) =>
                   event.preventDefault()
                 }
-                onClick={(event) => {
-                  if (longPressed.current) {
-                    event.preventDefault();
-                    longPressed.current = false;
+                onClick={() =>
+                  handleSeasonClick(entry.number)
+                }
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    handleSeasonClick(entry.number);
                   }
                 }}
               >
@@ -816,7 +875,7 @@ export default function AnimeInfoPage({
 
                 </div>
 
-              </Link>
+              </div>
             );
           })}
 
