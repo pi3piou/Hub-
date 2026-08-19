@@ -129,7 +129,7 @@ export async function GET(request: Request) {
       catalogueUrl
     );
 
-    const entries = parseSeasons(html);
+    const entries = parseSeasons(html, slug);
 
     const seasonEntries = entries.length
       ? entries
