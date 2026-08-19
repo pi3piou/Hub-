@@ -1557,6 +1557,24 @@ function AnimeInfoPageContent({
 
                         </div>
 
+                        {data?.fallback &&
+                          data.requestedLang !==
+                            data.lang && (
+                            <p className="episode-hint">
+                              Pas de{' '}
+                              {data.requestedLang ===
+                              'vf'
+                                ? 'VF'
+                                : 'VOSTFR'}{' '}
+                              disponible pour cette
+                              saison — lecture en{' '}
+                              {data.lang === 'vf'
+                                ? 'VF'
+                                : 'VOSTFR'}
+                              .
+                            </p>
+                          )}
+
                         <EpisodesBoundary>
 
                           {/* LECTEUR — apparaît ici
