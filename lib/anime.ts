@@ -591,10 +591,44 @@ export function extractAnimeInfo(
    SAISONS
    ========================================================= */
 
+/*
+ * Un chemin de type ".../catalogue/AUTRE-SLUG/saison2/vf"
+ * appartient à un autre anime (widget « oeuvres similaires »
+ * réutilisant parfois le même appel panneauAnime). On ne le
+ * rejette que si un slug DIFFÉRENT est explicitement présent
+ * dans le chemin : un chemin relatif classique du type
+ * "saison1/vostfr" (sans référence de catalogue) reste
+ * accepté comme avant, pour ne jamais casser les pages qui
+ * fonctionnaient déjà.
+ */
+function belongsToOtherAnime(
+  path: string,
+  normalizedSlug: string
+): boolean {
+  if (!normalizedSlug) return false;
+
+  const catalogueMatch = path.match(
+    /catalogue\/([^/]+)\//i
+  );
+
+  if (!catalogueMatch) return false;
+
+  const referencedSlug = catalogueMatch[1]
+    .trim()
+    .toLowerCase();
+
+  return referencedSlug !== normalizedSlug;
+}
+
 export function parseSeasons(
-  html: string
+  html: string,
+  slug?: string
 ): SeasonEntry[] {
   const found = new Map<number, SeasonEntry>();
+
+  const normalizedSlug = slug
+    ? slug.trim().toLowerCase()
+    : '';
 
   const regex =
     /panneauAnime\(\s*["'`]([^"'`]*)["'`]\s*,\s*["'`]([^"'`]*)["'`]\s*\)/gi;
@@ -612,8 +646,18 @@ export function parseSeasons(
       continue;
     }
 
+    if (belongsToOtherAnime(path, normalizedSlug)) {
+      continue;
+    }
+
+    /*
+     * "saison" doit être un vrai segment/mot du chemin,
+     * pas une sous-chaîne (ex. évite qu'un chemin du type
+     * "occasion2/vf" ou "saisonnier/vf" soit confondu avec
+     * une vraie saison).
+     */
     const seasonMatch = path.match(
-      /saison\s*(\d+)/i
+      /(?:^|[/_-])saison[\s_-]*(\d+)(?:$|[/_-])/i
     );
 
     if (!seasonMatch) continue;
@@ -656,7 +700,7 @@ export function parseSeasons(
   const fallback = new Set<number>();
 
   for (const match of html.matchAll(
-    /saison\s*(\d+)/gi
+    /(?:^|[/_-])saison[\s_-]*(\d+)(?:$|[/_-])/gi
   )) {
     const number = Number(match[1]);
 
