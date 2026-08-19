@@ -22,6 +22,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr">
+      <head>
+        {/*
+          Applique le thème enregistré AVANT le premier
+          rendu React, sinon on voit un flash du thème
+          sombre par défaut le temps que Navbar s'hydrate.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var t=localStorage.getItem('anime_theme');if(t==='light'){document.documentElement.setAttribute('data-theme','light');}}catch(e){}})();",
+          }}
+        />
+      </head>
       <body>
         <ProfileGate>
           {children}
