@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -21,9 +20,11 @@ import {
 
 import {
   clearSeason,
+  getWatchKey,
   markEpisodesUpTo,
   readMergedProgress,
   readWatched,
+  writeSeasonProgress,
 } from '@/lib/watchState';
 
 interface ContinueItem {
@@ -52,6 +53,7 @@ interface SeasonProgress {
 
 const SYNOPSIS_LIMIT = 260;
 const LONG_PRESS = 550;
+const WATCH_DELAY = 60000;
 
 function readFavorites(): FavoriteItem[] {
   try {
@@ -107,8 +109,6 @@ export default function AnimeInfoPage({
 }: {
   params: { slug: string };
 }) {
-  const router = useRouter();
-
   const slug = decodeURIComponent(params.slug);
 
   const [info, setInfo] =
@@ -142,8 +142,8 @@ export default function AnimeInfoPage({
    *
    * Une seule saison sélectionnée à la fois, comme un vrai
    * segmented control. Dès qu'on choisit une saison, ses
-   * épisodes se chargent et s'affichent juste en dessous
-   * dans un rail horizontal — pas de navigation.
+   * épisodes se chargent et s'affichent en dessous dans un
+   * rail horizontal — tout reste sur cette même page.
    * =======================================================
    */
 
@@ -181,6 +181,21 @@ export default function AnimeInfoPage({
   });
 
   const [pillReady, setPillReady] = useState(false);
+
+  /*
+   * =======================================================
+   * LECTEUR — reste sur la même page, jamais de
+   * navigation vers une autre route pour lire un épisode
+   * =======================================================
+   */
+
+  const [selectedEpisode, setSelectedEpisode] =
+    useState<number | null>(null);
+
+  const [playerIndex, setPlayerIndex] = useState(0);
+
+  const playerSectionRef =
+    useRef<HTMLDivElement | null>(null);
 
   /*
    * =======================================================
@@ -504,6 +519,11 @@ export default function AnimeInfoPage({
 
     setLang(initialLang);
     setSelectedSeason(seasonNumber);
+
+    /* On change de saison : on referme le lecteur en
+       cours, l'utilisateur doit choisir un épisode de
+       la nouvelle saison. */
+    setSelectedEpisode(null);
   };
 
   /*
@@ -578,6 +598,11 @@ export default function AnimeInfoPage({
     );
   }, [slug, selectedSeason, lang]);
 
+  /* Lecteur (mirroir) par défaut à chaque nouveau chargement */
+  useEffect(() => {
+    setPlayerIndex(data?.defaultPlayerIndex || 0);
+  }, [data]);
+
   const episodeCount = useMemo(() => {
     if (!data) return 0;
 
@@ -587,6 +612,17 @@ export default function AnimeInfoPage({
 
     return list?.length || data.totalEpisodes || 0;
   }, [data]);
+
+  const currentEpisodes = useMemo(() => {
+    if (!data?.players?.[playerIndex]) return [];
+
+    return data.players[playerIndex].urls || [];
+  }, [data, playerIndex]);
+
+  const videoUrl =
+    selectedEpisode !== null
+      ? currentEpisodes[selectedEpisode] || ''
+      : '';
 
   /*
    * =======================================================
@@ -626,21 +662,16 @@ export default function AnimeInfoPage({
 
   /*
    * =======================================================
-   * APPUI SUR UN ÉPISODE → LECTEUR
+   * CONTINUER LA LECTURE
    *
-   * On réutilise le mécanisme "continuer la lecture" déjà
-   * lu par la page /anime/[slug]/[saison] au montage :
-   * il suffit d'écrire la même entrée localStorage avant
-   * de naviguer, sans toucher à cette page-là.
+   * Toujours écrit dans le même localStorage que lisait
+   * (et lit toujours) la page /anime/[slug]/[saison], au
+   * cas où elle serait encore utilisée ailleurs — mais ici
+   * on ne quitte jamais la fiche.
    * =======================================================
    */
 
-  const openEpisode = (episodeIndex: number) => {
-    if (episodeLongPressed.current) {
-      episodeLongPressed.current = false;
-      return;
-    }
-
+  const saveContinue = (episodeIndex: number) => {
     if (selectedSeason === null) return;
 
     try {
@@ -658,6 +689,8 @@ export default function AnimeInfoPage({
         `anime_continue_${slug}`,
         JSON.stringify(item)
       );
+
+      setContinueItem(item);
 
       const historyRaw = localStorage.getItem(
         'anime_history'
@@ -684,13 +717,113 @@ export default function AnimeInfoPage({
     } catch {
       // localStorage indisponible
     }
-
-    router.push(
-      `/anime/${encodeURIComponent(
-        slug
-      )}/${selectedSeason}`
-    );
   };
+
+  /*
+   * =======================================================
+   * APPUI SUR UN ÉPISODE → LE LECTEUR S'OUVRE ICI
+   *
+   * Plus aucune navigation : on affiche le lecteur juste
+   * au-dessus du rail, sur la même page, et on y défile.
+   * =======================================================
+   */
+
+  const openEpisode = (episodeIndex: number) => {
+    if (episodeLongPressed.current) {
+      episodeLongPressed.current = false;
+      return;
+    }
+
+    if (selectedSeason === null) return;
+
+    setSelectedEpisode(episodeIndex);
+    saveContinue(episodeIndex);
+
+    window.requestAnimationFrame(() => {
+      playerSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
+
+  const jumpToContinue = () => {
+    const targetSeason =
+      continueItem?.season || firstSeason;
+
+    const targetLang: 'vostfr' | 'vf' =
+      continueItem?.lang || 'vostfr';
+
+    const targetEpisode = continueItem?.episode || 0;
+
+    setLang(targetLang);
+    setSelectedSeason(targetSeason);
+    setSelectedEpisode(targetEpisode);
+
+    window.requestAnimationFrame(() => {
+      playerSectionRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
+
+  /*
+   * =======================================================
+   * MARQUAGE AUTOMATIQUE APRÈS 60 SECONDES DE LECTURE
+   * =======================================================
+   */
+
+  const markEpisodeWatched = (
+    episodeIndex: number
+  ) => {
+    if (selectedSeason === null) return;
+
+    if (watched.includes(episodeIndex)) return;
+
+    const next = [...watched, episodeIndex].sort(
+      (a, b) => a - b
+    );
+
+    setWatched(next);
+
+    try {
+      localStorage.setItem(
+        getWatchKey(slug, selectedSeason, lang),
+        JSON.stringify(next)
+      );
+    } catch {
+      // localStorage indisponible
+    }
+
+    writeSeasonProgress(slug, lang, {
+      season: selectedSeason,
+      watched: next.length,
+      total: episodeCount,
+      lastEpisode: episodeIndex,
+      updatedAt: Date.now(),
+    });
+
+    setProgress(readMergedProgress(slug));
+  };
+
+  const markRef = useRef(markEpisodeWatched);
+
+  useEffect(() => {
+    markRef.current = markEpisodeWatched;
+  });
+
+  useEffect(() => {
+    if (!videoUrl || selectedEpisode === null) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      markRef.current(selectedEpisode);
+    }, WATCH_DELAY);
+
+    return () => clearTimeout(timer);
+  }, [videoUrl, selectedEpisode]);
 
   /*
    * =======================================================
@@ -1045,15 +1178,15 @@ export default function AnimeInfoPage({
       </section>
 
       {/* ===================================================
-          BOUTON PRINCIPAL
+          BOUTON PRINCIPAL — reste sur la page, ouvre le
+          lecteur ici et y défile au lieu de naviguer
           =================================================== */}
 
-      <Link
-        href={`/anime/${encodeURIComponent(
-          slug
-        )}/${continueItem?.season || firstSeason}`}
+      <button
+        type="button"
         className="primary-button hero-action"
-        onTouchStart={() =>
+        onClick={jumpToContinue}
+        onMouseEnter={() =>
           prefetchEpisodes(
             slug,
             continueItem?.season || firstSeason,
@@ -1066,7 +1199,7 @@ export default function AnimeInfoPage({
               continueItem.season
             } É${continueItem.episode + 1}`
           : 'Commencer'}
-      </Link>
+      </button>
 
       {/* ===================================================
           GENRES
@@ -1129,13 +1262,7 @@ export default function AnimeInfoPage({
         <div className="section-header">
 
           <div>
-
-            <span className="section-eyebrow">
-              SAISON {selectedSeason ?? ''}
-            </span>
-
-            <h2>Épisodes</h2>
-
+            <h2>Saison {selectedSeason ?? ''}</h2>
           </div>
 
           {episodeCount > 0 && (
@@ -1251,6 +1378,105 @@ export default function AnimeInfoPage({
           </div>
         )}
 
+        {/* =================================================
+            LECTEUR — apparaît ici même, sur la fiche,
+            dès qu'un épisode est choisi dans le rail
+            ci-dessous. Jamais de changement de page.
+            ================================================= */}
+
+        {selectedEpisode !== null && (
+          <div
+            ref={playerSectionRef}
+            className="section"
+            style={{ marginTop: 0 }}
+          >
+
+            <div className="section-header">
+
+              <div>
+                <span className="section-eyebrow">
+                  SAISON {selectedSeason} · ÉPISODE{' '}
+                  {selectedEpisode + 1}
+                </span>
+                <h2>{title}</h2>
+              </div>
+
+              <button
+                className="text-button"
+                onClick={() =>
+                  setSelectedEpisode(null)
+                }
+              >
+                Réduire
+              </button>
+
+            </div>
+
+            <section className="player-container">
+
+              {videoUrl ? (
+                <iframe
+                  key={videoUrl}
+                  src={videoUrl}
+                  title={`${title} épisode ${
+                    selectedEpisode + 1
+                  }`}
+                  allowFullScreen
+                  className="video-frame"
+                />
+              ) : (
+                <div className="player-empty">
+
+                  {episodesLoading ? (
+                    <>
+                      <span className="loader large" />
+                      <p>Chargement…</p>
+                    </>
+                  ) : (
+                    <>
+                      <span>▶</span>
+                      <p>Lecteur indisponible</p>
+                    </>
+                  )}
+
+                </div>
+              )}
+
+            </section>
+
+            {(data?.players?.length || 0) > 1 && (
+              <div className="players">
+
+                <span>Lecteur</span>
+
+                <div className="player-list">
+
+                  {data?.players.map(
+                    (item, index) => (
+                      <button
+                        key={`${item.name}-${index}`}
+                        className={
+                          playerIndex === index
+                            ? 'player-selected'
+                            : ''
+                        }
+                        onClick={() =>
+                          setPlayerIndex(index)
+                        }
+                      >
+                        {item.name}
+                      </button>
+                    )
+                  )}
+
+                </div>
+
+              </div>
+            )}
+
+          </div>
+        )}
+
         <p className="episode-hint">
           Appui long sur un épisode pour marquer
           tous les précédents comme vus, appui long
@@ -1274,10 +1500,7 @@ export default function AnimeInfoPage({
                 watched.includes(index);
 
               const isActive =
-                continueItem?.season ===
-                  selectedSeason &&
-                continueItem?.lang === lang &&
-                continueItem?.episode === index;
+                selectedEpisode === index;
 
               return (
                 <button
