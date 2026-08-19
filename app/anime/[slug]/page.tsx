@@ -61,6 +61,7 @@ interface SeasonProgress {
 const SYNOPSIS_LIMIT = 260;
 const LONG_PRESS = 550;
 const WATCH_DELAY = 60000;
+const PANEL_CLOSE_DELAY = 340;
 
 function readFavorites(): FavoriteItem[] {
   try {
@@ -113,12 +114,14 @@ function readFavorites(): FavoriteItem[] {
 
 /*
  * =========================================================
- * FILET DE SÉCURITÉ — DIAGNOSTIC TEMPORAIRE
+ * FILETS DE SÉCURITÉ
  *
- * Si le bloc épisodes plante au rendu pour une raison qui
- * n'apparaît pas dans mes tests, ce filet affiche l'erreur
- * à l'écran au lieu de laisser un vide silencieux. À
- * retirer une fois le bug identifié.
+ * Deux niveaux : un autour du seul bloc épisodes (n'affecte
+ * pas le reste de la fiche si ça casse), et un autour de
+ * TOUTE la page (sinon une erreur ailleurs — sélecteur de
+ * langue, lecteur, barre d'onglets — fait planter toute
+ * l'appli avec un écran blanc). Les deux affichent un
+ * message récupérable au lieu d'un vide silencieux.
  * =========================================================
  */
 
@@ -153,15 +156,6 @@ class EpisodesBoundary extends Component<
     return this.props.children;
   }
 }
-
-/*
- * Filet de sécurité pour TOUTE la page. Sans ça, une
- * erreur de rendu n'importe où (le sélecteur de langue,
- * le lecteur, la barre d'onglets...) fait planter
- * l'application entière avec un écran blanc. Ici, on
- * affiche un message récupérable à la place et on garde
- * un bouton pour revenir à l'accueil.
- */
 
 class PageBoundary extends Component<
   { children: ReactNode },
@@ -246,7 +240,7 @@ function AnimeInfoPageContent({
   const [expanded, setExpanded] = useState(false);
   const [showAlt, setShowAlt] = useState(false);
 
-  /* Appui long sur un onglet de saison */
+  /* Appui long sur l'en-tête d'une carte de saison */
   const [markingSeason, setMarkingSeason] =
     useState<number | null>(null);
 
@@ -255,17 +249,22 @@ function AnimeInfoPageContent({
 
   /*
    * =======================================================
-   * SÉLECTEUR DE SAISON (pastille glissante) + LANGUE
-   *
-   * Une seule saison sélectionnée à la fois, comme un vrai
-   * segmented control. Dès qu'on choisit une saison, ses
-   * épisodes se chargent et s'affichent en dessous dans un
-   * rail horizontal — tout reste sur cette même page.
+   * ACCORDÉON DE SAISON — une carte par saison, avec son
+   * statut (Vu / X sur Y), qui s'ouvre pour révéler la
+   * langue puis la liste de ses épisodes juste en dessous.
+   * Une seule carte ouverte à la fois. `closingSeason`
+   * garde le contenu monté le temps de l'animation de
+   * fermeture pour éviter un saut visuel.
    * =======================================================
    */
 
-  const [selectedSeason, setSelectedSeason] =
+  const [openSeason, setOpenSeason] =
     useState<number | null>(null);
+
+  const [closingSeason, setClosingSeason] =
+    useState<number | null>(null);
+
+  const closeTimer = useRef<number | null>(null);
 
   const [lang, setLang] =
     useState<'vostfr' | 'vf'>('vostfr');
@@ -286,18 +285,6 @@ function AnimeInfoPageContent({
     null
   );
   const episodeLongPressed = useRef(false);
-
-  /* Pastille glissante du sélecteur de saison */
-  const segRefs = useRef<
-    Record<number, HTMLButtonElement | null>
-  >({});
-
-  const [pillStyle, setPillStyle] = useState({
-    left: 0,
-    width: 0,
-  });
-
-  const [pillReady, setPillReady] = useState(false);
 
   /*
    * =======================================================
@@ -458,19 +445,24 @@ function AnimeInfoPageContent({
 
   /*
    * =======================================================
-   * SAISON SÉLECTIONNÉE PAR DÉFAUT
+   * SAISON OUVERTE PAR DÉFAUT
    *
    * Priorité : la saison demandée par l'URL (?season=,
    * utilisée par les cartes de l'accueil), sinon la saison
    * de "Continuer la lecture" si elle existe encore parmi
-   * les saisons connues, sinon la première saison
-   * disponible.
+   * les saisons connues. Sinon, aucune carte ne s'ouvre
+   * toute seule — l'utilisateur choisit.
    * =======================================================
    */
 
+  const didAutoOpen = useRef(false);
+
   useEffect(() => {
     if (!info) return;
-    if (selectedSeason !== null) return;
+    if (didAutoOpen.current) return;
+    if (seasonEntries.length === 0) return;
+
+    didAutoOpen.current = true;
 
     const hasRequestedSeason =
       requestedSeason !== null &&
@@ -484,7 +476,7 @@ function AnimeInfoPageContent({
           ? continueItem.lang || 'vostfr'
           : 'vostfr'
       );
-      setSelectedSeason(requestedSeason);
+      setOpenSeason(requestedSeason);
       return;
     }
 
@@ -496,18 +488,9 @@ function AnimeInfoPageContent({
 
     if (hasContinueSeason && continueItem) {
       setLang(continueItem.lang || 'vostfr');
-      setSelectedSeason(continueItem.season);
-    } else {
-      setSelectedSeason(firstSeason);
+      setOpenSeason(continueItem.season);
     }
-  }, [
-    info,
-    continueItem,
-    seasonEntries,
-    firstSeason,
-    selectedSeason,
-    requestedSeason,
-  ]);
+  }, [info, continueItem, seasonEntries, requestedSeason]);
 
   /*
    * =======================================================
@@ -607,7 +590,7 @@ function AnimeInfoPageContent({
 
       setProgress(readMergedProgress(slug));
 
-      if (selectedSeason === seasonNumber) {
+      if (openSeason === seasonNumber) {
         setWatched(
           readWatched(slug, seasonNumber, lang)
         );
@@ -619,7 +602,7 @@ function AnimeInfoPageContent({
 
   /*
    * =======================================================
-   * APPUI LONG — ONGLET DE SAISON
+   * APPUI LONG — EN-TÊTE DE CARTE DE SAISON
    * =======================================================
    */
 
@@ -640,13 +623,26 @@ function AnimeInfoPageContent({
     }
   };
 
-  const selectSeason = (seasonNumber: number) => {
+  const toggleSeason = (seasonNumber: number) => {
     if (longPressed.current) {
       longPressed.current = false;
       return;
     }
 
-    if (selectedSeason === seasonNumber) return;
+    if (openSeason === seasonNumber) {
+      setClosingSeason(seasonNumber);
+      setOpenSeason(null);
+
+      if (closeTimer.current !== null) {
+        window.clearTimeout(closeTimer.current);
+      }
+
+      closeTimer.current = window.setTimeout(() => {
+        setClosingSeason(null);
+      }, PANEL_CLOSE_DELAY);
+
+      return;
+    }
 
     const initialLang =
       continueItem?.season === seasonNumber
@@ -654,39 +650,34 @@ function AnimeInfoPageContent({
         : 'vostfr';
 
     setLang(initialLang);
-    setSelectedSeason(seasonNumber);
+    setOpenSeason(seasonNumber);
 
-    /* On change de saison : on referme le lecteur en
-       cours, l'utilisateur doit choisir un épisode de
-       la nouvelle saison. */
+    /* Nouvelle saison : le lecteur en cours se referme,
+       il faut choisir un épisode de cette saison-ci. */
     setSelectedEpisode(null);
   };
 
   /*
    * =======================================================
-   * CHARGEMENT DES ÉPISODES DE LA SAISON SÉLECTIONNÉE
+   * CHARGEMENT DES ÉPISODES DE LA SAISON OUVERTE
+   *
+   * Tout est protégé par try/catch : basculer sur une
+   * langue qui n'existe pas vraiment pour cette saison ne
+   * doit jamais planter la page.
    * =======================================================
    */
 
   useEffect(() => {
-    if (selectedSeason === null) return;
+    if (openSeason === null) return;
 
     let active = true;
-
-    /*
-     * Certaines saisons n'existent que dans une langue
-     * (ex. VOSTFR only). Basculer sur l'autre langue ne
-     * doit jamais planter la page, même si la source ou
-     * le cache se comporte mal pour cette combinaison —
-     * tout est donc protégé par try/catch ici.
-     */
 
     let cached: EpisodesData | null = null;
 
     try {
       cached = getCachedEpisodes(
         slug,
-        selectedSeason,
+        openSeason,
         lang
       );
     } catch {
@@ -704,9 +695,7 @@ function AnimeInfoPageContent({
     }
 
     Promise.resolve()
-      .then(() =>
-        loadEpisodes(slug, selectedSeason, lang)
-      )
+      .then(() => loadEpisodes(slug, openSeason, lang))
       .then((result) => {
         if (!active) return;
 
@@ -728,28 +717,17 @@ function AnimeInfoPageContent({
     return () => {
       active = false;
     };
-  }, [slug, selectedSeason, lang]);
+  }, [slug, openSeason, lang]);
 
-  /* Bascule automatique de langue si la source impose l'autre */
+  /* Épisodes déjà vus, pour la saison/langue ouverte */
   useEffect(() => {
-    if (!data) return;
-
-    if (data.lang && data.lang !== lang) {
-      setLang(data.lang);
-    }
-  }, [data, lang]);
-
-  /* Épisodes déjà vus, pour la saison/langue sélectionnée */
-  useEffect(() => {
-    if (selectedSeason === null) {
+    if (openSeason === null) {
       setWatched([]);
       return;
     }
 
-    setWatched(
-      readWatched(slug, selectedSeason, lang)
-    );
-  }, [slug, selectedSeason, lang]);
+    setWatched(readWatched(slug, openSeason, lang));
+  }, [slug, openSeason, lang]);
 
   /* Lecteur (mirroir) par défaut à chaque nouveau chargement */
   useEffect(() => {
@@ -779,60 +757,19 @@ function AnimeInfoPageContent({
 
   /*
    * =======================================================
-   * PASTILLE GLISSANTE DU SÉLECTEUR DE SAISON
-   * =======================================================
-   */
-
-  useEffect(() => {
-    if (selectedSeason === null) return;
-
-    const measure = () => {
-      const button = segRefs.current[selectedSeason];
-
-      if (!button) return;
-
-      setPillStyle({
-        left: button.offsetLeft,
-        width: button.offsetWidth,
-      });
-
-      if (!pillReady) {
-        window.requestAnimationFrame(() => {
-          setPillReady(true);
-        });
-      }
-    };
-
-    measure();
-
-    window.addEventListener('resize', measure);
-
-    return () => {
-      window.removeEventListener('resize', measure);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeason, seasonEntries.length]);
-
-  /*
-   * =======================================================
    * CONTINUER LA LECTURE
-   *
-   * Toujours écrit dans le même localStorage que lisait
-   * (et lit toujours) la page /anime/[slug]/[saison], au
-   * cas où elle serait encore utilisée ailleurs — mais ici
-   * on ne quitte jamais la fiche.
    * =======================================================
    */
 
   const saveContinue = (episodeIndex: number) => {
-    if (selectedSeason === null) return;
+    if (openSeason === null) return;
 
     try {
       const item: ContinueItem = {
         slug,
         name: info?.name || getAnimeName(slug),
         image: info?.image,
-        season: selectedSeason,
+        season: openSeason,
         episode: episodeIndex,
         lang,
         updatedAt: Date.now(),
@@ -875,9 +812,6 @@ function AnimeInfoPageContent({
   /*
    * =======================================================
    * APPUI SUR UN ÉPISODE → LE LECTEUR S'OUVRE ICI
-   *
-   * Plus aucune navigation : on affiche le lecteur juste
-   * au-dessus du rail, sur la même page, et on y défile.
    * =======================================================
    */
 
@@ -887,7 +821,7 @@ function AnimeInfoPageContent({
       return;
     }
 
-    if (selectedSeason === null) return;
+    if (openSeason === null) return;
 
     setSelectedEpisode(episodeIndex);
     saveContinue(episodeIndex);
@@ -910,7 +844,7 @@ function AnimeInfoPageContent({
     const targetEpisode = continueItem?.episode || 0;
 
     setLang(targetLang);
-    setSelectedSeason(targetSeason);
+    setOpenSeason(targetSeason);
     setSelectedEpisode(targetEpisode);
 
     window.requestAnimationFrame(() => {
@@ -930,7 +864,7 @@ function AnimeInfoPageContent({
   const markEpisodeWatched = (
     episodeIndex: number
   ) => {
-    if (selectedSeason === null) return;
+    if (openSeason === null) return;
 
     if (watched.includes(episodeIndex)) return;
 
@@ -942,7 +876,7 @@ function AnimeInfoPageContent({
 
     try {
       localStorage.setItem(
-        getWatchKey(slug, selectedSeason, lang),
+        getWatchKey(slug, openSeason, lang),
         JSON.stringify(next)
       );
     } catch {
@@ -950,7 +884,7 @@ function AnimeInfoPageContent({
     }
 
     writeSeasonProgress(slug, lang, {
-      season: selectedSeason,
+      season: openSeason,
       watched: next.length,
       total: episodeCount,
       lastEpisode: episodeIndex,
@@ -980,15 +914,12 @@ function AnimeInfoPageContent({
 
   /*
    * =======================================================
-   * MARQUAGE DEPUIS LE RAIL D'ÉPISODES
+   * MARQUAGE DEPUIS LA LISTE D'ÉPISODES
    * =======================================================
    */
 
   const markUpTo = (episodeIndex: number) => {
-    if (
-      selectedSeason === null ||
-      episodeCount === 0
-    ) {
+    if (openSeason === null || episodeCount === 0) {
       return;
     }
 
@@ -1002,7 +933,7 @@ function AnimeInfoPageContent({
 
     const next = markEpisodesUpTo(
       slug,
-      selectedSeason,
+      openSeason,
       lang,
       episodeIndex,
       episodeCount
@@ -1012,11 +943,8 @@ function AnimeInfoPageContent({
     setProgress(readMergedProgress(slug));
   };
 
-  const toggleWholeSeason = () => {
-    if (
-      selectedSeason === null ||
-      episodeCount === 0
-    ) {
+  const toggleWholeOpenSeason = () => {
+    if (openSeason === null || episodeCount === 0) {
       return;
     }
 
@@ -1032,7 +960,7 @@ function AnimeInfoPageContent({
         return;
       }
 
-      clearSeason(slug, selectedSeason, lang);
+      clearSeason(slug, openSeason, lang);
 
       setWatched([]);
       setProgress(readMergedProgress(slug));
@@ -1050,7 +978,7 @@ function AnimeInfoPageContent({
 
     const next = markEpisodesUpTo(
       slug,
-      selectedSeason,
+      openSeason,
       lang,
       episodeCount - 1,
       episodeCount
@@ -1088,6 +1016,10 @@ function AnimeInfoPageContent({
     return () => {
       cancelPress();
       cancelEpisodePress();
+
+      if (closeTimer.current !== null) {
+        window.clearTimeout(closeTimer.current);
+      }
     };
   }, []);
 
@@ -1406,8 +1338,8 @@ function AnimeInfoPageContent({
       )}
 
       {/* ===================================================
-          SAISON + LANGUE — pastille glissante,
-          exactement le même composant que la tab bar
+          SAISONS — cartes qui s'ouvrent, chacune révèle
+          la langue puis la liste de ses épisodes
           =================================================== */}
 
       <section className="section">
@@ -1415,323 +1347,447 @@ function AnimeInfoPageContent({
         <div className="section-header">
 
           <div>
-            <h2>Saison {selectedSeason ?? ''}</h2>
+
+            <span className="section-eyebrow">
+              CHOISIR
+            </span>
+
+            <h2>Saisons</h2>
+
           </div>
 
-          {episodeCount > 0 && (
-            <button
-              className="mark-button"
-              onClick={toggleWholeSeason}
-            >
-              {watched.length >= episodeCount
-                ? 'Tout décocher'
-                : 'Tout marquer'}
-            </button>
-          )}
+          <span className="episode-count">
+            {seasonEntries.length}
+          </span>
 
         </div>
 
-        <div
-          className="seg"
-          role="tablist"
-          aria-label="Saison"
-        >
+        <p className="episode-hint">
+          Appui sur une saison pour voir ses épisodes,
+          appui long pour la marquer entièrement comme
+          vue.
+        </p>
 
-          <span
-            className="pill"
-            style={{
-              left: pillStyle.left,
-              width: pillStyle.width,
-              transition: pillReady
-                ? 'left 0.32s cubic-bezier(0.4, 0, 0.2, 1), width 0.32s cubic-bezier(0.4, 0, 0.2, 1)'
-                : 'none',
-            }}
-          />
+        <div className="season-cards">
 
           {seasonEntries.map((entry) => {
 
             const item = progress.get(entry.number);
 
+            const watchedCount = item?.watched || 0;
+
+            const totalCount = item?.total || 0;
+
+            const percentage =
+              totalCount > 0
+                ? Math.min(
+                    100,
+                    (watchedCount / totalCount) * 100
+                  )
+                : 0;
+
             const isDone =
-              (item?.total || 0) > 0 &&
-              (item?.watched || 0) >= (item?.total || 0);
+              totalCount > 0 &&
+              watchedCount >= totalCount;
+
+            const isMarking =
+              markingSeason === entry.number;
+
+            const isOpen = openSeason === entry.number;
+
+            const showPanel =
+              isOpen || closingSeason === entry.number;
 
             return (
-              <button
+              <div
                 key={entry.number}
-                ref={(el) => {
-                  segRefs.current[entry.number] = el;
-                }}
-                role="tab"
-                aria-selected={
-                  selectedSeason === entry.number
-                }
                 className={[
-                  'segtab',
-                  isDone ? 'is-done' : '',
+                  'season-block',
+                  isOpen ? 'is-open' : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
-                onMouseEnter={() =>
-                  prefetchEpisodes(
-                    slug,
-                    entry.number
-                  )
-                }
-                onPointerDown={() =>
-                  startPress(entry.number)
-                }
-                onPointerUp={cancelPress}
-                onPointerLeave={cancelPress}
-                onPointerCancel={cancelPress}
-                onContextMenu={(event) =>
-                  event.preventDefault()
-                }
-                onClick={() =>
-                  selectSeason(entry.number)
-                }
               >
-                {markingSeason === entry.number
-                  ? '…'
-                  : entry.label}
-              </button>
+
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className={
+                    isDone
+                      ? 'season-card is-done'
+                      : 'season-card'
+                  }
+                  onMouseEnter={() =>
+                    prefetchEpisodes(
+                      slug,
+                      entry.number
+                    )
+                  }
+                  onPointerDown={() =>
+                    startPress(entry.number)
+                  }
+                  onPointerUp={cancelPress}
+                  onPointerLeave={cancelPress}
+                  onPointerCancel={cancelPress}
+                  onContextMenu={(event) =>
+                    event.preventDefault()
+                  }
+                  onClick={() =>
+                    toggleSeason(entry.number)
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      toggleSeason(entry.number);
+                    }
+                  }}
+                >
+
+                  <div className="season-card-top">
+
+                    <strong>{entry.label}</strong>
+
+                    <div className="season-card-icons">
+
+                      {isMarking ? (
+                        <span className="loader" />
+                      ) : (
+                        isDone && (
+                          <span className="season-done">
+                            ✓
+                          </span>
+                        )
+                      )}
+
+                      <span className="season-chevron">
+                        ⌄
+                      </span>
+
+                    </div>
+
+                  </div>
+
+                  <div className="season-card-meta">
+
+                    <span>
+                      {totalCount > 0
+                        ? `${watchedCount} / ${totalCount} épisodes`
+                        : 'Non commencée'}
+                    </span>
+
+                    {entry.langs?.length > 0 && (
+                      <span className="season-langs">
+                        {entry.langs
+                          .map((lang) =>
+                            lang.toUpperCase()
+                          )
+                          .join(' · ')}
+                      </span>
+                    )}
+
+                  </div>
+
+                  <div className="season-progress-track">
+
+                    <span
+                      style={{
+                        width: `${percentage}%`,
+                      }}
+                    />
+
+                  </div>
+
+                </div>
+
+                <div className="season-panel">
+
+                  <div className="season-panel-inner">
+
+                    {showPanel && (
+                      <div>
+
+                        <div className="season-panel-head">
+
+                          <div className="segmented">
+
+                            {data?.hasVOSTFR !== false && (
+                              <button
+                                className={
+                                  lang === 'vostfr'
+                                    ? 'selected'
+                                    : ''
+                                }
+                                onClick={() =>
+                                  setLang('vostfr')
+                                }
+                              >
+                                VOSTFR
+                              </button>
+                            )}
+
+                            {data?.hasVF && (
+                              <button
+                                className={
+                                  lang === 'vf'
+                                    ? 'selected'
+                                    : ''
+                                }
+                                onClick={() =>
+                                  setLang('vf')
+                                }
+                              >
+                                VF
+                              </button>
+                            )}
+
+                          </div>
+
+                          {episodeCount > 0 && (
+                            <button
+                              className="mark-button"
+                              onClick={
+                                toggleWholeOpenSeason
+                              }
+                            >
+                              {watched.length >=
+                              episodeCount
+                                ? 'Tout décocher'
+                                : 'Tout marquer'}
+                            </button>
+                          )}
+
+                        </div>
+
+                        <EpisodesBoundary>
+
+                          {/* LECTEUR — apparaît ici
+                              dès qu'un épisode est
+                              choisi, jamais de
+                              changement de page. */}
+
+                          {selectedEpisode !== null && (
+                            <div
+                              ref={playerSectionRef}
+                              className="season-player"
+                            >
+
+                              <div className="season-player-head">
+
+                                <span className="section-eyebrow">
+                                  ÉPISODE{' '}
+                                  {selectedEpisode + 1}
+                                </span>
+
+                                <button
+                                  className="text-button"
+                                  onClick={() =>
+                                    setSelectedEpisode(
+                                      null
+                                    )
+                                  }
+                                >
+                                  Réduire
+                                </button>
+
+                              </div>
+
+                              <section className="player-container">
+
+                                {videoUrl ? (
+                                  <iframe
+                                    key={videoUrl}
+                                    src={videoUrl}
+                                    title={`${title} épisode ${
+                                      selectedEpisode + 1
+                                    }`}
+                                    allowFullScreen
+                                    className="video-frame"
+                                  />
+                                ) : (
+                                  <div className="player-empty">
+
+                                    {episodesLoading ? (
+                                      <>
+                                        <span className="loader large" />
+                                        <p>Chargement…</p>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span>▶</span>
+                                        <p>
+                                          Lecteur
+                                          indisponible
+                                        </p>
+                                      </>
+                                    )}
+
+                                  </div>
+                                )}
+
+                              </section>
+
+                              {(data?.players?.length ||
+                                0) > 1 && (
+                                <div className="players">
+
+                                  <span>Lecteur</span>
+
+                                  <div className="player-list">
+
+                                    {data?.players.map(
+                                      (item, index) => (
+                                        <button
+                                          key={`${item.name}-${index}`}
+                                          className={
+                                            playerIndex ===
+                                            index
+                                              ? 'player-selected'
+                                              : ''
+                                          }
+                                          onClick={() =>
+                                            setPlayerIndex(
+                                              index
+                                            )
+                                          }
+                                        >
+                                          {item.name}
+                                        </button>
+                                      )
+                                    )}
+
+                                  </div>
+
+                                </div>
+                              )}
+
+                            </div>
+                          )}
+
+                          <p className="episode-hint">
+                            Appui long sur un épisode
+                            pour marquer tous les
+                            précédents comme vus.
+                          </p>
+
+                          {episodesLoading &&
+                          episodeCount === 0 ? (
+                            <div className="loading-row">
+                              <span className="loader" />
+                              <span>Chargement…</span>
+                            </div>
+                          ) : episodeCount > 0 ? (
+                            <div className="ep-list">
+
+                              {Array.from({
+                                length: episodeCount,
+                              }).map((_, index) => {
+
+                                const isWatched =
+                                  watched.includes(
+                                    index
+                                  );
+
+                                const isActive =
+                                  selectedEpisode ===
+                                  index;
+
+                                return (
+                                  <button
+                                    key={index}
+                                    className={[
+                                      'ep-row',
+                                      isActive
+                                        ? 'is-active'
+                                        : '',
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' ')}
+                                    onPointerDown={() =>
+                                      startEpisodePress(
+                                        index
+                                      )
+                                    }
+                                    onPointerUp={
+                                      cancelEpisodePress
+                                    }
+                                    onPointerLeave={
+                                      cancelEpisodePress
+                                    }
+                                    onPointerCancel={
+                                      cancelEpisodePress
+                                    }
+                                    onContextMenu={(
+                                      event
+                                    ) =>
+                                      event.preventDefault()
+                                    }
+                                    onClick={() =>
+                                      openEpisode(index)
+                                    }
+                                  >
+
+                                    <span
+                                      className="ep-row-thumb"
+                                      style={
+                                        info.image
+                                          ? {
+                                              backgroundImage: `url(${info.image})`,
+                                            }
+                                          : undefined
+                                      }
+                                    >
+
+                                      {isWatched && (
+                                        <span className="ep-row-check">
+                                          ✓
+                                        </span>
+                                      )}
+
+                                    </span>
+
+                                    <span className="ep-row-text">
+
+                                      <span className="ep-row-title">
+                                        Épisode{' '}
+                                        {index + 1}
+                                      </span>
+
+                                      <span className="ep-row-sub">
+                                        {isWatched
+                                          ? 'Vu'
+                                          : 'Non vu'}
+                                      </span>
+
+                                    </span>
+
+                                  </button>
+                                );
+                              })}
+
+                            </div>
+                          ) : (
+                            !episodesLoading && (
+                              <div className="empty-card">
+                                {episodesError
+                                  ? 'Impossible de charger les épisodes.'
+                                  : 'Aucun épisode disponible pour cette sélection.'}
+                              </div>
+                            )
+                          )}
+
+                        </EpisodesBoundary>
+
+                      </div>
+                    )}
+
+                  </div>
+
+                </div>
+
+              </div>
             );
           })}
 
         </div>
-
-        {(data?.hasVOSTFR !== false ||
-          data?.hasVF) && (
-          <div className="segmented season-lang-row">
-
-            {data?.hasVOSTFR !== false && (
-              <button
-                className={
-                  lang === 'vostfr'
-                    ? 'selected'
-                    : ''
-                }
-                onClick={() => setLang('vostfr')}
-              >
-                VOSTFR
-              </button>
-            )}
-
-            {data?.hasVF && (
-              <button
-                className={
-                  lang === 'vf' ? 'selected' : ''
-                }
-                onClick={() => setLang('vf')}
-              >
-                VF
-              </button>
-            )}
-
-          </div>
-        )}
-
-        {/* =================================================
-            LECTEUR — apparaît ici même, sur la fiche,
-            dès qu'un épisode est choisi dans le rail
-            ci-dessous. Jamais de changement de page.
-            ================================================= */}
-
-        {selectedEpisode !== null && (
-          <div
-            ref={playerSectionRef}
-            className="section"
-            style={{ marginTop: 0 }}
-          >
-
-            <div className="section-header">
-
-              <div>
-                <span className="section-eyebrow">
-                  SAISON {selectedSeason} · ÉPISODE{' '}
-                  {selectedEpisode + 1}
-                </span>
-                <h2>{title}</h2>
-              </div>
-
-              <button
-                className="text-button"
-                onClick={() =>
-                  setSelectedEpisode(null)
-                }
-              >
-                Réduire
-              </button>
-
-            </div>
-
-            <section className="player-container">
-
-              {videoUrl ? (
-                <iframe
-                  key={videoUrl}
-                  src={videoUrl}
-                  title={`${title} épisode ${
-                    selectedEpisode + 1
-                  }`}
-                  allowFullScreen
-                  className="video-frame"
-                />
-              ) : (
-                <div className="player-empty">
-
-                  {episodesLoading ? (
-                    <>
-                      <span className="loader large" />
-                      <p>Chargement…</p>
-                    </>
-                  ) : (
-                    <>
-                      <span>▶</span>
-                      <p>Lecteur indisponible</p>
-                    </>
-                  )}
-
-                </div>
-              )}
-
-            </section>
-
-            {(data?.players?.length || 0) > 1 && (
-              <div className="players">
-
-                <span>Lecteur</span>
-
-                <div className="player-list">
-
-                  {data?.players.map(
-                    (item, index) => (
-                      <button
-                        key={`${item.name}-${index}`}
-                        className={
-                          playerIndex === index
-                            ? 'player-selected'
-                            : ''
-                        }
-                        onClick={() =>
-                          setPlayerIndex(index)
-                        }
-                      >
-                        {item.name}
-                      </button>
-                    )
-                  )}
-
-                </div>
-
-              </div>
-            )}
-
-          </div>
-        )}
-
-        <p className="episode-hint">
-          Appui long sur un épisode pour marquer
-          tous les précédents comme vus, appui long
-          sur une saison pour la marquer entièrement
-          comme vue.
-        </p>
-
-        <EpisodesBoundary>
-
-        {episodesLoading && episodeCount === 0 ? (
-          <div className="loading-row">
-            <span className="loader" />
-            <span>Chargement…</span>
-          </div>
-        ) : episodeCount > 0 ? (
-          <div className="rail">
-
-            {Array.from({
-              length: episodeCount,
-            }).map((_, index) => {
-
-              const isWatched =
-                watched.includes(index);
-
-              const isActive =
-                selectedEpisode === index;
-
-              return (
-                <button
-                  key={index}
-                  className={[
-                    'tile',
-                    'tile--wide',
-                    isActive ? 'tile--active' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onPointerDown={() =>
-                    startEpisodePress(index)
-                  }
-                  onPointerUp={cancelEpisodePress}
-                  onPointerLeave={cancelEpisodePress}
-                  onPointerCancel={cancelEpisodePress}
-                  onContextMenu={(event) =>
-                    event.preventDefault()
-                  }
-                  onClick={() => openEpisode(index)}
-                >
-
-                  <span
-                    className="tile__art"
-                    style={
-                      info.image
-                        ? {
-                            backgroundImage: `url(${info.image})`,
-                          }
-                        : undefined
-                    }
-                  >
-
-                    <span className="tile__over">
-
-                      <span className="tile__ep">
-                        Ép. {index + 1}
-                      </span>
-
-                      {isWatched && (
-                        <span className="tile__check">
-                          ✓
-                        </span>
-                      )}
-
-                    </span>
-
-                    <span className="tile__prog">
-                      <i
-                        style={{
-                          width: isWatched
-                            ? '100%'
-                            : '0%',
-                        }}
-                      />
-                    </span>
-
-                  </span>
-
-                </button>
-              );
-            })}
-
-          </div>
-        ) : (
-          !episodesLoading && (
-            <div className="empty-card">
-              {episodesError
-                ? 'Impossible de charger les épisodes.'
-                : 'Aucun épisode disponible pour cette sélection.'}
-            </div>
-          )
-        )}
-
-        </EpisodesBoundary>
 
       </section>
 
