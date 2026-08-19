@@ -154,7 +154,62 @@ class EpisodesBoundary extends Component<
   }
 }
 
-export default function AnimeInfoPage({
+/*
+ * Filet de sécurité pour TOUTE la page. Sans ça, une
+ * erreur de rendu n'importe où (le sélecteur de langue,
+ * le lecteur, la barre d'onglets...) fait planter
+ * l'application entière avec un écran blanc. Ici, on
+ * affiche un message récupérable à la place et on garde
+ * un bouton pour revenir à l'accueil.
+ */
+
+class PageBoundary extends Component<
+  { children: ReactNode },
+  { error: string | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: unknown) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : String(error),
+    };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <main className="page">
+          <div className="error-card">
+
+            <span>⚠️</span>
+
+            <h2>Un problème est survenu</h2>
+
+            <p>{this.state.error}</p>
+
+            <Link
+              href="/"
+              className="primary-button"
+            >
+              Retour à l&apos;accueil
+            </Link>
+
+          </div>
+        </main>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function AnimeInfoPageContent({
   params,
 }: {
   params: { slug: string };
@@ -587,11 +642,25 @@ export default function AnimeInfoPage({
 
     let active = true;
 
-    const cached = getCachedEpisodes(
-      slug,
-      selectedSeason,
-      lang
-    );
+    /*
+     * Certaines saisons n'existent que dans une langue
+     * (ex. VOSTFR only). Basculer sur l'autre langue ne
+     * doit jamais planter la page, même si la source ou
+     * le cache se comporte mal pour cette combinaison —
+     * tout est donc protégé par try/catch ici.
+     */
+
+    let cached: EpisodesData | null = null;
+
+    try {
+      cached = getCachedEpisodes(
+        slug,
+        selectedSeason,
+        lang
+      );
+    } catch {
+      cached = null;
+    }
 
     if (cached) {
       setData(cached);
@@ -603,7 +672,10 @@ export default function AnimeInfoPage({
       setEpisodesError(false);
     }
 
-    loadEpisodes(slug, selectedSeason, lang)
+    Promise.resolve()
+      .then(() =>
+        loadEpisodes(slug, selectedSeason, lang)
+      )
       .then((result) => {
         if (!active) return;
 
@@ -1633,5 +1705,17 @@ export default function AnimeInfoPage({
       </section>
 
     </main>
+  );
+}
+
+export default function AnimeInfoPage({
+  params,
+}: {
+  params: { slug: string };
+}) {
+  return (
+    <PageBoundary>
+      <AnimeInfoPageContent params={params} />
+    </PageBoundary>
   );
 }
