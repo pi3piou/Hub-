@@ -208,7 +208,7 @@ function AnimeInfoPageContent({
   searchParams,
 }: {
   params: { slug: string };
-  searchParams?: { season?: string };
+  searchParams?: { season?: string; episode?: string };
 }) {
   const slug = decodeURIComponent(params.slug);
 
@@ -216,10 +216,17 @@ function AnimeInfoPageContent({
    * Une carte "Continuer" ou "Prochaines sorties" sur
    * l'accueil peut suggérer une saison précise via
    * ?season=N — utile ici puisqu'on ne navigue plus vers
-   * une page dédiée par saison.
+   * une page dédiée par saison. Le bouton "Reprendre" de
+   * l'accueil ajoute aussi ?episode=N : dans ce cas, on
+   * ouvre directement le lecteur sur ce numéro d'épisode
+   * au lieu de simplement révéler la liste de la saison.
    */
   const requestedSeason = searchParams?.season
     ? Number(searchParams.season)
+    : null;
+
+  const requestedEpisode = searchParams?.episode
+    ? Number(searchParams.episode)
     : null;
 
   const [info, setInfo] =
@@ -477,6 +484,19 @@ function AnimeInfoPageContent({
           : 'vostfr'
       );
       setOpenSeason(requestedSeason);
+
+      /*
+       * "Reprendre" depuis l'accueil ajoute ?episode=N :
+       * on ouvre directement le lecteur sur cet épisode
+       * au lieu de simplement montrer la liste.
+       */
+      if (
+        requestedEpisode !== null &&
+        requestedEpisode >= 0
+      ) {
+        setSelectedEpisode(requestedEpisode);
+      }
+
       return;
     }
 
@@ -490,7 +510,13 @@ function AnimeInfoPageContent({
       setLang(continueItem.lang || 'vostfr');
       setOpenSeason(continueItem.season);
     }
-  }, [info, continueItem, seasonEntries, requestedSeason]);
+  }, [
+    info,
+    continueItem,
+    seasonEntries,
+    requestedSeason,
+    requestedEpisode,
+  ]);
 
   /*
    * =======================================================
@@ -1881,7 +1907,7 @@ export default function AnimeInfoPage({
   searchParams,
 }: {
   params: { slug: string };
-  searchParams?: { season?: string };
+  searchParams?: { season?: string; episode?: string };
 }) {
   return (
     <PageBoundary>
