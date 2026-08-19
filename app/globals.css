@@ -2370,3 +2370,86 @@ a {
   background: transparent;
   color: #fff;
 }
+
+/* =========================================================
+   ACCORDÉON SAISON → ÉPISODES (fiche anime)
+
+   Au lieu de naviguer vers une page dédiée, un appui sur
+   une saison ouvre la grille de ses épisodes juste en
+   dessous. Technique CSS pure (pas de mesure JS) :
+   grid-template-rows anime de 0fr à 1fr, contenu dans un
+   conteneur overflow:hidden.
+   ========================================================= */
+
+.season-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.season-card-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.season-chevron {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1;
+  transition: transform var(--ease), color var(--ease);
+}
+
+.season-block.is-open .season-chevron {
+  transform: rotate(180deg);
+  color: var(--accent-light);
+}
+
+.season-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.season-block.is-open .season-panel {
+  grid-template-rows: 1fr;
+}
+
+.season-panel-inner {
+  overflow: hidden;
+}
+
+.season-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 14px 2px 10px;
+}
+
+.loading-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 60px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/*
+ * Un seul panneau ouvert à la fois : sur les points de
+ * rupture où les saisons passent en grille à plusieurs
+ * colonnes, on repasse en une seule colonne tant qu'un
+ * panneau est ouvert, pour éviter que la grille CSS
+ * n'étire les autres cartes à la hauteur du panneau.
+ */
+.season-cards {
+  align-items: start;
+}
+
+@media (min-width: 700px) {
+  .season-cards.has-open {
+    grid-template-columns: 1fr;
+  }
+}
