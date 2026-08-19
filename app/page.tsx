@@ -1,31 +1,34 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
-  AnimeInfoData,
-  EpisodesData,
-  getAnimeName,
-  getCachedAniList,
-  getCachedEpisodes,
   getCachedInfo,
-  getCachedTMDB,
-  loadAniList,
   loadAnimeInfo,
   loadEpisodes,
-  loadTMDB,
-  prefetchEpisodes,
 } from '@/lib/animeCache';
 
 import {
-  clearSeason,
-  getWatchKey,
-  markEpisodesUpTo,
+  PlanningItem,
+  formatPlanningDay,
+  formatPlanningTime,
+  loadPlanning,
+} from '@/lib/planning';
+
+import {
+  getSeasonProgress,
+  isSeasonComplete,
   readMergedProgress,
   readWatched,
   writeSeasonProgress,
 } from '@/lib/watchState';
+
+interface AnimeItem {
+  name: string;
+  slug: string;
+  image?: string;
+}
 
 interface ContinueItem {
   slug: string;
@@ -37,25 +40,49 @@ interface ContinueItem {
   updatedAt: number;
 }
 
-interface FavoriteItem {
-  name: string;
-  slug: string;
-  image?: string;
+/* Élément prêt à afficher, avec sa progression */
+interface ResumeItem extends ContinueItem {
+  targetSeason: number;
+  targetEpisode: number;
+  isNextSeason: boolean;
+  watchedCount: number;
+  totalCount: number;
 }
 
-interface SeasonProgress {
-  season: number;
-  watched: number;
-  total: number;
-  lastEpisode: number;
-  updatedAt: number;
+interface HomeStats {
+  totalWatched: number;
+  seriesTracked: number;
+  favoritesCount: number;
 }
 
-const SYNOPSIS_LIMIT = 260;
-const LONG_PRESS = 550;
-const WATCH_DELAY = 60000;
+function readHistory(): ContinueItem[] {
+  try {
+    const raw = localStorage.getItem(
+      'anime_history'
+    );
 
-function readFavorites(): FavoriteItem[] {
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter(
+        (item) =>
+          item &&
+          item.slug &&
+          Number.isInteger(item.season) &&
+          Number.isInteger(item.episode)
+      )
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch {
+    return [];
+  }
+}
+
+/* Slugs seulement : suffisant pour les stats et l'exclusion */
+function readFavoriteSlugs(): string[] {
   try {
     const raw = localStorage.getItem(
       'anime_favorites'
@@ -68,1515 +95,730 @@ function readFavorites(): FavoriteItem[] {
     if (!Array.isArray(parsed)) return [];
 
     return parsed
-      .map((item: unknown): FavoriteItem | null => {
-        if (typeof item === 'string') {
-          return {
-            name: getAnimeName(item),
-            slug: item,
-          };
-        }
-
-        if (
-          item &&
-          typeof item === 'object' &&
-          typeof (item as FavoriteItem).slug ===
-            'string'
-        ) {
-          const favorite = item as FavoriteItem;
-
-          return {
-            name:
-              favorite.name ||
-              getAnimeName(favorite.slug),
-            slug: favorite.slug,
-            image: favorite.image,
-          };
-        }
-
-        return null;
-      })
-      .filter(
-        (item): item is FavoriteItem =>
-          item !== null
-      );
+      .map((item) =>
+        typeof item === 'string'
+          ? item
+          : item?.slug
+      )
+      .filter(Boolean) as string[];
   } catch {
     return [];
   }
 }
 
-export default function AnimeInfoPage({
-  params,
-}: {
-  params: { slug: string };
-}) {
-  const slug = decodeURIComponent(params.slug);
+/*
+ * Stats calculées uniquement à partir du localStorage :
+ * aucune requête réseau, donc disponibles instantanément
+ * au chargement de la page.
+ */
+function computeStats(
+  slugs: string[],
+  favoritesCount: number
+): HomeStats {
+  let totalWatched = 0;
+  let seriesTracked = 0;
 
-  const [info, setInfo] =
-    useState<AnimeInfoData | null>(null);
+  for (const slug of slugs) {
+    const merged = readMergedProgress(slug);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+    if (merged.size > 0) seriesTracked++;
 
-  const [favorite, setFavorite] = useState(false);
-
-  const [continueItem, setContinueItem] =
-    useState<ContinueItem | null>(null);
-
-  const [progress, setProgress] = useState<
-    Map<number, SeasonProgress>
-  >(new Map());
-
-  const [expanded, setExpanded] = useState(false);
-  const [showAlt, setShowAlt] = useState(false);
-
-  /* Appui long sur un onglet de saison */
-  const [markingSeason, setMarkingSeason] =
-    useState<number | null>(null);
-
-  const pressTimer = useRef<number | null>(null);
-  const longPressed = useRef(false);
-
-  /*
-   * =======================================================
-   * SÉLECTEUR DE SAISON (pastille glissante) + LANGUE
-   *
-   * Une seule saison sélectionnée à la fois, comme un vrai
-   * segmented control. Dès qu'on choisit une saison, ses
-   * épisodes se chargent et s'affichent en dessous dans un
-   * rail horizontal — tout reste sur cette même page.
-   * =======================================================
-   */
-
-  const [selectedSeason, setSelectedSeason] =
-    useState<number | null>(null);
-
-  const [lang, setLang] =
-    useState<'vostfr' | 'vf'>('vostfr');
-
-  const [data, setData] =
-    useState<EpisodesData | null>(null);
-
-  const [episodesLoading, setEpisodesLoading] =
-    useState(false);
-
-  const [episodesError, setEpisodesError] =
-    useState(false);
-
-  const [watched, setWatched] =
-    useState<number[]>([]);
-
-  const episodePressTimer = useRef<number | null>(
-    null
-  );
-  const episodeLongPressed = useRef(false);
-
-  /* Pastille glissante du sélecteur de saison */
-  const segRefs = useRef<
-    Record<number, HTMLButtonElement | null>
-  >({});
-
-  const [pillStyle, setPillStyle] = useState({
-    left: 0,
-    width: 0,
-  });
-
-  const [pillReady, setPillReady] = useState(false);
-
-  /*
-   * =======================================================
-   * LECTEUR — reste sur la même page, jamais de
-   * navigation vers une autre route pour lire un épisode
-   * =======================================================
-   */
-
-  const [selectedEpisode, setSelectedEpisode] =
-    useState<number | null>(null);
-
-  const [playerIndex, setPlayerIndex] = useState(0);
-
-  const playerSectionRef =
-    useRef<HTMLDivElement | null>(null);
-
-  /*
-   * =======================================================
-   * FICHE
-   * =======================================================
-   */
-
-  useEffect(() => {
-    let active = true;
-
-    const cached = getCachedInfo(slug);
-
-    if (cached) {
-      setInfo(cached);
-      setLoading(false);
-    }
-
-    loadAnimeInfo(slug)
-      .then((data) => {
-        if (!active) return;
-
-        setInfo(data);
-        setError(false);
-      })
-      .catch(() => {
-        if (!active) return;
-
-        if (!cached) setError(true);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [slug]);
-
-  /*
-   * =======================================================
-   * DONNÉES LOCALES
-   * =======================================================
-   */
-
-  useEffect(() => {
-    const favorites = readFavorites();
-
-    setFavorite(
-      favorites.some((item) => item.slug === slug)
-    );
-
-    setProgress(readMergedProgress(slug));
-
-    try {
-      const raw = localStorage.getItem(
-        `anime_continue_${slug}`
-      );
-
-      setContinueItem(
-        raw ? JSON.parse(raw) : null
-      );
-    } catch {
-      setContinueItem(null);
-    }
-  }, [slug]);
-
-  /*
-   * =======================================================
-   * PRÉCHARGEMENT
-   * =======================================================
-   */
-
-  useEffect(() => {
-    if (!info) return;
-
-    const target =
-      continueItem?.season ||
-      info.seasons?.[0] ||
-      1;
-
-    prefetchEpisodes(
-      slug,
-      target,
-      continueItem?.lang || 'vostfr'
-    );
-
-    /*
-     * TMDB en priorité (statut + détail par saison),
-     * AniList en repli si TMDB ne matche pas.
-     */
-    if (!getCachedTMDB(slug)) {
-      loadTMDB(
-        slug,
-        info.name,
-        info.altTitles || [],
-        info.seasons?.length || 0
-      ).catch(() => {
-        // Simple enrichissement, pas bloquant
-      });
-    }
-
-    if (!getCachedAniList(slug)) {
-      loadAniList(
-        slug,
-        info.name,
-        info.altTitles || []
-      ).catch(() => {
-        // Simple enrichissement, pas bloquant
-      });
-    }
-  }, [info, continueItem, slug]);
-
-  /*
-   * =======================================================
-   * TOTAUX CONNUS
-   * =======================================================
-   */
-
-  const totals = useMemo(() => {
-    let watched = 0;
-    let episodes = 0;
-
-    progress.forEach((item) => {
-      watched += item.watched;
-      episodes += item.total;
+    merged.forEach((item) => {
+      totalWatched += item.watched;
     });
+  }
 
-    return { watched, episodes };
-  }, [progress]);
+  return { totalWatched, seriesTracked, favoritesCount };
+}
 
-  const seasonEntries = useMemo(() => {
-    return info?.seasonEntries?.length
-      ? info.seasonEntries
-      : (info?.seasons || []).map((number) => ({
-          number,
-          label: `Saison ${number}`,
-          langs: [] as string[],
-        }));
-  }, [info]);
+/*
+ * Un anime par carte : la sortie la plus proche parmi
+ * celles à venir, en excluant ce que tu suis déjà.
+ */
+function buildDiscovery(
+  planning: PlanningItem[],
+  excludeSlugs: Set<string>
+) {
+  const now = Date.now();
 
-  const firstSeason =
-    seasonEntries[0]?.number || 1;
+  const bySlug = new Map<string, PlanningItem>();
 
-  /*
-   * =======================================================
-   * SAISON SÉLECTIONNÉE PAR DÉFAUT
-   *
-   * On reprend la saison de "Continuer la lecture" si elle
-   * existe encore parmi les saisons connues, sinon la
-   * première saison disponible.
-   * =======================================================
-   */
+  for (const item of planning) {
+    if (excludeSlugs.has(item.slug)) continue;
 
-  useEffect(() => {
-    if (!info) return;
-    if (selectedSeason !== null) return;
+    if (item.releaseTs * 1000 <= now) continue;
 
-    const hasContinueSeason =
-      continueItem &&
-      seasonEntries.some(
-        (entry) => entry.number === continueItem.season
-      );
+    const existing = bySlug.get(item.slug);
 
-    if (hasContinueSeason && continueItem) {
-      setLang(continueItem.lang || 'vostfr');
-      setSelectedSeason(continueItem.season);
-    } else {
-      setSelectedSeason(firstSeason);
+    if (
+      !existing ||
+      item.releaseTs < existing.releaseTs
+    ) {
+      bySlug.set(item.slug, item);
     }
-  }, [
-    info,
-    continueItem,
-    seasonEntries,
-    firstSeason,
-    selectedSeason,
-  ]);
+  }
 
-  /*
-   * =======================================================
-   * MARQUAGE MANUEL D'UNE SAISON
-   *
-   * Ordre de résolution du total :
-   *   1. déjà connu localement (progression existante)
-   *   2. TMDB, si son découpage en saisons correspond
-   *      exactement à celui d'Anime-Sama
-   *   3. AniList, si la série ne fait qu'une saison
-   *   4. en dernier recours, chargement du episodes.js
-   *      réel de cette saison
-   * =======================================================
-   */
+  return Array.from(bySlug.values())
+    .sort((a, b) => a.releaseTs - b.releaseTs)
+    .slice(0, 8);
+}
 
-  const resolveSeasonTotal = async (
-    seasonNumber: number
-  ): Promise<number | null> => {
-    const existing = progress.get(seasonNumber);
+/*
+ * =========================================================
+ * DÉCISION D'AFFICHAGE (Continuer la lecture)
+ *
+ * Un anime quitte la file d'attente quand sa saison
+ * est terminée, sauf si une saison suivante existe
+ * ou si un nouvel épisode vient de sortir.
+ * =========================================================
+ */
+async function resolveResume(
+  item: ContinueItem,
+  planning: PlanningItem[]
+): Promise<ResumeItem | null> {
+  const progress = getSeasonProgress(
+    item.slug,
+    item.season,
+    item.lang
+  );
 
-    if (existing?.total) {
-      return existing.total;
-    }
+  if (!isSeasonComplete(progress)) {
+    return {
+      ...item,
+      targetSeason: item.season,
+      targetEpisode: item.episode,
+      isNextSeason: false,
+      watchedCount: progress?.watched ?? 0,
+      totalCount: progress?.total ?? 0,
+    };
+  }
 
-    const tmdb = getCachedTMDB(slug);
+  const release = planning.find(
+    (entry) =>
+      entry.slug === item.slug &&
+      entry.season === item.season &&
+      entry.releaseTs * 1000 <= Date.now()
+  );
 
-    if (tmdb?.matched && tmdb.seasons) {
-      const match = tmdb.seasons.find(
-        (season) =>
-          season.seasonNumber === seasonNumber
-      );
-
-      if (match?.episodeCount) {
-        return match.episodeCount;
-      }
-    }
-
-    const isSingleSeason =
-      (info?.seasons?.length || 0) <= 1;
-
-    if (isSingleSeason) {
-      const anilist = getCachedAniList(slug);
-
-      if (anilist?.matched && anilist.episodes) {
-        return anilist.episodes;
-      }
-    }
-
+  if (release && progress) {
     try {
-      const data = await loadEpisodes(
-        slug,
-        seasonNumber,
-        'vostfr'
+      const fresh = await loadEpisodes(
+        item.slug,
+        item.season,
+        item.lang
       );
 
       const total =
-        data.players[data.defaultPlayerIndex]
-          ?.urls.length || data.totalEpisodes;
+        fresh.players[fresh.defaultPlayerIndex]
+          ?.urls.length || fresh.totalEpisodes;
 
-      return total || null;
+      if (total > progress.total) {
+        const watched = readWatched(
+          item.slug,
+          item.season,
+          item.lang
+        );
+
+        writeSeasonProgress(
+          item.slug,
+          item.lang,
+          {
+            ...progress,
+            total,
+            updatedAt: Date.now(),
+          }
+        );
+
+        return {
+          ...item,
+          targetSeason: item.season,
+          targetEpisode: Math.min(
+            watched.length,
+            total - 1
+          ),
+          isNextSeason: false,
+          watchedCount: watched.length,
+          totalCount: total,
+        };
+      }
     } catch {
+      // Comportement par défaut
+    }
+  }
+
+  let info = getCachedInfo(item.slug);
+
+  if (!info) {
+    try {
+      info = await loadAnimeInfo(item.slug);
+    } catch {
+      info = null;
+    }
+  }
+
+  const nextSeason = info?.seasons
+    ?.filter((number) => number > item.season)
+    .sort((a, b) => a - b)[0];
+
+  if (nextSeason) {
+    const nextProgress = getSeasonProgress(
+      item.slug,
+      nextSeason,
+      item.lang
+    );
+
+    if (isSeasonComplete(nextProgress)) {
       return null;
     }
-  };
 
-  const markSeasonAsWatched = async (
-    seasonNumber: number
-  ) => {
-    setMarkingSeason(seasonNumber);
+    return {
+      ...item,
+      targetSeason: nextSeason,
+      targetEpisode:
+        nextProgress?.lastEpisode ?? 0,
+      isNextSeason: !nextProgress,
+      watchedCount: nextProgress?.watched ?? 0,
+      totalCount: nextProgress?.total ?? 0,
+    };
+  }
 
-    try {
-      const total = await resolveSeasonTotal(
-        seasonNumber
-      );
+  return null;
+}
 
-      if (!total) {
-        window.alert(
-          'Nombre d’épisodes introuvable pour cette saison.'
-        );
+export default function Home() {
+  const [query, setQuery] = useState('');
 
-        return;
-      }
+  const [results, setResults] = useState<
+    AnimeItem[]
+  >([]);
 
-      const confirmed = window.confirm(
-        `Marquer les ${total} épisodes de cette saison comme vus ?`
-      );
+  const [resume, setResume] = useState<
+    ResumeItem[]
+  >([]);
 
-      if (!confirmed) return;
+  const [discovery, setDiscovery] = useState<
+    PlanningItem[]
+  >([]);
 
-      markEpisodesUpTo(
-        slug,
-        seasonNumber,
-        'vostfr',
-        total - 1,
-        total
-      );
+  const [stats, setStats] =
+    useState<HomeStats | null>(null);
 
-      setProgress(readMergedProgress(slug));
+  const [searching, setSearching] =
+    useState(false);
 
-      if (selectedSeason === seasonNumber) {
-        setWatched(
-          readWatched(slug, seasonNumber, lang)
-        );
-      }
-    } finally {
-      setMarkingSeason(null);
-    }
-  };
-
-  /*
-   * =======================================================
-   * APPUI LONG — ONGLET DE SAISON
-   * =======================================================
-   */
-
-  const startPress = (seasonNumber: number) => {
-    longPressed.current = false;
-
-    pressTimer.current = window.setTimeout(() => {
-      longPressed.current = true;
-
-      markSeasonAsWatched(seasonNumber);
-    }, LONG_PRESS);
-  };
-
-  const cancelPress = () => {
-    if (pressTimer.current !== null) {
-      window.clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  };
-
-  const selectSeason = (seasonNumber: number) => {
-    if (longPressed.current) {
-      longPressed.current = false;
-      return;
-    }
-
-    if (selectedSeason === seasonNumber) return;
-
-    const initialLang =
-      continueItem?.season === seasonNumber
-        ? continueItem.lang || 'vostfr'
-        : 'vostfr';
-
-    setLang(initialLang);
-    setSelectedSeason(seasonNumber);
-
-    /* On change de saison : on referme le lecteur en
-       cours, l'utilisateur doit choisir un épisode de
-       la nouvelle saison. */
-    setSelectedEpisode(null);
-  };
-
-  /*
-   * =======================================================
-   * CHARGEMENT DES ÉPISODES DE LA SAISON SÉLECTIONNÉE
-   * =======================================================
-   */
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (selectedSeason === null) return;
+    const entries = readHistory();
+
+    const favoriteSlugs = readFavoriteSlugs();
+
+    setMounted(true);
+
+    /* Stats : synchrone, aucun réseau */
+    const allSlugs = Array.from(
+      new Set([
+        ...favoriteSlugs,
+        ...entries.map((item) => item.slug),
+      ])
+    );
+
+    setStats(
+      computeStats(allSlugs, favoriteSlugs.length)
+    );
 
     let active = true;
 
-    const cached = getCachedEpisodes(
-      slug,
-      selectedSeason,
-      lang
-    );
+    (async () => {
+      let planning: PlanningItem[] = [];
 
-    if (cached) {
-      setData(cached);
-      setEpisodesLoading(false);
-      setEpisodesError(false);
-    } else {
-      setData(null);
-      setEpisodesLoading(true);
-      setEpisodesError(false);
-    }
+      try {
+        planning = await loadPlanning();
+      } catch {
+        planning = [];
+      }
 
-    loadEpisodes(slug, selectedSeason, lang)
-      .then((result) => {
-        if (!active) return;
+      const resolved = await Promise.all(
+        entries
+          .slice(0, 8)
+          .map((item) =>
+            resolveResume(item, planning).catch(
+              () => null
+            )
+          )
+      );
 
-        setData(result);
-        setEpisodesError(false);
-      })
-      .catch(() => {
-        if (!active) return;
+      if (!active) return;
 
-        if (!cached) {
-          setEpisodesError(true);
-          setData(null);
-        }
-      })
-      .finally(() => {
-        if (active) setEpisodesLoading(false);
-      });
+      setResume(
+        resolved.filter(
+          (item): item is ResumeItem =>
+            item !== null
+        )
+      );
+
+      setDiscovery(
+        buildDiscovery(
+          planning,
+          new Set(allSlugs)
+        )
+      );
+    })();
 
     return () => {
       active = false;
     };
-  }, [slug, selectedSeason, lang]);
-
-  /* Bascule automatique de langue si la source impose l'autre */
-  useEffect(() => {
-    if (!data) return;
-
-    if (data.lang && data.lang !== lang) {
-      setLang(data.lang);
-    }
-  }, [data, lang]);
-
-  /* Épisodes déjà vus, pour la saison/langue sélectionnée */
-  useEffect(() => {
-    if (selectedSeason === null) {
-      setWatched([]);
-      return;
-    }
-
-    setWatched(
-      readWatched(slug, selectedSeason, lang)
-    );
-  }, [slug, selectedSeason, lang]);
-
-  /* Lecteur (mirroir) par défaut à chaque nouveau chargement */
-  useEffect(() => {
-    setPlayerIndex(data?.defaultPlayerIndex || 0);
-  }, [data]);
-
-  const episodeCount = useMemo(() => {
-    if (!data) return 0;
-
-    const list =
-      data.players?.[data.defaultPlayerIndex || 0]
-        ?.urls;
-
-    return list?.length || data.totalEpisodes || 0;
-  }, [data]);
-
-  const currentEpisodes = useMemo(() => {
-    if (!data?.players?.[playerIndex]) return [];
-
-    return data.players[playerIndex].urls || [];
-  }, [data, playerIndex]);
-
-  const videoUrl =
-    selectedEpisode !== null
-      ? currentEpisodes[selectedEpisode] || ''
-      : '';
-
-  /*
-   * =======================================================
-   * PASTILLE GLISSANTE DU SÉLECTEUR DE SAISON
-   * =======================================================
-   */
-
-  useEffect(() => {
-    if (selectedSeason === null) return;
-
-    const measure = () => {
-      const button = segRefs.current[selectedSeason];
-
-      if (!button) return;
-
-      setPillStyle({
-        left: button.offsetLeft,
-        width: button.offsetWidth,
-      });
-
-      if (!pillReady) {
-        window.requestAnimationFrame(() => {
-          setPillReady(true);
-        });
-      }
-    };
-
-    measure();
-
-    window.addEventListener('resize', measure);
-
-    return () => {
-      window.removeEventListener('resize', measure);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeason, seasonEntries.length]);
-
-  /*
-   * =======================================================
-   * CONTINUER LA LECTURE
-   *
-   * Toujours écrit dans le même localStorage que lisait
-   * (et lit toujours) la page /anime/[slug]/[saison], au
-   * cas où elle serait encore utilisée ailleurs — mais ici
-   * on ne quitte jamais la fiche.
-   * =======================================================
-   */
-
-  const saveContinue = (episodeIndex: number) => {
-    if (selectedSeason === null) return;
-
-    try {
-      const item: ContinueItem = {
-        slug,
-        name: info?.name || getAnimeName(slug),
-        image: info?.image,
-        season: selectedSeason,
-        episode: episodeIndex,
-        lang,
-        updatedAt: Date.now(),
-      };
-
-      localStorage.setItem(
-        `anime_continue_${slug}`,
-        JSON.stringify(item)
-      );
-
-      setContinueItem(item);
-
-      const historyRaw = localStorage.getItem(
-        'anime_history'
-      );
-
-      let history: ContinueItem[] = historyRaw
-        ? JSON.parse(historyRaw)
-        : [];
-
-      if (!Array.isArray(history)) {
-        history = [];
-      }
-
-      history = history.filter(
-        (entry) => entry.slug !== slug
-      );
-
-      history.unshift(item);
-
-      localStorage.setItem(
-        'anime_history',
-        JSON.stringify(history.slice(0, 20))
-      );
-    } catch {
-      // localStorage indisponible
-    }
-  };
-
-  /*
-   * =======================================================
-   * APPUI SUR UN ÉPISODE → LE LECTEUR S'OUVRE ICI
-   *
-   * Plus aucune navigation : on affiche le lecteur juste
-   * au-dessus du rail, sur la même page, et on y défile.
-   * =======================================================
-   */
-
-  const openEpisode = (episodeIndex: number) => {
-    if (episodeLongPressed.current) {
-      episodeLongPressed.current = false;
-      return;
-    }
-
-    if (selectedSeason === null) return;
-
-    setSelectedEpisode(episodeIndex);
-    saveContinue(episodeIndex);
-
-    window.requestAnimationFrame(() => {
-      playerSectionRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    });
-  };
-
-  const jumpToContinue = () => {
-    const targetSeason =
-      continueItem?.season || firstSeason;
-
-    const targetLang: 'vostfr' | 'vf' =
-      continueItem?.lang || 'vostfr';
-
-    const targetEpisode = continueItem?.episode || 0;
-
-    setLang(targetLang);
-    setSelectedSeason(targetSeason);
-    setSelectedEpisode(targetEpisode);
-
-    window.requestAnimationFrame(() => {
-      playerSectionRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    });
-  };
-
-  /*
-   * =======================================================
-   * MARQUAGE AUTOMATIQUE APRÈS 60 SECONDES DE LECTURE
-   * =======================================================
-   */
-
-  const markEpisodeWatched = (
-    episodeIndex: number
-  ) => {
-    if (selectedSeason === null) return;
-
-    if (watched.includes(episodeIndex)) return;
-
-    const next = [...watched, episodeIndex].sort(
-      (a, b) => a - b
-    );
-
-    setWatched(next);
-
-    try {
-      localStorage.setItem(
-        getWatchKey(slug, selectedSeason, lang),
-        JSON.stringify(next)
-      );
-    } catch {
-      // localStorage indisponible
-    }
-
-    writeSeasonProgress(slug, lang, {
-      season: selectedSeason,
-      watched: next.length,
-      total: episodeCount,
-      lastEpisode: episodeIndex,
-      updatedAt: Date.now(),
-    });
-
-    setProgress(readMergedProgress(slug));
-  };
-
-  const markRef = useRef(markEpisodeWatched);
-
-  useEffect(() => {
-    markRef.current = markEpisodeWatched;
-  });
-
-  useEffect(() => {
-    if (!videoUrl || selectedEpisode === null) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      markRef.current(selectedEpisode);
-    }, WATCH_DELAY);
-
-    return () => clearTimeout(timer);
-  }, [videoUrl, selectedEpisode]);
-
-  /*
-   * =======================================================
-   * MARQUAGE DEPUIS LE RAIL D'ÉPISODES
-   * =======================================================
-   */
-
-  const markUpTo = (episodeIndex: number) => {
-    if (
-      selectedSeason === null ||
-      episodeCount === 0
-    ) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Marquer les épisodes 1 à ${
-        episodeIndex + 1
-      } comme vus ?`
-    );
-
-    if (!confirmed) return;
-
-    const next = markEpisodesUpTo(
-      slug,
-      selectedSeason,
-      lang,
-      episodeIndex,
-      episodeCount
-    );
-
-    setWatched(next);
-    setProgress(readMergedProgress(slug));
-  };
-
-  const toggleWholeSeason = () => {
-    if (
-      selectedSeason === null ||
-      episodeCount === 0
-    ) {
-      return;
-    }
-
-    const isComplete =
-      watched.length >= episodeCount;
-
-    if (isComplete) {
-      if (
-        !window.confirm(
-          'Retirer la progression de cette saison ?'
-        )
-      ) {
-        return;
-      }
-
-      clearSeason(slug, selectedSeason, lang);
-
-      setWatched([]);
-      setProgress(readMergedProgress(slug));
-
-      return;
-    }
-
-    if (
-      !window.confirm(
-        `Marquer les ${episodeCount} épisodes comme vus ?`
-      )
-    ) {
-      return;
-    }
-
-    const next = markEpisodesUpTo(
-      slug,
-      selectedSeason,
-      lang,
-      episodeCount - 1,
-      episodeCount
-    );
-
-    setWatched(next);
-    setProgress(readMergedProgress(slug));
-  };
-
-  const startEpisodePress = (
-    episodeIndex: number
-  ) => {
-    episodeLongPressed.current = false;
-
-    episodePressTimer.current = window.setTimeout(
-      () => {
-        episodeLongPressed.current = true;
-
-        markUpTo(episodeIndex);
-      },
-      LONG_PRESS
-    );
-  };
-
-  const cancelEpisodePress = () => {
-    if (episodePressTimer.current !== null) {
-      window.clearTimeout(
-        episodePressTimer.current
-      );
-      episodePressTimer.current = null;
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      cancelPress();
-      cancelEpisodePress();
-    };
   }, []);
 
-  /*
-   * =======================================================
-   * FAVORI
-   * =======================================================
-   */
+  useEffect(() => {
+    const value = query.trim();
 
-  const toggleFavorite = () => {
-    try {
-      const favorites = readFavorites();
-
-      const next = favorite
-        ? favorites.filter(
-            (item) => item.slug !== slug
-          )
-        : [
-            ...favorites,
-            {
-              name:
-                info?.name || getAnimeName(slug),
-              slug,
-              image: info?.image,
-            },
-          ];
-
-      localStorage.setItem(
-        'anime_favorites',
-        JSON.stringify(next)
-      );
-
-      setFavorite(!favorite);
-    } catch (err) {
-      console.error(err);
+    if (value.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
     }
-  };
 
-  const title = info?.name || getAnimeName(slug);
+    const controller = new AbortController();
 
-  const synopsis = info?.synopsis || '';
+    const timer = window.setTimeout(async () => {
+      setSearching(true);
 
-  const isLongSynopsis =
-    synopsis.length > SYNOPSIS_LIMIT;
+      try {
+        const response = await fetch(
+          `/api/search?q=${encodeURIComponent(
+            value
+          )}`,
+          {
+            signal: controller.signal,
+            cache: 'no-store',
+          }
+        );
 
-  /*
-   * =======================================================
-   * SQUELETTE
-   * =======================================================
-   */
+        if (!response.ok) {
+          setResults([]);
+          return;
+        }
 
-  if (loading && !info) {
-    return (
-      <main className="page anime-page">
+        const data = await response.json();
 
-        <header className="anime-header">
+        setResults(
+          Array.isArray(data.results)
+            ? data.results
+            : []
+        );
+      } catch (error) {
+        if (
+          (error as Error).name !== 'AbortError'
+        ) {
+          console.error(error);
+        }
+      } finally {
+        setSearching(false);
+      }
+    }, 350);
 
-          <Link
-            href="/"
-            className="back-button"
-          >
-            ‹
-          </Link>
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
 
-          <div className="anime-title">
-            <span>ANIME</span>
-            <h1>{title}</h1>
-          </div>
+  const heroItem = resume[0] || null;
 
-        </header>
+  const restOfResume = resume.slice(1, 5);
 
-        <section className="anime-hero">
+  const showStats = Boolean(
+    stats &&
+      (stats.favoritesCount > 0 ||
+        stats.seriesTracked > 0)
+  );
 
-          <div className="skeleton skeleton-cover" />
-
-          <div className="anime-hero-content">
-            <div className="skeleton skeleton-line" />
-            <div className="skeleton skeleton-line short" />
-            <div className="skeleton skeleton-line short" />
-          </div>
-
-        </section>
-
-        <div className="skeleton skeleton-block" />
-
-      </main>
-    );
-  }
-
-  /*
-   * =======================================================
-   * ERREUR
-   * =======================================================
-   */
-
-  if (error || !info) {
-    return (
-      <main className="page">
-        <div className="error-card">
-
-          <span>⚠️</span>
-
-          <h2>
-            Impossible de charger cet anime
-          </h2>
-
-          <p>
-            La source n&apos;a pas répondu
-            correctement.
-          </p>
-
-          <Link
-            href="/"
-            className="primary-button"
-          >
-            Retour à l&apos;accueil
-          </Link>
-
-        </div>
-      </main>
-    );
-  }
-
-  /*
-   * =======================================================
-   * PAGE
-   * =======================================================
-   */
+  const nothingAtAll =
+    mounted &&
+    resume.length === 0 &&
+    discovery.length === 0;
 
   return (
-    <main className="page anime-page">
+    <main className="page">
 
-      <header className="anime-header">
-
-        <Link
-          href="/"
-          className="back-button"
-        >
-          ‹
-        </Link>
-
-        <div className="anime-title">
-
-          <span>ANIME</span>
-
-          <h1>{title}</h1>
-
-        </div>
-
-        <button
-          className={`favorite-button ${
-            favorite ? 'is-favorite' : ''
-          }`}
-          onClick={toggleFavorite}
-          aria-label="Favori"
-        >
-          {favorite ? '★' : '☆'}
-        </button>
-
+      <header className="hero-mini">
+        <span className="eyebrow">
+          ANIME STREAM
+        </span>
       </header>
 
-      {/* ===================================================
-          EN-TÊTE
-          =================================================== */}
+      {/* RECHERCHE */}
 
-      <section className="anime-hero">
+      <section className="search-section">
 
-        {info.image && (
-          <div className="anime-hero-cover">
-            <img
-              src={info.image}
-              alt={title}
-            />
-          </div>
-        )}
+        <div className="search-box">
 
-        <div className="anime-hero-content">
+          <span className="search-icon">⌕</span>
 
-          <h2>{title}</h2>
+          <input
+            value={query}
+            onChange={(event) =>
+              setQuery(event.target.value)
+            }
+            placeholder="Rechercher un anime..."
+            autoComplete="off"
+            spellCheck={false}
+          />
 
-          {info.altTitles?.length > 0 && (
-            <div className="alt-titles">
-
-              <p
-                className={
-                  showAlt ? 'is-open' : ''
-                }
-              >
-                {info.altTitles.join(' · ')}
-              </p>
-
-              {info.altTitles.length > 2 && (
-                <button
-                  className="text-button"
-                  onClick={() =>
-                    setShowAlt(!showAlt)
-                  }
-                >
-                  {showAlt
-                    ? 'Réduire'
-                    : 'Voir tous les titres'}
-                </button>
-              )}
-
-            </div>
+          {query && (
+            <button
+              className="clear-button"
+              onClick={() => setQuery('')}
+              aria-label="Effacer"
+            >
+              ×
+            </button>
           )}
 
-          <div className="meta-pills">
+        </div>
 
-            {info.year && (
-              <span>{info.year}</span>
-            )}
+        {query.trim().length >= 2 && (
+          <div className="search-results">
 
-            {info.type && (
-              <span>{info.type}</span>
-            )}
+            {searching ? (
+              <div className="search-state">
+                <span className="loader" />
+                Recherche…
+              </div>
+            ) : results.length === 0 ? (
+              <div className="search-state">
+                Aucun résultat
+              </div>
+            ) : (
+              results.map((item) => (
+                <Link
+                  key={item.slug}
+                  href={`/anime/${encodeURIComponent(
+                    item.slug
+                  )}`}
+                  className="search-result"
+                  onClick={() => setQuery('')}
+                >
 
-            {info.status && (
-              <span className="is-status">
-                {info.status}
-              </span>
-            )}
+                  <div className="search-cover">
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        loading="lazy"
+                        onError={(event) => {
+                          event.currentTarget.style.display =
+                            'none';
+                        }}
+                      />
+                    )}
+                  </div>
 
-            <span>
-              {seasonEntries.length}{' '}
-              {seasonEntries.length > 1
-                ? 'saisons'
-                : 'saison'}
-            </span>
+                  <div className="search-result-info">
+                    <strong>{item.name}</strong>
+                    <span>{item.slug}</span>
+                  </div>
 
-            {totals.episodes > 0 && (
-              <span>
-                {totals.episodes} épisodes
-              </span>
+                  <span className="arrow">›</span>
+
+                </Link>
+              ))
             )}
 
           </div>
-
-        </div>
+        )}
 
       </section>
 
-      {/* ===================================================
-          BOUTON PRINCIPAL — reste sur la page, ouvre le
-          lecteur ici et y défile au lieu de naviguer
-          =================================================== */}
+      {/* HERO */}
 
-      <button
-        type="button"
-        className="primary-button hero-action"
-        onClick={jumpToContinue}
-        onMouseEnter={() =>
-          prefetchEpisodes(
-            slug,
-            continueItem?.season || firstSeason,
-            continueItem?.lang || 'vostfr'
-          )
-        }
-      >
-        {continueItem
-          ? `Continuer · S${
-              continueItem.season
-            } É${continueItem.episode + 1}`
-          : 'Commencer'}
-      </button>
+      {mounted && heroItem ? (
+        <section className="home-hero">
 
-      {/* ===================================================
-          GENRES
-          =================================================== */}
-
-      {info.genres?.length > 0 && (
-        <div className="genre-badges">
-
-          {info.genres.map((genre) => (
-            <span key={genre}>{genre}</span>
-          ))}
-
-        </div>
-      )}
-
-      {/* ===================================================
-          SYNOPSIS
-          =================================================== */}
-
-      {synopsis && (
-        <section className="anime-synopsis">
-
-          <span className="section-eyebrow">
-            SYNOPSIS
-          </span>
-
-          <p
-            className={
-              !expanded && isLongSynopsis
-                ? 'is-clamped'
-                : ''
+          <div
+            className="home-hero-visual"
+            style={
+              heroItem.image
+                ? {
+                    backgroundImage: `url(${heroItem.image})`,
+                  }
+                : undefined
             }
           >
-            {synopsis}
-          </p>
 
-          {isLongSynopsis && (
-            <button
-              className="text-button"
-              onClick={() =>
-                setExpanded(!expanded)
-              }
-            >
-              {expanded
-                ? 'Réduire'
-                : 'Lire plus'}
-            </button>
-          )}
+            <div className="home-hero-overlay" />
 
-        </section>
-      )}
+            <div className="home-hero-content">
 
-      {/* ===================================================
-          SAISON + LANGUE — pastille glissante,
-          exactement le même composant que la tab bar
-          =================================================== */}
+              <span className="section-eyebrow">
+                REPRENDRE
+              </span>
 
-      <section className="section">
+              <h2>{heroItem.name}</h2>
 
-        <div className="section-header">
+              <p>
+                Saison {heroItem.targetSeason}
+                {' · '}
+                Épisode{' '}
+                {heroItem.targetEpisode + 1}
+                {heroItem.totalCount > 0 && (
+                  <>
+                    {' sur '}
+                    {heroItem.totalCount}
+                  </>
+                )}
+              </p>
 
-          <div>
-            <h2>Saison {selectedSeason ?? ''}</h2>
-          </div>
-
-          {episodeCount > 0 && (
-            <button
-              className="mark-button"
-              onClick={toggleWholeSeason}
-            >
-              {watched.length >= episodeCount
-                ? 'Tout décocher'
-                : 'Tout marquer'}
-            </button>
-          )}
-
-        </div>
-
-        <div
-          className="seg"
-          role="tablist"
-          aria-label="Saison"
-        >
-
-          <span
-            className="pill"
-            style={{
-              left: pillStyle.left,
-              width: pillStyle.width,
-              transition: pillReady
-                ? 'left 0.32s cubic-bezier(0.4, 0, 0.2, 1), width 0.32s cubic-bezier(0.4, 0, 0.2, 1)'
-                : 'none',
-            }}
-          />
-
-          {seasonEntries.map((entry) => {
-
-            const item = progress.get(entry.number);
-
-            const isDone =
-              (item?.total || 0) > 0 &&
-              (item?.watched || 0) >= (item?.total || 0);
-
-            return (
-              <button
-                key={entry.number}
-                ref={(el) => {
-                  segRefs.current[entry.number] = el;
-                }}
-                role="tab"
-                aria-selected={
-                  selectedSeason === entry.number
-                }
-                className={[
-                  'segtab',
-                  isDone ? 'is-done' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                onMouseEnter={() =>
-                  prefetchEpisodes(
-                    slug,
-                    entry.number
-                  )
-                }
-                onPointerDown={() =>
-                  startPress(entry.number)
-                }
-                onPointerUp={cancelPress}
-                onPointerLeave={cancelPress}
-                onPointerCancel={cancelPress}
-                onContextMenu={(event) =>
-                  event.preventDefault()
-                }
-                onClick={() =>
-                  selectSeason(entry.number)
-                }
+              <Link
+                href={`/anime/${encodeURIComponent(
+                  heroItem.slug
+                )}/${heroItem.targetSeason}`}
+                className="primary-button hero-cta"
               >
-                {markingSeason === entry.number
-                  ? '…'
-                  : entry.label}
-              </button>
-            );
-          })}
-
-        </div>
-
-        {(data?.hasVOSTFR !== false ||
-          data?.hasVF) && (
-          <div className="segmented season-lang-row">
-
-            {data?.hasVOSTFR !== false && (
-              <button
-                className={
-                  lang === 'vostfr'
-                    ? 'selected'
-                    : ''
-                }
-                onClick={() => setLang('vostfr')}
-              >
-                VOSTFR
-              </button>
-            )}
-
-            {data?.hasVF && (
-              <button
-                className={
-                  lang === 'vf' ? 'selected' : ''
-                }
-                onClick={() => setLang('vf')}
-              >
-                VF
-              </button>
-            )}
-
-          </div>
-        )}
-
-        {/* =================================================
-            LECTEUR — apparaît ici même, sur la fiche,
-            dès qu'un épisode est choisi dans le rail
-            ci-dessous. Jamais de changement de page.
-            ================================================= */}
-
-        {selectedEpisode !== null && (
-          <div
-            ref={playerSectionRef}
-            className="section"
-            style={{ marginTop: 0 }}
-          >
-
-            <div className="section-header">
-
-              <div>
-                <span className="section-eyebrow">
-                  SAISON {selectedSeason} · ÉPISODE{' '}
-                  {selectedEpisode + 1}
-                </span>
-                <h2>{title}</h2>
-              </div>
-
-              <button
-                className="text-button"
-                onClick={() =>
-                  setSelectedEpisode(null)
-                }
-              >
-                Réduire
-              </button>
+                {heroItem.isNextSeason
+                  ? '▶ Nouvelle saison'
+                  : '▶ Continuer'}
+              </Link>
 
             </div>
 
-            <section className="player-container">
+          </div>
 
-              {videoUrl ? (
-                <iframe
-                  key={videoUrl}
-                  src={videoUrl}
-                  title={`${title} épisode ${
-                    selectedEpisode + 1
-                  }`}
-                  allowFullScreen
-                  className="video-frame"
-                />
-              ) : (
-                <div className="player-empty">
+        </section>
+      ) : (
+        mounted && (
+          <section className="home-hero">
 
-                  {episodesLoading ? (
-                    <>
-                      <span className="loader large" />
-                      <p>Chargement…</p>
-                    </>
-                  ) : (
-                    <>
-                      <span>▶</span>
-                      <p>Lecteur indisponible</p>
-                    </>
-                  )}
+            <div className="home-hero-empty">
 
-                </div>
-              )}
+              <span className="eyebrow">
+                BIENVENUE
+              </span>
 
-            </section>
+              <h1>Regarde ton anime.</h1>
 
-            {(data?.players?.length || 0) > 1 && (
-              <div className="players">
+              <p>
+                Cherche un titre pour commencer à
+                le suivre.
+              </p>
 
-                <span>Lecteur</span>
+            </div>
 
-                <div className="player-list">
+          </section>
+        )
+      )}
 
-                  {data?.players.map(
-                    (item, index) => (
-                      <button
-                        key={`${item.name}-${index}`}
-                        className={
-                          playerIndex === index
-                            ? 'player-selected'
-                            : ''
-                        }
-                        onClick={() =>
-                          setPlayerIndex(index)
-                        }
-                      >
-                        {item.name}
-                      </button>
+      {/* STATS */}
+
+      {mounted && showStats && stats && (
+        <div className="home-stats">
+
+          <div className="home-stat">
+            <strong>{stats.totalWatched}</strong>
+            <span>épisodes vus</span>
+          </div>
+
+          <div className="home-stat">
+            <strong>
+              {stats.seriesTracked}
+            </strong>
+            <span>séries suivies</span>
+          </div>
+
+          <div className="home-stat">
+            <strong>
+              {stats.favoritesCount}
+            </strong>
+            <span>favoris</span>
+          </div>
+
+        </div>
+      )}
+
+      {/* SUITE DE LA LISTE CONTINUER */}
+
+      {mounted && restOfResume.length > 0 && (
+        <section className="section">
+
+          <div className="section-header">
+
+            <div>
+
+              <span className="section-eyebrow">
+                REPRENDRE
+              </span>
+
+              <h2>Aussi en cours</h2>
+
+            </div>
+
+          </div>
+
+          <div className="continue-list">
+
+            {restOfResume.map((item) => {
+
+              const percentage =
+                item.totalCount > 0
+                  ? Math.min(
+                      100,
+                      (item.watchedCount /
+                        item.totalCount) *
+                        100
                     )
-                  )}
-
-                </div>
-
-              </div>
-            )}
-
-          </div>
-        )}
-
-        <p className="episode-hint">
-          Appui long sur un épisode pour marquer
-          tous les précédents comme vus, appui long
-          sur une saison pour la marquer entièrement
-          comme vue.
-        </p>
-
-        {episodesLoading && episodeCount === 0 ? (
-          <div className="loading-row">
-            <span className="loader" />
-            <span>Chargement…</span>
-          </div>
-        ) : episodeCount > 0 ? (
-          <div className="rail">
-
-            {Array.from({
-              length: episodeCount,
-            }).map((_, index) => {
-
-              const isWatched =
-                watched.includes(index);
-
-              const isActive =
-                selectedEpisode === index;
+                  : 0;
 
               return (
-                <button
-                  key={index}
-                  className={[
-                    'tile',
-                    'tile--wide',
-                    isActive ? 'tile--active' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onPointerDown={() =>
-                    startEpisodePress(index)
-                  }
-                  onPointerUp={cancelEpisodePress}
-                  onPointerLeave={cancelEpisodePress}
-                  onPointerCancel={cancelEpisodePress}
-                  onContextMenu={(event) =>
-                    event.preventDefault()
-                  }
-                  onClick={() => openEpisode(index)}
+                <Link
+                  key={`${item.slug}-${item.targetSeason}-${item.lang}`}
+                  href={`/anime/${encodeURIComponent(
+                    item.slug
+                  )}/${item.targetSeason}`}
+                  className="continue-card"
                 >
 
-                  <span
-                    className="tile__art"
-                    style={
-                      info.image
-                        ? {
-                            backgroundImage: `url(${info.image})`,
-                          }
-                        : undefined
-                    }
-                  >
+                  <div className="continue-cover">
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
 
-                    <span className="tile__over">
+                  <div className="continue-info">
 
-                      <span className="tile__ep">
-                        Ép. {index + 1}
-                      </span>
+                    <strong>{item.name}</strong>
 
-                      {isWatched && (
-                        <span className="tile__check">
-                          ✓
-                        </span>
+                    <span>
+                      Saison {item.targetSeason}
+                      {' • '}
+                      Épisode{' '}
+                      {item.targetEpisode + 1}
+                      {item.totalCount > 0 && (
+                        <>
+                          {' sur '}
+                          {item.totalCount}
+                        </>
                       )}
-
                     </span>
 
-                    <span className="tile__prog">
-                      <i
+                    <div className="continue-progress">
+                      <span
                         style={{
-                          width: isWatched
-                            ? '100%'
-                            : '0%',
+                          width: `${percentage}%`,
                         }}
                       />
-                    </span>
+                    </div>
 
-                  </span>
+                    <small>
+                      {item.isNextSeason
+                        ? '▶ Nouvelle saison'
+                        : '▶ Reprendre'}
+                    </small>
 
-                </button>
+                  </div>
+
+                  <span className="arrow">›</span>
+
+                </Link>
               );
             })}
 
           </div>
-        ) : (
-          !episodesLoading && (
-            <div className="empty-card">
-              {episodesError
-                ? 'Impossible de charger les épisodes.'
-                : 'Aucun épisode disponible pour cette sélection.'}
-            </div>
-          )
-        )}
 
-      </section>
+        </section>
+      )}
+
+      {/* DÉCOUVERTE */}
+
+      {mounted && discovery.length > 0 && (
+        <section className="section">
+
+          <div className="section-header">
+
+            <div>
+
+              <span className="section-eyebrow">
+                DÉCOUVRIR
+              </span>
+
+              <h2>Prochaines sorties</h2>
+
+            </div>
+
+            <Link
+              href="/planning"
+              className="see-all"
+            >
+              Tout voir
+            </Link>
+
+          </div>
+
+          <div className="discovery-scroll">
+
+            {discovery.map((item) => (
+              <Link
+                key={`${item.slug}-${item.season}-${item.lang}-${item.releaseTs}`}
+                href={`/anime/${encodeURIComponent(
+                  item.slug
+                )}/${item.season}`}
+                className="discovery-card"
+              >
+
+                <div className="discovery-cover">
+                  {item.image && (
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      loading="lazy"
+                    />
+                  )}
+                </div>
+
+                <strong>{item.title}</strong>
+
+                <span>
+                  {formatPlanningDay(
+                    new Date(
+                      item.releaseTs * 1000
+                    )
+                      .toISOString()
+                      .slice(0, 10)
+                  )}
+                  {' · '}
+                  {formatPlanningTime(
+                    item.releaseTs
+                  )}
+                </span>
+
+              </Link>
+            ))}
+
+          </div>
+
+        </section>
+      )}
+
+      {/* ULTIME FILET DE SÉCURITÉ */}
+
+      {nothingAtAll && (
+        <div className="empty-card">
+
+          <div className="empty-icon">▶</div>
+
+          <h3>Rien à afficher</h3>
+
+          <p>
+            Recherche un anime pour commencer à
+            le suivre.
+          </p>
+
+        </div>
+      )}
 
     </main>
   );
