@@ -128,12 +128,6 @@
   --accent-border: rgba(0, 0, 0, 0.24);
 }
 
-/* Coupe le défilement du fond quand la feuille d'épisodes
-   est ouverte, pour un vrai comportement de modale iOS. */
-body.sheet-open {
-  overflow: hidden;
-}
-
 /* =========================================================
    RESET
    ========================================================= */
@@ -1290,6 +1284,15 @@ a {
   height: 25px;
 }
 
+.loading-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 2px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -1389,53 +1392,133 @@ a {
    ========================================================= */
 
 /*
- * L'affiche s'affiche d'abord, en grand, pleine largeur —
- * le titre et les informations viennent ensuite en dessous
- * (façon fiche Apple TV+), au lieu d'une vignette à côté
- * du texte.
+ * =========================================================
+ * AFFICHE PLEIN ÉCRAN — façon fiche Apple TV+ : l'image
+ * déborde de tout le cadre de la page (marges négatives),
+ * le titre est écrit PAR-DESSUS via un dégradé, et deux
+ * boutons ronds en verre (retour, favori) restent fixes à
+ * l'écran quel que soit le défilement. `.hero-banner-frame`
+ * est l'élément que le scroll anime : étirement élastique
+ * quand on tire vers le bas en haut de page, léger
+ * rétrécissement en parallaxe quand on défile vers le bas.
+ * =========================================================
  */
 
-.anime-hero {
+.hero-float-buttons {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top, 14px));
+  left: 0;
+  right: 0;
+  z-index: 60;
   display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-bottom: 18px;
+  justify-content: space-between;
+  padding: 0 var(--page-pad);
+  pointer-events: none;
 }
 
-.anime-hero-cover {
-  width: 100%;
-  aspect-ratio: 2 / 3;
-  max-height: 440px;
+.hero-round-button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  background: rgba(28, 28, 32, 0.55);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  backdrop-filter: blur(var(--blur-md)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
+  pointer-events: auto;
+  transition: transform var(--ease-spring), background var(--ease);
+}
+
+.hero-round-button:active {
+  transform: scale(0.88);
+}
+
+.hero-round-button.is-favorite {
+  color: #ffd45c;
+}
+
+.hero-compact-title {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top, 14px));
+  left: 62px;
+  right: 62px;
+  z-index: 59;
   overflow: hidden;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xl);
-  background: var(--surface-solid);
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight-soft),
-    0 20px 50px rgba(0, 0, 0, 0.5);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 38px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity var(--ease), transform var(--ease);
+  pointer-events: none;
 }
 
-.anime-hero-cover img {
+.hero-compact-title.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hero-banner {
+  position: relative;
+  overflow: hidden;
+  height: 58vh;
+  min-height: 380px;
+  max-height: 580px;
+  margin: -12px calc(-1 * var(--page-pad)) 18px;
+  background: var(--bg);
+}
+
+.hero-banner-frame {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.hero-banner-img,
+.hero-banner-img-empty {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  background-color: var(--surface-solid);
 }
 
-.anime-hero-content {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  padding: 0 2px;
+.hero-banner-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.05) 0%,
+    rgba(0, 0, 0, 0.2) 45%,
+    var(--bg) 96%
+  );
+  pointer-events: none;
 }
 
-.anime-hero-content h2 {
-  margin: 0;
-  font-size: 25px;
-  line-height: 1.15;
+.hero-banner-content {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 0 var(--page-pad) 18px;
+  pointer-events: none;
+}
+
+.hero-banner-content h1 {
+  margin: 0 0 4px;
+  font-size: 27px;
+  line-height: 1.12;
   letter-spacing: -0.03em;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
 }
 
 .alt-titles p {
@@ -1444,28 +1527,36 @@ a {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.75);
   font-size: 11px;
   line-height: 1.5;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
 }
 
 .alt-titles p.is-open {
   -webkit-line-clamp: unset;
 }
 
+.alt-titles .text-button {
+  pointer-events: auto;
+}
+
 .meta-pills {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 2px;
+  margin-top: 8px;
+  pointer-events: auto;
 }
 
 .meta-pills span {
   padding: 5px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.06);
-  color: #cfcfd6;
+  background: rgba(20, 20, 24, 0.45);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  color: #e6e6ea;
   font-size: 10px;
   font-weight: 650;
 }
@@ -1544,75 +1635,131 @@ a {
   font-weight: 700;
 }
 
-/* Cartes de saison (fiche anime) */
+/*
+ * =========================================================
+ * SÉLECTEUR DE SAISON — petit bouton "Saison X ›" qui ouvre
+ * un menu déroulant en verre juste en dessous, façon Apple
+ * TV+, au lieu d'une grande feuille modale.
+ * =========================================================
+ */
 
-.season-cards {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
-.season-card {
+.season-picker {
   position: relative;
-  display: block;
-  padding: 16px;
+}
+
+.season-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.season-picker-trigger .season-chevron {
+  color: var(--text-dim);
+  font-size: 14px;
+  transition: transform var(--ease-spring);
+}
+
+.season-picker.is-open
+  .season-picker-trigger
+  .season-chevron {
+  transform: rotate(90deg);
+}
+
+.season-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  width: min(280px, 84vw);
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xl);
-  background: var(--surface-glass);
-  color: inherit;
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight-soft),
-    0 10px 26px rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(var(--blur-md)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
-  transition:
-    transform var(--ease-spring),
-    border-color var(--ease),
-    background var(--ease),
-    box-shadow var(--ease);
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-  cursor: pointer;
-}
-
-.season-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--accent-border);
-  background: var(--surface-glass-hover);
-}
-
-.season-card:active {
-  transform: scale(0.98);
-}
-
-.season-card.is-open {
-  border-color: var(--accent-border);
-  background: var(--accent-tint);
+  border-radius: var(--radius-lg);
+  background: var(--surface-strong);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
-    0 0 0 1px var(--accent-border),
-    0 10px 26px rgba(0, 0, 0, 0.32);
+    0 20px 46px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(var(--blur-lg)) saturate(190%);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(190%);
+  transform-origin: top left;
+  transform: scale(0.92);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--ease-spring),
+    transform var(--ease-spring);
 }
 
-.season-card.is-done {
-  border-color: var(--accent-border);
-  background: var(--accent-tint);
+.season-menu.is-open {
+  transform: scale(1);
+  opacity: 1;
+  pointer-events: auto;
 }
 
-.season-card-top {
+.season-menu-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  font-size: 14px;
+  width: 100%;
+  padding: 10px 11px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background var(--ease);
 }
 
-.season-card-top strong {
+.season-menu-row + .season-menu-row {
+  margin-top: 2px;
+}
+
+.season-menu-row:active {
+  background: var(--surface-hover);
+}
+
+.season-menu-row.is-active {
+  background: var(--accent-tint);
+}
+
+.season-menu-row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.season-menu-row-label strong {
   overflow: hidden;
+  font-size: 13.5px;
   font-weight: 650;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.season-menu-row-label span {
+  color: var(--text-dim);
+  font-size: 10.5px;
+}
+
+.season-menu-row-icons {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
 }
 
 .season-done {
@@ -1625,23 +1772,6 @@ a {
   background: var(--accent);
   color: var(--accent-ink);
   font-size: 10px;
-}
-
-.season-card-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 8px 0 10px;
-  font-size: 11px;
-  opacity: 0.6;
-}
-
-.season-langs {
-  flex: 0 0 auto;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  opacity: 0.85;
 }
 
 /* Squelettes */
@@ -1664,10 +1794,13 @@ a {
   }
 }
 
-.skeleton-cover {
-  width: 100%;
-  aspect-ratio: 2 / 3;
-  max-height: 440px;
+.skeleton-hero {
+  position: relative;
+  height: 58vh;
+  min-height: 380px;
+  max-height: 580px;
+  margin: -12px calc(-1 * var(--page-pad)) 18px;
+  border-radius: 0;
 }
 
 .skeleton-line {
@@ -1687,18 +1820,13 @@ a {
 /* Tablette et desktop */
 
 @media (min-width: 700px) {
-  .anime-hero-cover,
-  .skeleton-cover {
-    max-height: 520px;
+  .hero-banner,
+  .skeleton-hero {
+    max-height: 640px;
   }
 
-  .anime-hero-content h2 {
-    font-size: 30px;
-  }
-
-  .season-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+  .hero-banner-content h1 {
+    font-size: 34px;
   }
 
   .hero-action {
@@ -2434,157 +2562,22 @@ a {
 }
 
 /* =========================================================
-   CARTES DE SAISON + FEUILLE D'ÉPISODES (BOTTOM SHEET)
-   style repris du concept iOS 26 Liquid Glass
-
-   `.season-card` / `.season-cards` existent déjà plus haut
-   dans ce fichier (verre translucide, flou, survol) : on
-   les réutilise telles quelles pour l'en-tête de chaque
-   saison. Taper une carte n'ouvre plus un panneau qui pousse
-   le reste de la page vers le bas : ça fait glisser une
-   feuille de verre depuis le bas de l'écran, par-dessus la
-   fiche, exactement comme une modale iOS — la page ne bouge
-   jamais et l'espace n'est plus mal utilisé.
+   SAISON ACTIVE — barre VOSTFR/VF, lecteur intégré et rail
+   d'épisodes horizontal, façon fiche Apple TV+
    ========================================================= */
-
-.season-card-icons {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.season-chevron {
-  flex: 0 0 auto;
-  color: var(--text-dim);
-  font-size: 15px;
-  line-height: 1;
-  transition: transform var(--ease), color var(--ease);
-}
-
-.season-card.is-open .season-chevron {
-  transform: translateX(2px);
-  color: var(--accent-light);
-}
-
-/* Fond assombri + flouté derrière la feuille */
-
-.sheet-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(3, 3, 4, 0.001);
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
-  opacity: 0;
-  transition:
-    opacity var(--ease-spring),
-    background var(--ease-spring),
-    backdrop-filter var(--ease-spring);
-}
-
-.sheet-backdrop.is-open {
-  background: rgba(3, 3, 4, 0.32);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  opacity: 1;
-}
-
-/*
- * La feuille elle-même : vrai verre, pas un panneau plein
- * — on doit deviner la fiche derrière, floutée, pas la
- * perdre sous un aplat opaque.
- */
-
-.episode-sheet {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 41;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: var(--page-max);
-  margin: 0 auto;
-  max-height: 86vh;
-  border: 1px solid var(--border-strong);
-  border-bottom: 0;
-  border-radius: 28px 28px 0 0;
-  background: var(--surface);
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    0 -14px 46px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(var(--blur-lg)) saturate(190%);
-  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(190%);
-  transform: translateY(100%);
-  transition: transform var(--ease-spring);
-}
-
-.episode-sheet.is-open {
-  transform: translateY(0);
-}
-
-.episode-sheet-handle {
-  flex: 0 0 auto;
-  width: 36px;
-  height: 5px;
-  margin: 10px auto 0;
-  border-radius: var(--radius-pill);
-  background: var(--border-strong);
-}
-
-.episode-sheet-header {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px var(--page-pad) 0;
-}
-
-.episode-sheet-header h2 {
-  margin: 2px 0 0;
-  font-size: 19px;
-}
-
-.sheet-close {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--text-muted);
-  font-size: 13px;
-  transition: transform var(--ease-spring), background var(--ease);
-}
-
-.sheet-close:active {
-  transform: scale(0.9);
-}
-
-.episode-sheet-body {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  padding: 0 var(--page-pad)
-    calc(var(--page-pad) + env(safe-area-inset-bottom, 0px));
-  -webkit-overflow-scrolling: touch;
-}
 
 .season-panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin: 14px 2px 10px;
+  margin: 14px 0 12px;
 }
 
-/* Lecteur intégré en haut de la feuille d'épisodes */
+/* Lecteur intégré au-dessus du rail d'épisodes */
 
 .season-player {
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .season-player-head {
@@ -2595,93 +2588,103 @@ a {
   margin-bottom: 8px;
 }
 
-/* Liste verticale d'épisodes : une ligne pleine largeur,
-   vignette 16:9, titre, statut, coche si vu. */
+/*
+ * Rail d'épisodes horizontal : vignette 16:9, titre et
+ * statut dessous, scroll-snap comme les rangées de cartes
+ * d'Apple TV+ — jamais de liste verticale pleine largeur.
+ */
 
-.ep-list {
+.ep-rail {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  margin: 0 calc(-1 * var(--page-pad));
+  padding: 2px var(--page-pad) 6px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
 }
 
-.ep-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 9px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface-glass);
+.ep-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.ep-card {
+  flex: 0 0 auto;
+  width: 208px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
-  transition:
-    background var(--ease),
-    border-color var(--ease),
-    transform var(--ease-spring);
+  scroll-snap-align: start;
+  transition: transform var(--ease-spring);
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
 }
 
-.ep-row:active {
-  transform: scale(0.97);
-  background: var(--surface-glass-hover);
+.ep-card:active {
+  transform: scale(0.96);
 }
 
-.ep-row.is-active {
-  border-color: var(--accent-border);
-  background: var(--accent-tint);
-}
-
-.ep-row-thumb {
+.ep-card-thumb {
   position: relative;
-  flex: 0 0 104px;
-  width: 104px;
+  display: block;
+  width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border-radius: calc(var(--radius-lg) - 9px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   background-color: var(--surface-solid);
   background-size: cover;
   background-position: center;
+  transition: border-color var(--ease);
 }
 
-.ep-row-check {
+.ep-card.is-active .ep-card-thumb {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px var(--accent-border);
+}
+
+.ep-card-check {
   position: absolute;
-  top: 5px;
-  right: 5px;
+  top: 6px;
+  right: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--accent);
   color: var(--accent-ink);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
-.ep-row-text {
+.ep-card-text {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  min-width: 0;
+  gap: 2px;
+  padding: 8px 2px 0;
 }
 
-.ep-row-title {
-  font-size: 13.5px;
+.ep-card-title {
+  overflow: hidden;
+  font-size: 13px;
   font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.ep-row-sub {
+.ep-card-sub {
   font-size: 11px;
   color: var(--text-dim);
 }
 
-.ep-row.is-active .ep-row-sub {
+.ep-card.is-active .ep-card-sub {
   color: var(--accent-light);
 }
 
