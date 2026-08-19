@@ -2,9 +2,19 @@
    VARIABLES
    ========================================================= */
 
+/*
+ * =========================================================
+ * THÈME — noir quasi pur façon Apple TV+, un seul accent
+ * neutre (blanc/gris) au lieu d'une couleur vive. Le thème
+ * clair ci-dessous réutilise exactement les mêmes noms de
+ * variable : rien d'autre dans le fichier n'a besoin de
+ * connaître le thème actif.
+ * =========================================================
+ */
+
 :root {
   /* Fond */
-  --bg: #030304;
+  --bg: #000000;
 
   /*
    * Verre : translucide et clair sur fond sombre, pas
@@ -13,7 +23,7 @@
    */
   --surface: rgba(255, 255, 255, 0.075);
   --surface-strong: rgba(255, 255, 255, 0.13);
-  --surface-solid: #1c1c21;
+  --surface-solid: #161618;
   --surface-input: rgba(255, 255, 255, 0.045);
   --surface-hover: rgba(255, 255, 255, 0.12);
 
@@ -38,15 +48,29 @@
   --blur-xl: 56px;
 
   /* Texte */
-  --text: #f7f7fa;
-  --text-muted: #9c9ca6;
-  --text-dim: #6f6f79;
+  --text: #f5f5f7;
+  --text-muted: #98989f;
+  --text-dim: #6c6c72;
 
-  /* Accent */
-  --accent: #6a5cf5;
-  --accent-light: #9a8fff;
-  --accent-tint: rgba(122, 106, 255, 0.16);
-  --accent-border: rgba(122, 106, 255, 0.28);
+  /*
+   * Accent monochrome, façon Apple TV+ : un blanc cassé
+   * pour les boutons pleins et les états actifs, jamais de
+   * teinte vive. `--accent-ink` est le texte à utiliser
+   * PAR-DESSUS un fond `--accent` (sombre sur clair).
+   */
+  --accent: #f2f2f4;
+  --accent-ink: #0a0a0b;
+  --accent-light: #ffffff;
+  --accent-tint: rgba(255, 255, 255, 0.12);
+  --accent-border: rgba(255, 255, 255, 0.32);
+
+  /* Barre de navigation flottante : reste sombre même en
+     thème clair, comme la barre d'onglets d'Apple TV+ —
+     donc son texte reste clair lui aussi dans les deux
+     thèmes, indépendamment de --text/--text-dim. */
+  --nav-surface: rgba(22, 22, 27, 0.62);
+  --nav-text: rgba(255, 255, 255, 0.56);
+  --nav-text-active: #ffffff;
 
   /* Rayons — plus généreux, esprit continu */
   --radius-sm: 14px;
@@ -70,6 +94,40 @@
   --ease-spring: 0.46s cubic-bezier(0.32, 1.4, 0.34, 1);
 }
 
+/*
+ * Thème clair — activé en posant data-theme="light" sur
+ * <html> (bouton dans la barre de navigation). Mêmes noms
+ * de variable, valeurs inversées : verre sombre sur fond
+ * clair au lieu de verre clair sur fond sombre.
+ */
+:root[data-theme="light"] {
+  --bg: #f2f2f4;
+
+  --surface: rgba(0, 0, 0, 0.045);
+  --surface-strong: rgba(0, 0, 0, 0.075);
+  --surface-solid: #e4e4e8;
+  --surface-input: rgba(0, 0, 0, 0.04);
+  --surface-hover: rgba(0, 0, 0, 0.07);
+
+  --surface-glass: rgba(0, 0, 0, 0.055);
+  --surface-glass-hover: rgba(0, 0, 0, 0.09);
+
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --glass-highlight: rgba(255, 255, 255, 0.7);
+  --glass-highlight-soft: rgba(255, 255, 255, 0.4);
+
+  --text: #0b0b0c;
+  --text-muted: #55555c;
+  --text-dim: #86868d;
+
+  --accent: #0b0b0c;
+  --accent-ink: #ffffff;
+  --accent-light: #000000;
+  --accent-tint: rgba(0, 0, 0, 0.08);
+  --accent-border: rgba(0, 0, 0, 0.24);
+}
+
 /* Coupe le défilement du fond quand la feuille d'épisodes
    est ouverte, pour un vrai comportement de modale iOS. */
 body.sheet-open {
@@ -91,13 +149,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(
-      circle at 50% -10%,
-      rgba(106, 92, 245, 0.2),
-      transparent 38%
-    ),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
   font-family:
     -apple-system,
@@ -447,12 +499,12 @@ a {
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   font-size: 12px;
   font-weight: 750;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 10px 26px rgba(106, 92, 245, 0.32);
+    0 10px 26px rgba(0, 0, 0, 0.4);
 }
 
 .remove-button {
@@ -517,19 +569,35 @@ a {
   pointer-events: none;
 }
 
+/*
+ * Pilule flottante façon Safari iOS : elle rétrécit
+ * pendant le défilement (padding et gap réduits, libellés
+ * repliés à zéro) puis reprend sa taille normale au repos,
+ * avec le petit rebond `--ease-spring`.
+ */
+
 .bottom-nav-inner {
   display: flex;
+  align-items: center;
   gap: 6px;
   padding: 8px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-pill);
-  background: rgba(22, 22, 27, 0.62);
+  background: var(--nav-surface);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
     0 18px 45px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(var(--blur-lg)) saturate(190%);
   -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(190%);
   pointer-events: auto;
+  transition:
+    padding var(--ease-spring),
+    gap var(--ease-spring);
+}
+
+.bottom-nav-inner.is-shrunk {
+  padding: 6px;
+  gap: 2px;
 }
 
 .nav-item {
@@ -539,23 +607,48 @@ a {
   gap: 2px;
   min-width: 58px;
   padding: 7px 12px 6px;
+  border: 0;
   border-radius: var(--radius-md);
-  color: #86868f;
+  background: transparent;
+  color: var(--nav-text);
+  font: inherit;
   font-size: 9px;
   font-weight: 650;
   transition:
     background var(--ease),
-    color var(--ease);
+    color var(--ease),
+    padding var(--ease-spring),
+    min-width var(--ease-spring);
 }
 
 .nav-item.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: transparent;
+  color: var(--nav-text-active);
+}
+
+.is-shrunk .nav-item {
+  min-width: 0;
+  padding: 6px 9px;
 }
 
 .nav-icon {
   font-size: 20px;
   line-height: 20px;
+}
+
+.nav-label {
+  max-width: 60px;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 1;
+  transition:
+    max-width var(--ease-spring),
+    opacity 0.15s ease;
+}
+
+.is-shrunk .nav-label {
+  max-width: 0;
+  opacity: 0;
 }
 
 /* =========================================================
@@ -1017,7 +1110,7 @@ a {
 
 .segmented button.selected {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
@@ -1067,7 +1160,7 @@ a {
 .player-list button.player-selected {
   border-color: var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 /* =========================================================
@@ -1127,7 +1220,7 @@ a {
   height: 15px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   font-size: 9px;
   font-weight: 700;
 }
@@ -1135,7 +1228,7 @@ a {
 .episode.active {
   border-color: var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   opacity: 1;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
@@ -1295,32 +1388,31 @@ a {
    FICHE ANIME
    ========================================================= */
 
+/*
+ * L'affiche s'affiche d'abord, en grand, pleine largeur —
+ * le titre et les informations viennent ensuite en dessous
+ * (façon fiche Apple TV+), au lieu d'une vignette à côté
+ * du texte.
+ */
+
 .anime-hero {
   display: flex;
-  gap: 16px;
-  padding: 18px;
-  margin-bottom: 16px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xl);
-  background: linear-gradient(
-    150deg,
-    rgba(122, 106, 255, 0.16),
-    rgba(255, 255, 255, 0.04)
-  );
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    0 20px 50px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(var(--blur-md)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
 .anime-hero-cover {
-  flex: 0 0 132px;
-  width: 132px;
-  aspect-ratio: 16 / 9;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  max-height: 440px;
   overflow: hidden;
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
   background: var(--surface-solid);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight-soft),
+    0 20px 50px rgba(0, 0, 0, 0.5);
 }
 
 .anime-hero-cover img {
@@ -1336,12 +1428,13 @@ a {
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  padding: 0 2px;
 }
 
 .anime-hero-content h2 {
   margin: 0;
-  font-size: 19px;
-  line-height: 1.2;
+  font-size: 25px;
+  line-height: 1.15;
   letter-spacing: -0.03em;
 }
 
@@ -1391,7 +1484,7 @@ a {
   font-size: 13px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 12px 30px rgba(106, 92, 245, 0.35);
+    0 12px 30px rgba(0, 0, 0, 0.45);
 }
 
 /* Genres */
@@ -1530,7 +1623,7 @@ a {
   height: 18px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   font-size: 10px;
 }
 
@@ -1572,9 +1665,9 @@ a {
 }
 
 .skeleton-cover {
-  flex: 0 0 132px;
-  width: 132px;
-  aspect-ratio: 16 / 9;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  max-height: 440px;
 }
 
 .skeleton-line {
@@ -1594,19 +1687,13 @@ a {
 /* Tablette et desktop */
 
 @media (min-width: 700px) {
-  .anime-hero {
-    gap: 22px;
-    padding: 24px;
-  }
-
   .anime-hero-cover,
   .skeleton-cover {
-    flex-basis: 220px;
-    width: 220px;
+    max-height: 520px;
   }
 
   .anime-hero-content h2 {
-    font-size: 24px;
+    font-size: 30px;
   }
 
   .season-cards {
@@ -2012,16 +2099,12 @@ a {
   padding: 0 22px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 10px 26px rgba(106, 92, 245, 0.4);
+    0 10px 26px rgba(0, 0, 0, 0.5);
 }
 
 .home-hero-empty {
   padding: 34px 22px;
-  background: linear-gradient(
-    150deg,
-    rgba(122, 106, 255, 0.18),
-    rgba(255, 255, 255, 0.03)
-  );
+  background: var(--surface);
   backdrop-filter: blur(var(--blur-md)) saturate(180%);
   -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
 }
@@ -2243,7 +2326,7 @@ a {
   border: 0;
   border-radius: var(--radius-md);
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   font-size: 12px;
   font-weight: 700;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
@@ -2351,284 +2434,6 @@ a {
 }
 
 /* =========================================================
-   CORRECTIF — VERRE MOINS OPAQUE, ONGLETS AUTHENTIQUES
-   ========================================================= */
-
-:root {
-  --surface: rgba(255, 255, 255, 0.04);
-  --surface-strong: rgba(255, 255, 255, 0.065);
-  --surface-input: rgba(255, 255, 255, 0.035);
-  --surface-hover: rgba(255, 255, 255, 0.07);
-
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.13);
-  --glass-highlight: rgba(255, 255, 255, 0.2);
-  --glass-highlight-soft: rgba(255, 255, 255, 0.07);
-
-  --blur-sm: 18px;
-  --blur-md: 26px;
-  --blur-lg: 32px;
-}
-
-.search-box {
-  backdrop-filter: blur(var(--blur-md)) saturate(130%);
-  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(130%);
-}
-
-.search-results {
-  background: rgba(18, 18, 22, 0.55);
-}
-
-.bottom-nav-inner {
-  background: rgba(20, 20, 24, 0.42);
-  backdrop-filter: blur(var(--blur-lg)) saturate(130%);
-  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(130%);
-}
-
-.anime-hero {
-  backdrop-filter: blur(var(--blur-md)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(140%);
-}
-
-.home-hero-empty {
-  backdrop-filter: blur(var(--blur-md)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(140%);
-}
-
-/*
- * Barre d'onglets : un vrai onglet iOS change juste de
- * couleur au clic, il n'y a pas de pastille de fond
- * derrière l'icône sélectionnée. Ça, c'est réservé aux
- * contrôles segmentés (VOSTFR/VF), pas aux onglets.
- */
-.nav-item {
-  padding: 6px 10px 5px;
-  background: transparent;
-}
-
-.nav-item.active {
-  background: transparent;
-  color: #fff;
-}
-
-/* =========================================================
-   SÉLECTEUR DE SAISON À PASTILLE GLISSANTE + RAIL
-   D'ÉPISODES HORIZONTAL (fiche anime)
-
-   Le sélecteur de saison réutilise EXACTEMENT le même
-   composant que la barre d'onglets : une pastille qui
-   glisse derrière l'onglet actif (mesurée en JS via
-   offsetLeft/offsetWidth, animée en CSS pur, sans
-   dépendance). Une fois la saison choisie, ses épisodes
-   s'affichent juste en dessous dans un rail qui défile
-   horizontalement, comme "Continuer la lecture" en accueil.
-   ========================================================= */
-
-.seg {
-  position: relative;
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  margin-bottom: 14px;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.05);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.seg::-webkit-scrollbar {
-  display: none;
-}
-
-.pill {
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-strong);
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight-soft),
-    0 1px 4px rgba(0, 0, 0, 0.28);
-  z-index: 0;
-}
-
-.segtab {
-  position: relative;
-  z-index: 1;
-  flex: 0 0 auto;
-  min-height: 34px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  transition: color var(--ease);
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.segtab[aria-selected="true"] {
-  color: var(--text);
-}
-
-.segtab.is-done::after {
-  content: "";
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  margin-left: 6px;
-  border-radius: 50%;
-  background: var(--accent-light);
-  vertical-align: middle;
-}
-
-.season-lang-row {
-  margin-bottom: 14px;
-}
-
-.loading-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 60px;
-  color: var(--text-dim);
-  font-size: 11px;
-}
-
-.rail {
-  display: flex;
-  gap: 11px;
-  padding: 2px 2px 6px;
-  margin: 0 -2px;
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-}
-
-.rail::-webkit-scrollbar {
-  display: none;
-}
-
-.tile {
-  display: block;
-  flex: 0 0 auto;
-  width: 208px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  scroll-snap-align: start;
-  transition: transform var(--ease);
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.tile:active {
-  transform: scale(0.965);
-}
-
-/*
- * display: block est indispensable ici. tile__art est un
- * <span> dans un <button> : un span reste "inline" par
- * défaut, et un élément inline ignore purement et
- * simplement width/aspect-ratio — c'est ce qui faisait
- * disparaître visuellement toutes les tuiles d'épisodes.
- */
-.tile__art,
-.tile__over,
-.tile__ep,
-.tile__check,
-.tile__prog {
-  display: block;
-}
-
-.tile__art {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
-  background-color: var(--surface-solid);
-  background-size: cover;
-  background-position: center;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
-}
-
-.tile__art::after {
-  content: "";
-  position: absolute;
-  inset: 40% 0 0 0;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    rgba(0, 0, 0, 0.78)
-  );
-}
-
-.tile--active .tile__art {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.tile__over {
-  position: absolute;
-  inset: auto 0 0 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 9px;
-}
-
-.tile__ep {
-  color: #fff;
-  font-size: 11px;
-  font-weight: 650;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-}
-
-.tile__check {
-  display: grid;
-  place-items: center;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  font-size: 9px;
-}
-
-.tile__prog {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 3;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.22);
-}
-
-.tile__prog i {
-  display: block;
-  height: 100%;
-  background: var(--accent-light);
-}
-
-@media (min-width: 700px) {
-  .tile {
-    width: 240px;
-  }
-}
-
-/* =========================================================
    CARTES DE SAISON + FEUILLE D'ÉPISODES (BOTTOM SHEET)
    style repris du concept iOS 26 Liquid Glass
 
@@ -2678,14 +2483,17 @@ a {
 }
 
 .sheet-backdrop.is-open {
-  background: rgba(3, 3, 4, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(3, 3, 4, 0.32);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   opacity: 1;
 }
 
-/* La feuille elle-même : verre épais, coins hauts très
-   arrondis, glisse depuis le bas avec un léger rebond. */
+/*
+ * La feuille elle-même : vrai verre, pas un panneau plein
+ * — on doit deviner la fiche derrière, floutée, pas la
+ * perdre sous un aplat opaque.
+ */
 
 .episode-sheet {
   position: fixed;
@@ -2702,12 +2510,12 @@ a {
   border: 1px solid var(--border-strong);
   border-bottom: 0;
   border-radius: 28px 28px 0 0;
-  background: var(--surface-strong);
+  background: var(--surface);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
     0 -14px 46px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(var(--blur-xl)) saturate(190%);
-  -webkit-backdrop-filter: blur(var(--blur-xl)) saturate(190%);
+  backdrop-filter: blur(var(--blur-lg)) saturate(190%);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(190%);
   transform: translateY(100%);
   transition: transform var(--ease-spring);
 }
@@ -2850,7 +2658,7 @@ a {
   height: 18px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   font-size: 10px;
   font-weight: 700;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
