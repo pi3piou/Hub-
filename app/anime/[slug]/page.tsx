@@ -211,10 +211,22 @@ class PageBoundary extends Component<
 
 function AnimeInfoPageContent({
   params,
+  searchParams,
 }: {
   params: { slug: string };
+  searchParams?: { season?: string };
 }) {
   const slug = decodeURIComponent(params.slug);
+
+  /*
+   * Une carte "Continuer" ou "Prochaines sorties" sur
+   * l'accueil peut suggérer une saison précise via
+   * ?season=N — utile ici puisqu'on ne navigue plus vers
+   * une page dédiée par saison.
+   */
+  const requestedSeason = searchParams?.season
+    ? Number(searchParams.season)
+    : null;
 
   const [info, setInfo] =
     useState<AnimeInfoData | null>(null);
@@ -448,15 +460,33 @@ function AnimeInfoPageContent({
    * =======================================================
    * SAISON SÉLECTIONNÉE PAR DÉFAUT
    *
-   * On reprend la saison de "Continuer la lecture" si elle
-   * existe encore parmi les saisons connues, sinon la
-   * première saison disponible.
+   * Priorité : la saison demandée par l'URL (?season=,
+   * utilisée par les cartes de l'accueil), sinon la saison
+   * de "Continuer la lecture" si elle existe encore parmi
+   * les saisons connues, sinon la première saison
+   * disponible.
    * =======================================================
    */
 
   useEffect(() => {
     if (!info) return;
     if (selectedSeason !== null) return;
+
+    const hasRequestedSeason =
+      requestedSeason !== null &&
+      seasonEntries.some(
+        (entry) => entry.number === requestedSeason
+      );
+
+    if (hasRequestedSeason && requestedSeason !== null) {
+      setLang(
+        continueItem?.season === requestedSeason
+          ? continueItem.lang || 'vostfr'
+          : 'vostfr'
+      );
+      setSelectedSeason(requestedSeason);
+      return;
+    }
 
     const hasContinueSeason =
       continueItem &&
@@ -476,6 +506,7 @@ function AnimeInfoPageContent({
     seasonEntries,
     firstSeason,
     selectedSeason,
+    requestedSeason,
   ]);
 
   /*
@@ -1710,12 +1741,17 @@ function AnimeInfoPageContent({
 
 export default function AnimeInfoPage({
   params,
+  searchParams,
 }: {
   params: { slug: string };
+  searchParams?: { season?: string };
 }) {
   return (
     <PageBoundary>
-      <AnimeInfoPageContent params={params} />
+      <AnimeInfoPageContent
+        params={params}
+        searchParams={searchParams}
+      />
     </PageBoundary>
   );
 }
