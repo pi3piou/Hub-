@@ -2588,3 +2588,165 @@ a {
   }
 }
 
+/* =========================================================
+   CARTES DE SAISON QUI S'OUVRENT (ACCORDÉON) + LISTE
+   VERTICALE D'ÉPISODES — style repris du concept iOS 26
+
+   `.season-card` / `.season-cards` existent déjà plus haut
+   dans ce fichier (verre translucide, flou, survol) : on
+   les réutilise telles quelles pour l'en-tête de chaque
+   saison. Ici on ajoute seulement la mécanique d'ouverture
+   (grid-template-rows en CSS pur, sans mesure JS) et le
+   composant de ligne d'épisode.
+   ========================================================= */
+
+.season-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.season-card-icons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.season-chevron {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1;
+  transition: transform var(--ease), color var(--ease);
+}
+
+.season-block.is-open .season-chevron {
+  transform: rotate(180deg);
+  color: var(--accent-light);
+}
+
+.season-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.season-block.is-open .season-panel {
+  grid-template-rows: 1fr;
+}
+
+.season-panel-inner {
+  overflow: hidden;
+}
+
+.season-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 14px 2px 10px;
+}
+
+/* Lecteur intégré dans le panneau de la saison ouverte */
+
+.season-player {
+  margin-bottom: 10px;
+}
+
+.season-player-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* Liste verticale d'épisodes : une ligne pleine largeur,
+   vignette 16:9, titre, statut, coche si vu. */
+
+.ep-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ep-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  transition:
+    background var(--ease),
+    border-color var(--ease),
+    transform var(--ease);
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.ep-row:active {
+  transform: scale(0.985);
+  background: var(--surface-strong);
+}
+
+.ep-row.is-active {
+  border-color: var(--accent-border);
+  background: var(--accent-tint);
+}
+
+.ep-row-thumb {
+  position: relative;
+  flex: 0 0 104px;
+  width: 104px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: calc(var(--radius-lg) - 9px);
+  background-color: var(--surface-solid);
+  background-size: cover;
+  background-position: center;
+}
+
+.ep-row-check {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.ep-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ep-row-title {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.ep-row-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.ep-row.is-active .ep-row-sub {
+  color: var(--accent-light);
+}
+
