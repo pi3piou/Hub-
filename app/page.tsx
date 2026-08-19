@@ -573,7 +573,7 @@ export default function Home() {
               <Link
                 href={`/anime/${encodeURIComponent(
                   heroItem.slug
-                )}/${heroItem.targetSeason}`}
+                )}?season=${heroItem.targetSeason}`}
                 className="primary-button hero-cta"
               >
                 {heroItem.isNextSeason
@@ -674,7 +674,7 @@ export default function Home() {
                   key={`${item.slug}-${item.targetSeason}-${item.lang}`}
                   href={`/anime/${encodeURIComponent(
                     item.slug
-                  )}/${item.targetSeason}`}
+                  )}?season=${item.targetSeason}`}
                   className="continue-card"
                 >
 
@@ -765,7 +765,7 @@ export default function Home() {
                 key={`${item.slug}-${item.season}-${item.lang}-${item.releaseTs}`}
                 href={`/anime/${encodeURIComponent(
                   item.slug
-                )}/${item.season}`}
+                )}?season=${item.season}`}
                 className="discovery-card"
               >
 
