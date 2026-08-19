@@ -1534,19 +1534,6 @@ export default function AnimeInfoPage({
           comme vue.
         </p>
 
-        <p
-          className="episode-hint"
-          style={{ opacity: 0.6 }}
-        >
-          Debug temporaire — saison :{' '}
-          {String(selectedSeason)} · langue : {lang}{' '}
-          · chargement :{' '}
-          {String(episodesLoading)} · erreur :{' '}
-          {String(episodesError)} · épisodes trouvés :{' '}
-          {episodeCount} · data présent :{' '}
-          {String(Boolean(data))}
-        </p>
-
         <EpisodesBoundary>
 
         {episodesLoading && episodeCount === 0 ? (
