@@ -1,7 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Component,
+  ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   AnimeInfoData,
@@ -101,6 +108,49 @@ function readFavorites(): FavoriteItem[] {
       );
   } catch {
     return [];
+  }
+}
+
+/*
+ * =========================================================
+ * FILET DE SÉCURITÉ — DIAGNOSTIC TEMPORAIRE
+ *
+ * Si le bloc épisodes plante au rendu pour une raison qui
+ * n'apparaît pas dans mes tests, ce filet affiche l'erreur
+ * à l'écran au lieu de laisser un vide silencieux. À
+ * retirer une fois le bug identifié.
+ * =========================================================
+ */
+
+class EpisodesBoundary extends Component<
+  { children: ReactNode },
+  { error: string | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: unknown) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : String(error),
+    };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="empty-card">
+          Erreur d’affichage des épisodes :{' '}
+          {this.state.error}
+        </div>
+      );
+    }
+
+    return this.props.children;
   }
 }
 
@@ -1484,6 +1534,21 @@ export default function AnimeInfoPage({
           comme vue.
         </p>
 
+        <p
+          className="episode-hint"
+          style={{ opacity: 0.6 }}
+        >
+          Debug temporaire — saison :{' '}
+          {String(selectedSeason)} · langue : {lang}{' '}
+          · chargement :{' '}
+          {String(episodesLoading)} · erreur :{' '}
+          {String(episodesError)} · épisodes trouvés :{' '}
+          {episodeCount} · data présent :{' '}
+          {String(Boolean(data))}
+        </p>
+
+        <EpisodesBoundary>
+
         {episodesLoading && episodeCount === 0 ? (
           <div className="loading-row">
             <span className="loader" />
@@ -1575,6 +1640,8 @@ export default function AnimeInfoPage({
             </div>
           )
         )}
+
+        </EpisodesBoundary>
 
       </section>
 
