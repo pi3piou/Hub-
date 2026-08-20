@@ -1,7 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   PlanningItem,
@@ -120,6 +125,58 @@ export default function PlanningPage() {
     .toISOString()
     .slice(0, 10);
 
+  /*
+   * =======================================================
+   * ARRIVÉE SUR LE BON JOUR — les jours écoulés restent
+   * rendus au-dessus (on peut remonter les chercher), mais
+   * la page s'ouvre calée sur le premier jour encore à
+   * venir. On ne déplace rien s'il n'y a aucun jour passé
+   * au-dessus, sinon on masquerait l'en-tête pour rien.
+   *
+   * Le repositionnement est instantané et fait une seule
+   * fois : en `smooth` on verrait la page défiler toute
+   * seule à chaque ouverture, et sans le garde-fou elle
+   * resauterait au moindre changement de filtre.
+   * =======================================================
+   */
+
+  const dayRefs = useRef<
+    Record<string, HTMLElement | null>
+  >({});
+
+  const didAlignRef = useRef(false);
+
+  useEffect(() => {
+    if (didAlignRef.current) return;
+    if (loading || days.length === 0) return;
+
+    const firstUpcoming = days.findIndex(
+      ([key]) => key >= today
+    );
+
+    if (firstUpcoming <= 0) {
+      didAlignRef.current = true;
+      return;
+    }
+
+    const key = days[firstUpcoming][0];
+
+    window.requestAnimationFrame(() => {
+      const el = dayRefs.current[key];
+
+      if (!el) return;
+
+      const top =
+        el.getBoundingClientRect().top +
+        window.scrollY -
+        12;
+
+      window.scrollTo({ top, behavior: 'auto' });
+
+      didAlignRef.current = true;
+    });
+  }, [days, loading, today]);
+
   return (
     <main className="page">
 
@@ -213,6 +270,9 @@ export default function PlanningPage() {
               : 'planning-day'
           }
           key={key}
+          ref={(el) => {
+            dayRefs.current[key] = el;
+          }}
         >
 
           <div className="planning-day-title">
