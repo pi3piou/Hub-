@@ -96,8 +96,8 @@ const WOBBLE_Y = 0.3;
 /* Pichenettes : à la prise en main, et à l'arrivée sur
    l'onglet. */
 
-const GRAB_IMPULSE = 1.2;
-const LAND_IMPULSE = 0.95;
+const GRAB_IMPULSE = 0.9;
+const LAND_IMPULSE = 0.75;
 
 /* Sous le doigt la bulle DÉBORDE de la barre. La piste fait
    la hauteur des onglets et la barre y ajoute son padding :
