@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const items = [
   {
@@ -25,10 +25,11 @@ const items = [
 const THEME_KEY = 'anime_theme';
 
 /*
- * La pilule ne bouge plus au défilement — comme la barre
- * d'onglets d'Apple TV+, elle reste immobile. Le soin est
- * mis dans le verre lui-même (voir .bottom-nav-inner dans
- * globals.css) plutôt que dans un effet de rétrécissement.
+ * La pilule elle-même ne bouge pas au défilement, comme la
+ * barre d'onglets d'Apple TV+. Ce qui glisse, c'est le petit
+ * repère en verre DERRIÈRE l'onglet actif — mesuré en JS
+ * (offsetLeft/offsetWidth du lien actif) puis animé en CSS
+ * pur avec le ressort `--ease-spring`, façon Liquid Glass.
  */
 
 export default function Navbar() {
@@ -37,6 +38,54 @@ export default function Navbar() {
   const [theme, setTheme] = useState<'dark' | 'light'>(
     'dark'
   );
+
+  const activeIndex = items.findIndex((item) =>
+    item.href === '/'
+      ? pathname === '/'
+      : pathname.startsWith(item.href)
+  );
+
+  const itemRefs = useRef<
+    Array<HTMLAnchorElement | null>
+  >([]);
+
+  const [pill, setPill] = useState<{
+    left: number;
+    width: number;
+  } | null>(null);
+
+  /*
+   * =======================================================
+   * REPÈRE GLISSANT — mesuré après chaque changement de
+   * page et à chaque redimensionnement (rotation d'écran).
+   * =======================================================
+   */
+
+  useEffect(() => {
+    const measure = () => {
+      const el =
+        activeIndex >= 0
+          ? itemRefs.current[activeIndex]
+          : null;
+
+      if (el) {
+        setPill({
+          left: el.offsetLeft,
+          width: el.offsetWidth,
+        });
+      } else {
+        setPill(null);
+      }
+    };
+
+    measure();
+
+    window.addEventListener('resize', measure);
+
+    return () => {
+      window.removeEventListener('resize', measure);
+    };
+  }, [activeIndex]);
 
   /*
    * =======================================================
@@ -76,16 +125,27 @@ export default function Navbar() {
   return (
     <nav className="bottom-nav">
       <div className="bottom-nav-inner">
-        {items.map((item) => {
-          const active =
-            item.href === '/'
-              ? pathname === '/'
-              : pathname.startsWith(item.href);
+
+        {pill && (
+          <span
+            className="nav-pill"
+            style={{
+              transform: `translateX(${pill.left}px)`,
+              width: pill.width,
+            }}
+          />
+        )}
+
+        {items.map((item, index) => {
+          const active = index === activeIndex;
 
           return (
             <Link
               key={item.href}
               href={item.href}
+              ref={(el) => {
+                itemRefs.current[index] = el;
+              }}
               className={`nav-item ${active ? 'active' : ''}`}
             >
               <span className="nav-icon">{item.icon}</span>
@@ -107,6 +167,7 @@ export default function Navbar() {
           </span>
           <span className="nav-label">Thème</span>
         </button>
+
       </div>
     </nav>
   );
