@@ -59,7 +59,12 @@ const SPEED_REF = 34;
 
 const MAX_STRETCH = 0.22;
 const MAX_SQUASH = 0.14;
-const MAX_GROW = 0.12;
+
+/* Sous le doigt la bulle DÉBORDE de la barre : +24% la rend
+   franchement plus haute que la barre elle-même, et elle
+   reprend sa taille exacte une fois posée. */
+
+const MAX_GROW = 0.24;
 
 export default function Navbar() {
   const pathname = usePathname();
