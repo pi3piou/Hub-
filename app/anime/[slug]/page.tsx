@@ -313,17 +313,6 @@ function AnimeInfoPageContent({
   const episodeRailRef =
     useRef<HTMLDivElement | null>(null);
 
-  /* Largeur d'une carte d'épisode + son espacement,
-     pour faire défiler le rail d'un "cran" par clic. */
-  const scrollEpisodeRail = (
-    direction: -1 | 1
-  ) => {
-    episodeRailRef.current?.scrollBy({
-      left: direction * 440,
-      behavior: 'smooth',
-    });
-  };
-
   /*
    * =======================================================
    * AFFICHE PLEIN ÉCRAN — léger effet de parallaxe (l'image
@@ -969,6 +958,9 @@ function AnimeInfoPageContent({
     }
 
     if (activeSeason === null) return;
+    if (episodeIndex < 0 || episodeIndex >= episodeCount) {
+      return;
+    }
 
     setSelectedEpisode(episodeIndex);
     saveContinue(episodeIndex);
@@ -1754,45 +1746,46 @@ function AnimeInfoPageContent({
                 </div>
               )}
 
-            </div>
-          )}
+              {/* PRÉCÉDENT / SUIVANT — change l'épisode
+                  affiché directement, sans repasser par
+                  le rail en dessous. */}
 
-          <div className="ep-rail-head">
-
-            <p className="episode-hint">
-              Appui long sur un épisode pour marquer
-              tous les précédents comme vus.
-            </p>
-
-            {episodeCount > 0 && (
-              <div className="ep-rail-nav">
+              <div className="player-episode-nav">
 
                 <button
                   type="button"
-                  className="ep-rail-nav-button"
+                  className="player-episode-nav-button"
                   onClick={() =>
-                    scrollEpisodeRail(-1)
+                    openEpisode(selectedEpisode - 1)
                   }
-                  aria-label="Faire défiler vers les épisodes précédents"
+                  disabled={selectedEpisode <= 0}
                 >
-                  ‹
+                  ‹ Précédent
                 </button>
 
                 <button
                   type="button"
-                  className="ep-rail-nav-button"
+                  className="player-episode-nav-button"
                   onClick={() =>
-                    scrollEpisodeRail(1)
+                    openEpisode(selectedEpisode + 1)
                   }
-                  aria-label="Faire défiler vers les épisodes suivants"
+                  disabled={
+                    selectedEpisode >=
+                    episodeCount - 1
+                  }
                 >
-                  ›
+                  Suivant ›
                 </button>
 
               </div>
-            )}
 
-          </div>
+            </div>
+          )}
+
+          <p className="episode-hint">
+            Appui long sur un épisode pour marquer
+            tous les précédents comme vus.
+          </p>
 
           {episodesLoading && episodeCount === 0 ? (
             <div className="loading-row">
