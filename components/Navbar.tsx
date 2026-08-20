@@ -51,7 +51,7 @@ const PILL_INSET = 4;
 
 const STIFFNESS = 0.22;
 const DAMPING = 0.68;
-const PRESS_EASE = 0.22;
+const PRESS_EASE = 0.26;
 
 /* Vitesse (px/frame) à partir de laquelle la déformation
    est à son maximum. */
@@ -60,11 +60,14 @@ const SPEED_REF = 34;
 const MAX_STRETCH = 0.22;
 const MAX_SQUASH = 0.14;
 
-/* Sous le doigt la bulle DÉBORDE de la barre : +24% la rend
-   franchement plus haute que la barre elle-même, et elle
-   reprend sa taille exacte une fois posée. */
+/* Sous le doigt la bulle DÉBORDE de la barre. La piste fait
+   la hauteur des onglets et la barre y ajoute son padding :
+   il faut donc dépasser ce padding pour que le débordement
+   se voie vraiment — d'autant que la barre gonfle elle aussi
+   au toucher. +36% la fait sortir nettement en haut et en
+   bas, et elle reprend sa taille exacte une fois posée. */
 
-const MAX_GROW = 0.24;
+const MAX_GROW = 0.36;
 
 export default function Navbar() {
   const pathname = usePathname();
