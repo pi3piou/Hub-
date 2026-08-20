@@ -177,8 +177,22 @@ export default function PlanningPage() {
     });
   }, [days, loading, today]);
 
+  /*
+   * Le filtre flottant réserve de la place en bas de page :
+   * sans cette classe, il recouvrirait la dernière ligne de
+   * la liste, qu'on ne pourrait plus jamais atteindre.
+   */
+
+  const showFilter = followed.size > 0;
+
   return (
-    <main className="page">
+    <main
+      className={
+        showFilter
+          ? 'page has-floating-filter'
+          : 'page'
+      }
+    >
 
       <header className="simple-header">
 
@@ -201,23 +215,6 @@ export default function PlanningPage() {
           )}
 
         </div>
-
-        {followed.size > 0 && (
-          <button
-            className={
-              onlyFollowed
-                ? 'filter-chip is-active'
-                : 'filter-chip'
-            }
-            onClick={() =>
-              setOnlyFollowed(!onlyFollowed)
-            }
-          >
-            {onlyFollowed
-              ? 'Tous les animes'
-              : 'Uniquement mes animes'}
-          </button>
-        )}
 
       </header>
 
@@ -356,6 +353,33 @@ export default function PlanningPage() {
 
         </section>
       ))}
+
+      {/*
+        Filtre flottant — reste accessible quel que soit le
+        défilement, posé au-dessus de la barre d'onglets.
+      */}
+
+      {showFilter && (
+        <div className="floating-filter">
+
+          <button
+            type="button"
+            className={
+              onlyFollowed
+                ? 'filter-chip is-active'
+                : 'filter-chip'
+            }
+            onClick={() =>
+              setOnlyFollowed(!onlyFollowed)
+            }
+          >
+            {onlyFollowed
+              ? 'Tous les animes'
+              : 'Uniquement mes animes'}
+          </button>
+
+        </div>
+      )}
 
     </main>
   );
