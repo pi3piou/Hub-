@@ -666,7 +666,9 @@ export default function LibraryPage() {
                 <Link
                   href={`/anime/${encodeURIComponent(
                     item.slug
-                  )}/${item.season}`}
+                  )}?season=${item.season}&episode=${
+                    item.episode
+                  }`}
                   className="history-main"
                 >
 
