@@ -560,7 +560,7 @@ a {
   z-index: 100;
   display: flex;
   justify-content: center;
-  padding: 0 var(--page-pad);
+  padding: 0 10px;
   pointer-events: none;
 }
 
@@ -568,8 +568,9 @@ a {
  * La barre prend toute la largeur utile de l'écran, comme
  * la vraie barre d'onglets d'Apple TV+ — pas une petite
  * pilule centrée qui flotte au milieu. Verre très
- * transparent, flou et saturation poussés, reflet net en
- * haut et ombre creusée en bas pour un vrai effet de
+ * transparent, flou et saturation poussés, trait de contour
+ * très fin (0.5px) plutôt qu'un liseré épais, reflet discret
+ * en haut et ombre creusée en bas pour un vrai effet de
  * profondeur plutôt qu'un simple flou plat.
  */
 
@@ -577,17 +578,17 @@ a {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 4px;
   width: 100%;
   max-width: var(--page-max);
-  padding: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  padding: 6px;
+  border: 0.5px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius-pill);
   background: var(--nav-surface);
   box-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -8px 16px rgba(0, 0, 0, 0.35),
-    0 18px 45px rgba(0, 0, 0, 0.55);
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.3),
+    0 18px 45px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(var(--blur-xl)) saturate(220%)
     brightness(1.08);
   -webkit-backdrop-filter: blur(var(--blur-xl))
@@ -596,27 +597,58 @@ a {
 }
 
 /*
- * Repère glissant façon Liquid Glass : un onglet de verre
- * plus clair qui se déplace derrière l'onglet actif au lieu
- * de rester statique — mesuré en JS (Navbar.tsx), animé ici
- * en CSS pur avec le ressort `--ease-spring`.
+ * La piste des 3 onglets : c'est ELLE qui capte le doigt et
+ * sert de repère de coordonnées à la pastille, pour ne pas
+ * empiéter sur le bouton de thème séparé à droite.
+ */
+
+.nav-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  touch-action: pan-y;
+}
+
+/*
+ * Repère glissant façon Liquid Glass : une petite bulle de
+ * verre qui vit vraiment — elle se colle sous le doigt et le
+ * suit sans latence pendant l'appui (.is-dragging coupe la
+ * transition sur `left`), grossit légèrement pour se
+ * sentir "tenue", puis retombe en ressort (`--ease-spring`)
+ * sur l'onglet relâché.
  */
 
 .nav-pill {
   position: absolute;
-  top: 7px;
-  bottom: 7px;
+  top: 6px;
+  bottom: 6px;
   left: 0;
   z-index: 0;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 0.5px solid rgba(255, 255, 255, 0.24);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.16);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -4px 10px rgba(0, 0, 0, 0.2);
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -4px 10px rgba(0, 0, 0, 0.18);
+  transition:
+    left var(--ease-spring),
+    width var(--ease-spring),
+    transform var(--ease-spring),
+    background var(--ease);
+}
+
+.nav-pill.is-dragging {
   transition:
     transform var(--ease-spring),
-    width var(--ease-spring);
+    background var(--ease);
+  background: rgba(255, 255, 255, 0.26);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -4px 12px rgba(0, 0, 0, 0.22),
+    0 6px 16px rgba(0, 0, 0, 0.3);
+  transform: scale(1.08);
 }
 
 .nav-item {
@@ -649,6 +681,15 @@ a {
 .nav-item.active {
   background: transparent;
   color: var(--nav-text-active);
+}
+
+.nav-theme-button {
+  flex: 0 0 auto;
+  margin-left: 2px;
+  padding-left: 12px;
+  padding-right: 12px;
+  border-left: 0.5px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0;
 }
 
 .nav-icon {
