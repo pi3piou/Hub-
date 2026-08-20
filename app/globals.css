@@ -68,7 +68,7 @@
      thème clair, comme la barre d'onglets d'Apple TV+ —
      donc son texte reste clair lui aussi dans les deux
      thèmes, indépendamment de --text/--text-dim. */
-  --nav-surface: rgba(24, 24, 28, 0.18);
+  --nav-surface: rgba(20, 20, 24, 0.07);
   --nav-text: rgba(255, 255, 255, 0.56);
   --nav-text-active: #ffffff;
 
@@ -587,11 +587,14 @@ a {
   border-radius: var(--radius-pill);
   background: var(--nav-surface);
   box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.3),
-    0 10px 30px rgba(0, 0, 0, 0.4);
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
+    0 10px 30px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(var(--blur-xl)) saturate(180%);
   -webkit-backdrop-filter: blur(var(--blur-xl))
     saturate(180%);
+  /* La bulle doit pouvoir sortir de la barre quand elle
+     grossit sous le doigt : surtout pas d'overflow caché. */
+  overflow: visible;
   transition:
     transform var(--ease-spring),
     background var(--ease),
@@ -608,8 +611,8 @@ a {
 
 .bottom-nav-inner.is-pressed {
   transform: scale(1.02);
-  border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(28, 28, 32, 0.26);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(26, 26, 30, 0.12);
 }
 
 /*
@@ -626,6 +629,7 @@ a {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
+  overflow: visible;
   touch-action: none;
 }
 
@@ -664,11 +668,18 @@ a {
     opacity var(--ease);
 }
 
+/*
+ * Tenue par le doigt, la bulle déborde de la barre : elle
+ * doit donc se détacher comme un objet soulevé — verre plus
+ * dense, reflet plus net, et une vraie ombre portée en
+ * dessous pour qu'elle flotte au-dessus de la barre.
+ */
+
 .nav-pill.is-dragging {
-  background: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.26);
   box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.55),
-    0 4px 14px rgba(0, 0, 0, 0.25);
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.6),
+    0 8px 22px rgba(0, 0, 0, 0.34);
 }
 
 .nav-item {
