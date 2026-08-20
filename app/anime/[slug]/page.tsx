@@ -310,12 +310,28 @@ function AnimeInfoPageContent({
   const playerSectionRef =
     useRef<HTMLDivElement | null>(null);
 
+  const episodeRailRef =
+    useRef<HTMLDivElement | null>(null);
+
+  /* Largeur d'une carte d'épisode + son espacement,
+     pour faire défiler le rail d'un "cran" par clic. */
+  const scrollEpisodeRail = (
+    direction: -1 | 1
+  ) => {
+    episodeRailRef.current?.scrollBy({
+      left: direction * 440,
+      behavior: 'smooth',
+    });
+  };
+
   /*
    * =======================================================
-   * AFFICHE PLEIN ÉCRAN — étirement élastique quand on
-   * tire vers le bas en haut de page, léger rétrécissement
-   * en parallaxe en scrollant, titre qui glisse dans une
-   * barre compacte une fois l'affiche quittée.
+   * AFFICHE PLEIN ÉCRAN — léger effet de parallaxe (l'image
+   * défile un peu plus lentement que la page) et titre qui
+   * glisse dans une barre compacte une fois l'affiche
+   * quittée. Pas d'étirement élastique : sur une image de
+   * définition modeste, ça l'agrandissait encore plus et
+   * ça accrochait au lieu de glisser.
    * =======================================================
    */
 
@@ -331,21 +347,13 @@ function AnimeInfoPageContent({
     const update = () => {
       ticking = false;
 
-      const y = window.scrollY;
+      const y = Math.max(window.scrollY, 0);
       const frame = heroFrameRef.current;
 
       if (frame) {
-        if (y < 0) {
-          const scale =
-            1 + (Math.min(-y, 260) / 260) * 0.35;
+        const shift = Math.min(y * 0.18, 60);
 
-          frame.style.transform = `scale(${scale})`;
-        } else {
-          const shift = Math.min(y * 0.25, 90);
-          const scale = Math.max(1 - y / 1600, 0.94);
-
-          frame.style.transform = `translateY(${-shift}px) scale(${scale})`;
-        }
+        frame.style.transform = `translateY(${-shift}px)`;
       }
 
       setIsCompact((prev) => {
@@ -1749,10 +1757,42 @@ function AnimeInfoPageContent({
             </div>
           )}
 
-          <p className="episode-hint">
-            Appui long sur un épisode pour marquer
-            tous les précédents comme vus.
-          </p>
+          <div className="ep-rail-head">
+
+            <p className="episode-hint">
+              Appui long sur un épisode pour marquer
+              tous les précédents comme vus.
+            </p>
+
+            {episodeCount > 0 && (
+              <div className="ep-rail-nav">
+
+                <button
+                  type="button"
+                  className="ep-rail-nav-button"
+                  onClick={() =>
+                    scrollEpisodeRail(-1)
+                  }
+                  aria-label="Faire défiler vers les épisodes précédents"
+                >
+                  ‹
+                </button>
+
+                <button
+                  type="button"
+                  className="ep-rail-nav-button"
+                  onClick={() =>
+                    scrollEpisodeRail(1)
+                  }
+                  aria-label="Faire défiler vers les épisodes suivants"
+                >
+                  ›
+                </button>
+
+              </div>
+            )}
+
+          </div>
 
           {episodesLoading && episodeCount === 0 ? (
             <div className="loading-row">
@@ -1760,7 +1800,7 @@ function AnimeInfoPageContent({
               <span>Chargement…</span>
             </div>
           ) : episodeCount > 0 ? (
-            <div className="ep-rail">
+            <div className="ep-rail" ref={episodeRailRef}>
 
               {Array.from({
                 length: episodeCount,
