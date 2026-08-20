@@ -25,6 +25,15 @@ const items = [
 const THEME_KEY = 'anime_theme';
 
 /*
+ * La bulle ne remplit pas tout l'onglet bord à bord : elle
+ * se resserre de quelques pixels de chaque côté, comme sur
+ * la barre d'onglets d'Apple Music, sinon elle touche ses
+ * voisines et fait un gros bloc au lieu d'une pastille.
+ */
+
+const PILL_INSET = 4;
+
+/*
  * =============================================================
  * PASTILLE VIVANTE — la petite bulle de verre se colle sous le
  * doigt et le suit en continu sur toute la largeur de la barre
@@ -86,8 +95,11 @@ export default function Navbar() {
 
       if (el) {
         setRestPill({
-          left: el.offsetLeft,
-          width: el.offsetWidth,
+          left: el.offsetLeft + PILL_INSET,
+          width: Math.max(
+            0,
+            el.offsetWidth - PILL_INSET * 2
+          ),
         });
       } else {
         setRestPill(null);
@@ -143,13 +155,18 @@ export default function Navbar() {
 
     if (!el) return;
 
-    const width = el.offsetWidth;
-    const maxLeft = Math.max(
+    const width = Math.max(
       0,
-      trackWidthRef.current - width
+      el.offsetWidth - PILL_INSET * 2
     );
+
+    const maxLeft = Math.max(
+      PILL_INSET,
+      trackWidthRef.current - width - PILL_INSET
+    );
+
     const left = Math.min(
-      Math.max(relativeX - width / 2, 0),
+      Math.max(relativeX - width / 2, PILL_INSET),
       maxLeft
     );
 
