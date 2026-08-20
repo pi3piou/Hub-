@@ -64,13 +64,20 @@
   --accent-tint: rgba(255, 255, 255, 0.12);
   --accent-border: rgba(255, 255, 255, 0.32);
 
-  /* Barre de navigation flottante : reste sombre même en
-     thème clair, comme la barre d'onglets d'Apple TV+ —
-     donc son texte reste clair lui aussi dans les deux
-     thèmes, indépendamment de --text/--text-dim. */
+  /* Barre de navigation flottante. Tout son verre passe par
+     ces variables pour qu'elle puisse s'inverser proprement
+     en thème clair (icônes noires sur verre clair) au lieu
+     de rester un bloc sombre plaqué sur une page blanche. */
   --nav-surface: rgba(20, 20, 24, 0.07);
+  --nav-surface-pressed: rgba(26, 26, 30, 0.12);
   --nav-text: rgba(255, 255, 255, 0.56);
   --nav-text-active: #ffffff;
+  --nav-pill: rgba(255, 255, 255, 0.14);
+  --nav-pill-strong: rgba(255, 255, 255, 0.26);
+  --nav-hairline: rgba(255, 255, 255, 0.09);
+  --nav-hairline-strong: rgba(255, 255, 255, 0.14);
+  --nav-sheen: rgba(255, 255, 255, 0.22);
+  --nav-sheen-strong: rgba(255, 255, 255, 0.6);
 
   /* Rayons — plus généreux, esprit continu */
   --radius-sm: 14px;
@@ -126,6 +133,20 @@
   --accent-light: #000000;
   --accent-tint: rgba(0, 0, 0, 0.08);
   --accent-border: rgba(0, 0, 0, 0.24);
+
+  /* Barre de navigation en thème clair : verre blanc et
+     icônes NOIRES. Le verre reste très peu teinté pour
+     qu'on continue de voir la page défiler derrière. */
+  --nav-surface: rgba(255, 255, 255, 0.22);
+  --nav-surface-pressed: rgba(255, 255, 255, 0.34);
+  --nav-text: rgba(0, 0, 0, 0.45);
+  --nav-text-active: #000000;
+  --nav-pill: rgba(255, 255, 255, 0.5);
+  --nav-pill-strong: rgba(255, 255, 255, 0.72);
+  --nav-hairline: rgba(0, 0, 0, 0.08);
+  --nav-hairline-strong: rgba(0, 0, 0, 0.14);
+  --nav-sheen: rgba(255, 255, 255, 0.65);
+  --nav-sheen-strong: rgba(255, 255, 255, 0.9);
 }
 
 /* =========================================================
@@ -555,7 +576,7 @@ a {
 .bottom-nav {
   position: fixed;
   right: 0;
-  bottom: 17px;
+  bottom: 26px;
   left: 0;
   z-index: 100;
   display: flex;
@@ -582,18 +603,19 @@ a {
   gap: 2px;
   width: auto;
   max-width: 100%;
-  padding: 4px;
-  border: 0.5px solid rgba(255, 255, 255, 0.09);
+  padding: 5px;
+  border: 0.5px solid var(--nav-hairline);
   border-radius: var(--radius-pill);
   background: var(--nav-surface);
   box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.22),
-    0 10px 30px rgba(0, 0, 0, 0.32);
-  /* Flou volontairement faible : c'est du verre qu'on
-     traverse du regard, pas du dépoli. La saturation fait
-     le reste du travail pour garder la couleur du fond. */
-  backdrop-filter: blur(14px) saturate(190%);
-  -webkit-backdrop-filter: blur(14px) saturate(190%);
+    inset 0 0.5px 0 var(--nav-sheen),
+    0 10px 30px rgba(0, 0, 0, 0.28);
+  /* Flou volontairement TRÈS faible : c'est du verre qu'on
+     traverse du regard, pas du dépoli. On doit reconnaître
+     l'image qui passe derrière, pas seulement ses couleurs.
+     La saturation fait le reste du travail. */
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
   /* La bulle doit pouvoir sortir de la barre quand elle
      grossit sous le doigt : surtout pas d'overflow caché. */
   overflow: visible;
@@ -612,9 +634,9 @@ a {
  */
 
 .bottom-nav-inner.is-pressed {
-  transform: scale(1.05);
-  border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(26, 26, 30, 0.12);
+  transform: scale(1.07);
+  border-color: var(--nav-hairline-strong);
+  background: var(--nav-surface-pressed);
 }
 
 /*
@@ -671,8 +693,8 @@ a {
   transform-origin: center center;
   border: 0;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.14);
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.35);
+  background: var(--nav-pill);
+  box-shadow: inset 0 0.5px 0 var(--nav-sheen);
   will-change: transform;
   transition:
     background var(--ease),
@@ -688,10 +710,10 @@ a {
  */
 
 .nav-pill.is-dragging {
-  background: rgba(255, 255, 255, 0.26);
+  background: var(--nav-pill-strong);
   box-shadow:
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.6),
-    0 8px 22px rgba(0, 0, 0, 0.34);
+    inset 0 0.5px 0 var(--nav-sheen-strong),
+    0 8px 22px rgba(0, 0, 0, 0.3);
 }
 
 .nav-item {
@@ -702,8 +724,8 @@ a {
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  width: 72px;
-  padding: 6px 4px 5px;
+  width: 80px;
+  padding: 8px 4px 7px;
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
@@ -712,6 +734,12 @@ a {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: -0.1px;
+  /* Sans ça, un appui long sur un onglet déclenche l'aperçu
+     de lien d'iOS (la page s'ouvre en popover) au beau
+     milieu du balayage. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
   transition:
     background var(--ease),
     color var(--ease),
@@ -743,12 +771,12 @@ a {
 
 .nav-theme-button {
   flex: 0 0 auto;
-  width: 62px;
+  width: 68px;
 }
 
 .nav-icon {
-  font-size: 23px;
-  line-height: 25px;
+  font-size: 26px;
+  line-height: 28px;
   transition: transform var(--ease-spring);
 }
 
@@ -1470,7 +1498,7 @@ a {
   }
 
   .bottom-nav {
-    bottom: 25px;
+    bottom: 34px;
   }
 
   .anime-grid,
