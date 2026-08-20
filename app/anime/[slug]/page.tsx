@@ -1053,6 +1053,50 @@ function AnimeInfoPageContent({
 
   /*
    * =======================================================
+   * RAIL SYNCHRONISÉ AVEC LE LECTEUR — quand on arrive de
+   * "Reprendre la lecture", ou qu'on passe à l'épisode
+   * suivant/précédent, la carte correspondante vient se
+   * centrer dans le rail. Sans ça on lisait l'épisode 12
+   * pendant que le rail montrait toujours le 1, et il
+   * fallait le chercher à la main.
+   *
+   * `episodeCount` fait partie des dépendances : au premier
+   * rendu la liste n'est pas encore chargée, le rail n'existe
+   * pas, et l'effet doit rejouer une fois les cartes là.
+   * =======================================================
+   */
+
+  useEffect(() => {
+    if (selectedEpisode === null) return;
+    if (episodeCount === 0) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const rail = episodeRailRef.current;
+
+      if (!rail) return;
+
+      const card = rail.children[
+        selectedEpisode
+      ] as HTMLElement | undefined;
+
+      if (!card) return;
+
+      const target =
+        card.offsetLeft -
+        (rail.clientWidth - card.offsetWidth) / 2;
+
+      rail.scrollTo({
+        left: Math.max(0, target),
+        behavior: 'smooth',
+      });
+    });
+
+    return () =>
+      window.cancelAnimationFrame(frame);
+  }, [selectedEpisode, episodeCount]);
+
+  /*
+   * =======================================================
    * MARQUAGE DEPUIS LE RAIL D'ÉPISODES
    * =======================================================
    */
