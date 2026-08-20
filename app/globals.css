@@ -68,7 +68,7 @@
      thème clair, comme la barre d'onglets d'Apple TV+ —
      donc son texte reste clair lui aussi dans les deux
      thèmes, indépendamment de --text/--text-dim. */
-  --nav-surface: rgba(22, 22, 27, 0.62);
+  --nav-surface: rgba(24, 24, 28, 0.38);
   --nav-text: rgba(255, 255, 255, 0.56);
   --nav-text-active: #ffffff;
 
@@ -564,43 +564,40 @@ a {
 }
 
 /*
- * Pilule flottante façon Safari iOS : elle rétrécit
- * pendant le défilement (padding et gap réduits, libellés
- * repliés à zéro) puis reprend sa taille normale au repos,
- * avec le petit rebond `--ease-spring`.
+ * Pilule fixe, façon Apple TV+ : elle ne bouge pas au
+ * défilement — tout le soin est mis dans le verre lui-même
+ * plutôt que dans un effet de rétrécissement. Verre très
+ * transparent, flou et saturation poussés, reflet net en
+ * haut et ombre creusée en bas pour un vrai effet de
+ * profondeur/réfraction plutôt qu'un simple flou plat.
  */
 
 .bottom-nav-inner {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px;
-  border: 1px solid var(--border-strong);
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--radius-pill);
   background: var(--nav-surface);
   box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    0 18px 45px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(var(--blur-lg)) saturate(190%);
-  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(190%);
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.35),
+    0 18px 45px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(var(--blur-xl)) saturate(220%)
+    brightness(1.08);
+  -webkit-backdrop-filter: blur(var(--blur-xl))
+    saturate(220%) brightness(1.08);
   pointer-events: auto;
-  transition:
-    padding var(--ease-spring),
-    gap var(--ease-spring);
-}
-
-.bottom-nav-inner.is-shrunk {
-  padding: 6px;
-  gap: 2px;
 }
 
 .nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-width: 58px;
-  padding: 7px 12px 6px;
+  gap: 3px;
+  min-width: 62px;
+  padding: 8px 13px 7px;
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
@@ -611,8 +608,11 @@ a {
   transition:
     background var(--ease),
     color var(--ease),
-    padding var(--ease-spring),
-    min-width var(--ease-spring);
+    transform var(--ease-spring);
+}
+
+.nav-item:active {
+  transform: scale(0.92);
 }
 
 .nav-item.active {
@@ -620,29 +620,15 @@ a {
   color: var(--nav-text-active);
 }
 
-.is-shrunk .nav-item {
-  min-width: 0;
-  padding: 6px 9px;
-}
-
 .nav-icon {
-  font-size: 20px;
-  line-height: 20px;
+  font-size: 25px;
+  line-height: 25px;
 }
 
 .nav-label {
   max-width: 60px;
   overflow: hidden;
   white-space: nowrap;
-  opacity: 1;
-  transition:
-    max-width var(--ease-spring),
-    opacity 0.15s ease;
-}
-
-.is-shrunk .nav-label {
-  max-width: 0;
-  opacity: 0;
 }
 
 /* =========================================================
@@ -1470,9 +1456,9 @@ a {
 .hero-banner {
   position: relative;
   overflow: hidden;
-  height: 58vh;
-  min-height: 380px;
-  max-height: 580px;
+  height: 42vh;
+  min-height: 300px;
+  max-height: 430px;
   margin: -12px calc(-1 * var(--page-pad)) 18px;
   background: var(--bg);
 }
@@ -1796,9 +1782,9 @@ a {
 
 .skeleton-hero {
   position: relative;
-  height: 58vh;
-  min-height: 380px;
-  max-height: 580px;
+  height: 42vh;
+  min-height: 300px;
+  max-height: 430px;
   margin: -12px calc(-1 * var(--page-pad)) 18px;
   border-radius: 0;
 }
@@ -1822,7 +1808,7 @@ a {
 @media (min-width: 700px) {
   .hero-banner,
   .skeleton-hero {
-    max-height: 640px;
+    max-height: 480px;
   }
 
   .hero-banner-content h1 {
@@ -2594,13 +2580,56 @@ a {
  * d'Apple TV+ — jamais de liste verticale pleine largeur.
  */
 
+.ep-rail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ep-rail-head .episode-hint {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+/* Deux boutons ronds en verre pour faire défiler le rail
+   sans avoir à glisser le doigt sur chaque carte. */
+
+.ep-rail-nav {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.ep-rail-nav-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface-glass);
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1;
+  backdrop-filter: blur(var(--blur-md)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
+  transition: transform var(--ease-spring), background var(--ease);
+}
+
+.ep-rail-nav-button:active {
+  transform: scale(0.88);
+  background: var(--surface-glass-hover);
+}
+
 .ep-rail {
   display: flex;
   gap: 10px;
-  margin: 0 calc(-1 * var(--page-pad));
+  margin: 10px calc(-1 * var(--page-pad)) 0;
   padding: 2px var(--page-pad) 6px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
+  scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
 
