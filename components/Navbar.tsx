@@ -26,23 +26,40 @@ const THEME_KEY = 'anime_theme';
 
 /*
  * La bulle ne remplit pas tout l'onglet bord à bord : elle
- * se resserre de quelques pixels de chaque côté, comme sur
- * la barre d'onglets d'Apple Music, sinon elle touche ses
- * voisines et fait un gros bloc au lieu d'une pastille.
+ * se resserre de quelques pixels de chaque côté, sinon elle
+ * touche ses voisines et fait un gros bloc au lieu d'une
+ * pastille.
  */
 
 const PILL_INSET = 4;
 
 /*
  * =============================================================
- * PASTILLE VIVANTE — la petite bulle de verre se colle sous le
- * doigt et le suit en continu sur toute la largeur de la barre
- * pendant l'appui (aucune transition, recopie 1:1 la position
- * du pointeur), puis "BAM" elle se règle en ressort sur
- * l'onglet relâché grâce à `--ease-spring`. Au repos, elle
- * reste simplement calée sous l'onglet actif.
+ * RESSORT — la pastille n'est plus repositionnée "au pixel"
+ * à chaque pointermove (ce qui donnait ce rendu saccadé) :
+ * le doigt ne fait que déplacer une CIBLE, et une boucle
+ * requestAnimationFrame fait courir la bulle vers cette cible
+ * avec un vrai ressort amorti. Elle a donc de l'inertie, elle
+ * dépasse légèrement puis revient, et surtout elle S'ÉCRASE :
+ * sa vitesse instantanée étire la bulle dans le sens du
+ * mouvement et l'aplatit en hauteur (squash & stretch), comme
+ * une goutte de verre. Tout passe par `transform` uniquement,
+ * jamais par `left`, donc c'est composité par le GPU et
+ * parfaitement fluide.
  * =============================================================
  */
+
+const STIFFNESS = 0.22;
+const DAMPING = 0.68;
+const PRESS_EASE = 0.22;
+
+/* Vitesse (px/frame) à partir de laquelle la déformation
+   est à son maximum. */
+const SPEED_REF = 34;
+
+const MAX_STRETCH = 0.22;
+const MAX_SQUASH = 0.14;
+const MAX_GROW = 0.12;
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -59,25 +76,103 @@ export default function Navbar() {
   );
 
   const trackRef = useRef<HTMLDivElement | null>(null);
+  const pillRef = useRef<HTMLSpanElement | null>(null);
 
   const itemRefs = useRef<
     Array<HTMLAnchorElement | null>
   >([]);
 
-  const [restPill, setRestPill] = useState<{
-    left: number;
-    width: number;
-  } | null>(null);
-
-  const [dragPill, setDragPill] = useState<{
-    left: number;
-    width: number;
-  } | null>(null);
-
+  const [pillWidth, setPillWidth] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [hoverIndex, setHoverIndex] = useState<
+    number | null
+  >(null);
 
-  const dragIndexRef = useRef<number | null>(null);
+  /* Valeurs mutables lues dans la boucle d'animation : elles
+     ne doivent JAMAIS passer par un state React, sinon on
+     re-rend le composant 60 fois par seconde. */
+
+  const motion = useRef({
+    x: 0,
+    v: 0,
+    target: 0,
+    press: 0,
+    pressTarget: 0,
+    raf: 0,
+    ready: false,
+  });
+
+  const pillWidthRef = useRef(0);
   const trackWidthRef = useRef(0);
+  const trackLeftRef = useRef(0);
+  const draggingRef = useRef(false);
+  const dragIndexRef = useRef<number | null>(null);
+
+  /*
+   * =======================================================
+   * BOUCLE DE RESSORT
+   * =======================================================
+   */
+
+  const frame = () => {
+    const m = motion.current;
+    const el = pillRef.current;
+
+    if (!el) {
+      m.raf = 0;
+      return;
+    }
+
+    const dx = m.target - m.x;
+
+    m.v = (m.v + dx * STIFFNESS) * DAMPING;
+    m.x += m.v;
+
+    m.press += (m.pressTarget - m.press) * PRESS_EASE;
+
+    const speed = Math.min(
+      Math.abs(m.v) / SPEED_REF,
+      1
+    );
+
+    const grow = 1 + m.press * MAX_GROW;
+    const scaleX = grow * (1 + speed * MAX_STRETCH);
+    const scaleY = grow * (1 - speed * MAX_SQUASH);
+
+    el.style.transform =
+      `translate3d(${m.x}px, 0, 0)` +
+      ` scale(${scaleX}, ${scaleY})`;
+
+    const settled =
+      Math.abs(dx) < 0.15 &&
+      Math.abs(m.v) < 0.15 &&
+      Math.abs(m.pressTarget - m.press) < 0.005;
+
+    if (settled) {
+      m.x = m.target;
+      m.v = 0;
+      m.press = m.pressTarget;
+
+      const rest = 1 + m.press * MAX_GROW;
+
+      el.style.transform =
+        `translate3d(${m.x}px, 0, 0) scale(${rest})`;
+
+      m.raf = 0;
+
+      return;
+    }
+
+    m.raf = window.requestAnimationFrame(frame);
+  };
+
+  const kick = () => {
+    const m = motion.current;
+
+    if (m.raf === 0) {
+      m.raf = window.requestAnimationFrame(frame);
+    }
+  };
 
   /*
    * =======================================================
@@ -93,17 +188,26 @@ export default function Navbar() {
           ? itemRefs.current[activeIndex]
           : null;
 
-      if (el) {
-        setRestPill({
-          left: el.offsetLeft + PILL_INSET,
-          width: Math.max(
-            0,
-            el.offsetWidth - PILL_INSET * 2
-          ),
-        });
-      } else {
-        setRestPill(null);
+      if (!el) return;
+
+      const width = Math.max(
+        0,
+        el.offsetWidth - PILL_INSET * 2
+      );
+
+      pillWidthRef.current = width;
+      setPillWidth(width);
+
+      const m = motion.current;
+
+      m.target = el.offsetLeft + PILL_INSET;
+
+      if (!m.ready) {
+        m.x = m.target;
+        m.ready = true;
       }
+
+      kick();
     };
 
     measure();
@@ -115,13 +219,20 @@ export default function Navbar() {
     };
   }, [activeIndex]);
 
+  useEffect(() => {
+    return () => {
+      if (motion.current.raf) {
+        window.cancelAnimationFrame(motion.current.raf);
+      }
+    };
+  }, []);
+
   /*
    * =======================================================
-   * SUIVI DU DOIGT — pointerdown/move/up capturés sur la
-   * piste des 3 onglets. Tant que ça appuie, la pastille
-   * recopie la position X du pointeur sans aucune animation
-   * (suivi 1:1). Au relâchement, on navigue si besoin et la
-   * pastille retombe en ressort sur sa position de repos.
+   * SUIVI DU DOIGT — le doigt déplace la cible du ressort,
+   * et l'onglet survolé s'allume au passage. La navigation
+   * n'a lieu qu'au relâchement, pour que la page ne saute
+   * pas pendant qu'on balaie la barre.
    * =======================================================
    */
 
@@ -144,33 +255,42 @@ export default function Navbar() {
     return best;
   };
 
-  const updateDragPosition = (relativeX: number) => {
+  const tick = () => {
+    try {
+      const nav = navigator as any;
+
+      if (nav && typeof nav.vibrate === 'function') {
+        nav.vibrate(8);
+      }
+    } catch {
+      // vibration non supportee (iOS)
+    }
+  };
+
+  const scrub = (clientX: number) => {
+    const relativeX = clientX - trackLeftRef.current;
+
     const index = nearestIndexAt(relativeX);
 
-    if (index < 0) return;
+    if (index >= 0 && index !== dragIndexRef.current) {
+      dragIndexRef.current = index;
+      setHoverIndex(index);
+      tick();
+    }
 
-    dragIndexRef.current = index;
-
-    const el = itemRefs.current[index];
-
-    if (!el) return;
-
-    const width = Math.max(
-      0,
-      el.offsetWidth - PILL_INSET * 2
-    );
+    const width = pillWidthRef.current;
 
     const maxLeft = Math.max(
       PILL_INSET,
       trackWidthRef.current - width - PILL_INSET
     );
 
-    const left = Math.min(
+    motion.current.target = Math.min(
       Math.max(relativeX - width / 2, PILL_INSET),
       maxLeft
     );
 
-    setDragPill({ left, width });
+    kick();
   };
 
   const handlePointerDown = (
@@ -183,59 +303,66 @@ export default function Navbar() {
     if (!track) return;
 
     track.setPointerCapture(e.pointerId);
+
     trackWidthRef.current = track.offsetWidth;
+    trackLeftRef.current =
+      track.getBoundingClientRect().left;
 
-    const relativeX =
-      e.clientX - track.getBoundingClientRect().left;
-
+    draggingRef.current = true;
     setIsDragging(true);
-    updateDragPosition(relativeX);
+
+    motion.current.pressTarget = 1;
+
+    scrub(e.clientX);
   };
 
   const handlePointerMove = (
     e: React.PointerEvent<HTMLDivElement>
   ) => {
-    if (!isDragging) return;
+    if (!draggingRef.current) return;
 
-    const track = trackRef.current;
-
-    if (!track) return;
-
-    const relativeX =
-      e.clientX - track.getBoundingClientRect().left;
-
-    updateDragPosition(relativeX);
+    scrub(e.clientX);
   };
 
   const endPress = () => {
+    if (!draggingRef.current) return;
+
+    draggingRef.current = false;
+
     setIsDragging(false);
+    setHoverIndex(null);
+
+    motion.current.pressTarget = 0;
 
     const finalIndex = dragIndexRef.current;
 
     dragIndexRef.current = null;
 
-    if (finalIndex !== null && finalIndex !== activeIndex) {
-      router.push(items[finalIndex].href);
+    if (finalIndex !== null && finalIndex >= 0) {
+      const el = itemRefs.current[finalIndex];
+
+      if (el) {
+        motion.current.target =
+          el.offsetLeft + PILL_INSET;
+      }
+
+      if (finalIndex !== activeIndex) {
+        router.push(items[finalIndex].href);
+      }
     }
-  };
 
-  const handlePointerUp = () => {
-    endPress();
-  };
-
-  const handlePointerCancel = () => {
-    endPress();
+    kick();
   };
 
   const handleItemClick = (
     e: React.MouseEvent<HTMLAnchorElement>
   ) => {
     /*
-     * detail === 0 signale une activation clavier (Entrée /
-     * Espace) : pas de pointerdown associé, donc on laisse
+     * detail === 0 signale une activation clavier (Entree /
+     * Espace) : pas de pointerdown associe, donc on laisse
      * le lien naviguer normalement. Un vrai clic souris ou
-     * tactile est déjà entièrement géré par les gestionnaires
-     * de pointeur ci-dessus, donc on l'annule ici pour éviter
+     * tactile est deja entierement gere par les gestionnaires
+     * de pointeur ci-dessus, donc on l'annule ici pour eviter
      * une double navigation.
      */
     if (e.detail === 0) return;
@@ -278,35 +405,37 @@ export default function Navbar() {
     }
   };
 
-  const shownPill = isDragging ? dragPill : restPill;
-
   return (
     <nav className="bottom-nav">
-      <div className="bottom-nav-inner">
+      <div
+        className={`bottom-nav-inner ${
+          isDragging ? 'is-pressed' : ''
+        }`}
+      >
 
         <div
           className="nav-track"
           ref={trackRef}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerCancel}
+          onPointerUp={endPress}
+          onPointerCancel={endPress}
         >
 
-          {shownPill && (
-            <span
-              className={`nav-pill ${
-                isDragging ? 'is-dragging' : ''
-              }`}
-              style={{
-                left: shownPill.left,
-                width: shownPill.width,
-              }}
-            />
-          )}
+          <span
+            className={`nav-pill ${
+              isDragging ? 'is-dragging' : ''
+            }`}
+            ref={pillRef}
+            style={{
+              width: pillWidth,
+              opacity: pillWidth ? 1 : 0,
+            }}
+          />
 
           {items.map((item, index) => {
             const active = index === activeIndex;
+            const hovered = index === hoverIndex;
 
             return (
               <Link
@@ -316,7 +445,11 @@ export default function Navbar() {
                   itemRefs.current[index] = el;
                 }}
                 onClick={handleItemClick}
-                className={`nav-item ${active ? 'active' : ''}`}
+                className={
+                  'nav-item' +
+                  (active ? ' active' : '') +
+                  (hovered ? ' is-hover' : '')
+                }
               >
                 <span className="nav-icon">{item.icon}</span>
                 <span className="nav-label">
