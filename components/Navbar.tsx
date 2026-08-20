@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const items = [
   {
@@ -24,55 +24,19 @@ const items = [
 
 const THEME_KEY = 'anime_theme';
 
-/* Combien de temps sans défilement avant que la pilule
-   reprenne sa taille normale, comme la barre de Safari. */
-const SCROLL_IDLE_DELAY = 650;
+/*
+ * La pilule ne bouge plus au défilement — comme la barre
+ * d'onglets d'Apple TV+, elle reste immobile. Le soin est
+ * mis dans le verre lui-même (voir .bottom-nav-inner dans
+ * globals.css) plutôt que dans un effet de rétrécissement.
+ */
 
 export default function Navbar() {
   const pathname = usePathname();
 
-  const [shrunk, setShrunk] = useState(false);
-
   const [theme, setTheme] = useState<'dark' | 'light'>(
     'dark'
   );
-
-  const scrollTimer = useRef<number | null>(null);
-
-  /*
-   * =======================================================
-   * PILULE QUI RÉTRÉCIT PENDANT LE DÉFILEMENT
-   * =======================================================
-   */
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setShrunk(true);
-
-      if (scrollTimer.current !== null) {
-        window.clearTimeout(scrollTimer.current);
-      }
-
-      scrollTimer.current = window.setTimeout(() => {
-        setShrunk(false);
-      }, SCROLL_IDLE_DELAY);
-    };
-
-    window.addEventListener('scroll', handleScroll, {
-      passive: true,
-    });
-
-    return () => {
-      window.removeEventListener(
-        'scroll',
-        handleScroll
-      );
-
-      if (scrollTimer.current !== null) {
-        window.clearTimeout(scrollTimer.current);
-      }
-    };
-  }, []);
 
   /*
    * =======================================================
@@ -111,11 +75,7 @@ export default function Navbar() {
 
   return (
     <nav className="bottom-nav">
-      <div
-        className={`bottom-nav-inner ${
-          shrunk ? 'is-shrunk' : ''
-        }`}
-      >
+      <div className="bottom-nav-inner">
         {items.map((item) => {
           const active =
             item.href === '/'
