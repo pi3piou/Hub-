@@ -72,26 +72,32 @@ const MAX_SQUASH = 0.14;
  * négatif = étirée et étroite. On l'injecte quand on attrape la
  * bulle et quand elle arrive sur un onglet.
  *
- * WOBBLE_STIFFNESS donne la vitesse du rebond, WOBBLE_DAMPING
- * sa persistance. Ces valeurs-ci donnent 3 oscillations sur
- * ~0,6 s, avec une déformation qui va de -14% à +14% en largeur.
- * ATTENTION en les touchant : monter WOBBLE_DAMPING vers 0.9
- * fait passer la gelée à une douzaine d'oscillations sur 1,5 s,
- * ce qui ne ressemble plus à de la gelée mais à un bug.
+ * Réglage voulu : une grosse déformation, mais UN SEUL rebond.
+ * C'est WOBBLE_DAMPING qui décide du nombre d'oscillations et
+ * l'impulsion qui décide de leur ampleur — les deux curseurs
+ * sont indépendants. On amortit donc fort (0.64, la bulle se
+ * calme en un aller-retour) et on frappe fort (impulsions à
+ * ~1.0), ce qui donne une belle boudinée molle plutôt qu'un
+ * tremblement.
+ *
+ * Résultat mesuré : ~0,45 s, 1 rebond, la bulle passe de 84 à
+ * 118 px de large à la prise en main. Remonter WOBBLE_DAMPING
+ * vers 0.85 la ferait vibrer 5 ou 6 fois — c'est exactement
+ * l'effet "ressort cassé" qu'on ne veut pas.
  * -------------------------------------------------------------
  */
 
-const WOBBLE_STIFFNESS = 0.3;
-const WOBBLE_DAMPING = 0.76;
+const WOBBLE_STIFFNESS = 0.2;
+const WOBBLE_DAMPING = 0.64;
 
-const WOBBLE_X = 0.24;
-const WOBBLE_Y = 0.18;
+const WOBBLE_X = 0.38;
+const WOBBLE_Y = 0.3;
 
 /* Pichenettes : à la prise en main, et à l'arrivée sur
    l'onglet. */
 
-const GRAB_IMPULSE = 0.5;
-const LAND_IMPULSE = 0.4;
+const GRAB_IMPULSE = 1.2;
+const LAND_IMPULSE = 0.95;
 
 /* Sous le doigt la bulle DÉBORDE de la barre. La piste fait
    la hauteur des onglets et la barre y ajoute son padding :
