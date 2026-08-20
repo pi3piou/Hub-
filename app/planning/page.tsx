@@ -240,7 +240,7 @@ export default function PlanningPage() {
                   key={`${item.slug}-${item.season}-${item.lang}-${item.releaseTs}`}
                   href={`/anime/${encodeURIComponent(
                     item.slug
-                  )}/${item.season}`}
+                  )}?season=${item.season}`}
                   className={
                     isFollowed
                       ? 'planning-card is-followed'
