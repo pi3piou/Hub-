@@ -21,19 +21,19 @@
    * "verre teinté noir". C'est ce qui donne l'effet
    * Liquid Glass plutôt que l'ancien flou sombre opaque.
    */
-  --surface: rgba(255, 255, 255, 0.075);
-  --surface-strong: rgba(255, 255, 255, 0.13);
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-strong: rgba(255, 255, 255, 0.09);
   --surface-solid: #161618;
   --surface-input: rgba(255, 255, 255, 0.045);
-  --surface-hover: rgba(255, 255, 255, 0.12);
+  --surface-hover: rgba(255, 255, 255, 0.1);
 
   /*
    * Verre "carte de saison" : un cran plus opaque que
    * --surface pour rester lisible sans image derrière,
    * avec un reflet du haut plus marqué (esprit iOS 26).
    */
-  --surface-glass: rgba(255, 255, 255, 0.1);
-  --surface-glass-hover: rgba(255, 255, 255, 0.15);
+  --surface-glass: rgba(255, 255, 255, 0.065);
+  --surface-glass-hover: rgba(255, 255, 255, 0.1);
 
   /* Bordures et reflets */
   --border: rgba(255, 255, 255, 0.1);
@@ -68,7 +68,7 @@
      thème clair, comme la barre d'onglets d'Apple TV+ —
      donc son texte reste clair lui aussi dans les deux
      thèmes, indépendamment de --text/--text-dim. */
-  --nav-surface: rgba(24, 24, 28, 0.38);
+  --nav-surface: rgba(24, 24, 28, 0.24);
   --nav-text: rgba(255, 255, 255, 0.56);
   --nav-text-active: #ffffff;
 
@@ -103,14 +103,14 @@
 :root[data-theme="light"] {
   --bg: #f2f2f4;
 
-  --surface: rgba(0, 0, 0, 0.045);
-  --surface-strong: rgba(0, 0, 0, 0.075);
+  --surface: rgba(0, 0, 0, 0.03);
+  --surface-strong: rgba(0, 0, 0, 0.05);
   --surface-solid: #e4e4e8;
   --surface-input: rgba(0, 0, 0, 0.04);
-  --surface-hover: rgba(0, 0, 0, 0.07);
+  --surface-hover: rgba(0, 0, 0, 0.06);
 
-  --surface-glass: rgba(0, 0, 0, 0.055);
-  --surface-glass-hover: rgba(0, 0, 0, 0.09);
+  --surface-glass: rgba(0, 0, 0, 0.035);
+  --surface-glass-hover: rgba(0, 0, 0, 0.06);
 
   --border: rgba(0, 0, 0, 0.1);
   --border-strong: rgba(0, 0, 0, 0.16);
@@ -256,7 +256,7 @@ a {
 }
 
 .search-icon {
-  color: #a8a8b4;
+  color: var(--text-dim);
   font-size: 25px;
   line-height: 1;
 }
@@ -272,7 +272,7 @@ a {
 }
 
 .search-box input::placeholder {
-  color: #78787f;
+  color: var(--text-dim);
 }
 
 .clear-button {
@@ -282,7 +282,7 @@ a {
   border: 0;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
-  color: #c4c4cc;
+  color: var(--text-muted);
   line-height: 20px;
 }
 
@@ -295,7 +295,7 @@ a {
   overflow: auto;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-xl);
-  background: rgba(20, 20, 25, 0.88);
+  background: var(--surface-strong);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight-soft),
     0 25px 60px rgba(0, 0, 0, 0.5);
@@ -336,7 +336,7 @@ a {
   display: block;
   margin-top: 4px;
   overflow: hidden;
-  color: #78787f;
+  color: var(--text-dim);
   font-size: 10px;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -348,7 +348,7 @@ a {
   justify-content: center;
   gap: 9px;
   min-height: 80px;
-  color: #8a8a92;
+  color: var(--text-dim);
   font-size: 12px;
 }
 
@@ -543,7 +543,7 @@ a {
 .empty-card p {
   max-width: 280px;
   margin: 0 auto;
-  color: #83838a;
+  color: var(--text-muted);
   font-size: 11px;
   line-height: 1.5;
 }
@@ -560,22 +560,26 @@ a {
   z-index: 100;
   display: flex;
   justify-content: center;
+  padding: 0 var(--page-pad);
   pointer-events: none;
 }
 
 /*
- * Pilule fixe, façon Apple TV+ : elle ne bouge pas au
- * défilement — tout le soin est mis dans le verre lui-même
- * plutôt que dans un effet de rétrécissement. Verre très
+ * La barre prend toute la largeur utile de l'écran, comme
+ * la vraie barre d'onglets d'Apple TV+ — pas une petite
+ * pilule centrée qui flotte au milieu. Verre très
  * transparent, flou et saturation poussés, reflet net en
  * haut et ombre creusée en bas pour un vrai effet de
- * profondeur/réfraction plutôt qu'un simple flou plat.
+ * profondeur plutôt qu'un simple flou plat.
  */
 
 .bottom-nav-inner {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: space-between;
+  width: 100%;
+  max-width: var(--page-max);
   padding: 7px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--radius-pill);
@@ -591,13 +595,40 @@ a {
   pointer-events: auto;
 }
 
+/*
+ * Repère glissant façon Liquid Glass : un onglet de verre
+ * plus clair qui se déplace derrière l'onglet actif au lieu
+ * de rester statique — mesuré en JS (Navbar.tsx), animé ici
+ * en CSS pur avec le ressort `--ease-spring`.
+ */
+
+.nav-pill {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 0;
+  z-index: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -4px 10px rgba(0, 0, 0, 0.2);
+  transition:
+    transform var(--ease-spring),
+    width var(--ease-spring);
+}
+
 .nav-item {
+  position: relative;
+  z-index: 1;
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  min-width: 62px;
-  padding: 8px 13px 7px;
+  min-width: 0;
+  padding: 8px 10px 7px;
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
@@ -841,7 +872,7 @@ a {
   box-shadow: inset 0 1px 0 var(--glass-highlight-soft);
   backdrop-filter: blur(var(--blur-sm));
   -webkit-backdrop-filter: blur(var(--blur-sm));
-  color: #c4c4cc;
+  color: var(--text-muted);
 }
 
 .back-button {
@@ -1082,7 +1113,7 @@ a {
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: #83838a;
+  color: var(--text-muted);
   font-size: 10px;
   font-weight: 800;
   transition: background var(--ease), color var(--ease);
@@ -1113,7 +1144,7 @@ a {
 .players > span {
   display: block;
   margin-bottom: 7px;
-  color: #75757c;
+  color: var(--text-dim);
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -1132,7 +1163,7 @@ a {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.05);
-  color: #83838a;
+  color: var(--text-muted);
   font-size: 9px;
   font-weight: 700;
 }
@@ -1167,7 +1198,7 @@ a {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.045);
-  color: #83838a;
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 750;
   transition:
@@ -1251,7 +1282,7 @@ a {
   align-content: center;
   gap: 12px;
   min-height: 70vh;
-  color: #7c7c85;
+  color: var(--text-dim);
   font-size: 11px;
 }
 
@@ -1323,7 +1354,7 @@ a {
 
 .error-card p {
   margin: 0;
-  color: #83838a;
+  color: var(--text-muted);
   font-size: 11px;
   line-height: 1.5;
 }
@@ -1599,7 +1630,7 @@ a {
 
 .anime-synopsis p {
   margin: 6px 0 0;
-  color: #d2d2d8;
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.65;
 }
@@ -2580,52 +2611,45 @@ a {
  * d'Apple TV+ — jamais de liste verticale pleine largeur.
  */
 
-.ep-rail-head {
+/* Précédent / Suivant, sous le lecteur : deux boutons en
+   verre qui changent directement l'épisode affiché. */
+
+.player-episode-nav {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.ep-rail-head .episode-hint {
-  flex: 1 1 auto;
-  margin: 0;
-}
-
-/* Deux boutons ronds en verre pour faire défiler le rail
-   sans avoir à glisser le doigt sur chaque carte. */
-
-.ep-rail-nav {
-  display: flex;
-  flex: 0 0 auto;
   gap: 8px;
+  margin-top: 10px;
 }
 
-.ep-rail-nav-button {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
+.player-episode-nav-button {
+  flex: 1 1 0;
+  padding: 11px 0;
   border: 1px solid var(--border-strong);
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--surface-glass);
   color: var(--text);
-  font-size: 17px;
-  line-height: 1;
+  font-size: 12.5px;
+  font-weight: 700;
   backdrop-filter: blur(var(--blur-md)) saturate(180%);
   -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
-  transition: transform var(--ease-spring), background var(--ease);
+  transition:
+    transform var(--ease-spring),
+    background var(--ease),
+    opacity var(--ease);
 }
 
-.ep-rail-nav-button:active {
-  transform: scale(0.88);
+.player-episode-nav-button:active {
+  transform: scale(0.96);
   background: var(--surface-glass-hover);
+}
+
+.player-episode-nav-button:disabled {
+  opacity: 0.35;
 }
 
 .ep-rail {
   display: flex;
   gap: 10px;
-  margin: 10px calc(-1 * var(--page-pad)) 0;
+  margin: 0 calc(-1 * var(--page-pad));
   padding: 2px var(--page-pad) 6px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
