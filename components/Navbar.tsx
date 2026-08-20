@@ -64,10 +64,10 @@ const MAX_SQUASH = 0.14;
    la hauteur des onglets et la barre y ajoute son padding :
    il faut donc dépasser ce padding pour que le débordement
    se voie vraiment — d'autant que la barre gonfle elle aussi
-   au toucher. +36% la fait sortir nettement en haut et en
+   au toucher. +40% la fait sortir franchement en haut et en
    bas, et elle reprend sa taille exacte une fois posée. */
 
-const MAX_GROW = 0.36;
+const MAX_GROW = 0.4;
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -379,6 +379,20 @@ export default function Navbar() {
   };
 
   /*
+   * Appui long : iOS ouvre sinon l'aperçu de lien (la page
+   * apparaît en popover par-dessus l'app) dès qu'on garde le
+   * doigt posé sur un onglet — exactement le geste qu'on
+   * utilise pour balayer la barre. On coupe donc le menu
+   * contextuel, en plus du `-webkit-touch-callout: none`
+   * côté CSS qui, seul, ne suffit pas sur toutes les
+   * versions.
+   */
+
+  const blockLongPress = (e: React.MouseEvent<HTMLElement>) => {
+    e.preventDefault();
+  };
+
+  /*
    * =======================================================
    * THÈME CLAIR / SOMBRE
    * =======================================================
@@ -428,6 +442,7 @@ export default function Navbar() {
           onPointerMove={handlePointerMove}
           onPointerUp={endPress}
           onPointerCancel={endPress}
+          onContextMenu={blockLongPress}
         >
 
           <span
@@ -453,6 +468,8 @@ export default function Navbar() {
                   itemRefs.current[index] = el;
                 }}
                 onClick={handleItemClick}
+                onContextMenu={blockLongPress}
+                draggable={false}
                 className={
                   'nav-item' +
                   (active ? ' active' : '') +
