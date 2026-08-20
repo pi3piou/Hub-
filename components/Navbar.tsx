@@ -60,6 +60,39 @@ const SPEED_REF = 34;
 const MAX_STRETCH = 0.22;
 const MAX_SQUASH = 0.14;
 
+/*
+ * -------------------------------------------------------------
+ * GELÉE — un second oscillateur, indépendant du ressort de
+ * position. Le ressort de position est amorti (il arrive et
+ * s'arrête) ; celui-ci est volontairement SOUS-amorti : on lui
+ * donne une pichenette et il rebondit plusieurs fois avant de
+ * s'éteindre. C'est ce qui fait le "bouing".
+ *
+ * `d` est le taux de déformation : positif = aplatie et large,
+ * négatif = étirée et étroite. On l'injecte quand on attrape la
+ * bulle et quand elle arrive sur un onglet.
+ *
+ * WOBBLE_STIFFNESS donne la vitesse du rebond, WOBBLE_DAMPING
+ * sa persistance. Ces valeurs-ci donnent 3 oscillations sur
+ * ~0,6 s, avec une déformation qui va de -14% à +14% en largeur.
+ * ATTENTION en les touchant : monter WOBBLE_DAMPING vers 0.9
+ * fait passer la gelée à une douzaine d'oscillations sur 1,5 s,
+ * ce qui ne ressemble plus à de la gelée mais à un bug.
+ * -------------------------------------------------------------
+ */
+
+const WOBBLE_STIFFNESS = 0.3;
+const WOBBLE_DAMPING = 0.76;
+
+const WOBBLE_X = 0.24;
+const WOBBLE_Y = 0.18;
+
+/* Pichenettes : à la prise en main, et à l'arrivée sur
+   l'onglet. */
+
+const GRAB_IMPULSE = 0.5;
+const LAND_IMPULSE = 0.4;
+
 /* Sous le doigt la bulle DÉBORDE de la barre. La piste fait
    la hauteur des onglets et la barre y ajoute son padding :
    il faut donc dépasser ce padding pour que le débordement
@@ -106,6 +139,12 @@ export default function Navbar() {
     target: 0,
     press: 0,
     pressTarget: 0,
+    /* déformation "gelée" et sa vitesse */
+    d: 0,
+    dv: 0,
+    /* évite de redéclencher le rebond d'arrivée en boucle
+       tant qu'on n'a pas redonné une nouvelle destination */
+    landed: true,
     raf: 0,
     ready: false,
   });
@@ -138,14 +177,38 @@ export default function Navbar() {
 
     m.press += (m.pressTarget - m.press) * PRESS_EASE;
 
+    /* Arrivée sur l'onglet : la bulle a fini sa course, on lui
+       donne la pichenette qui la fait trembloter. */
+
+    if (
+      !m.landed &&
+      !draggingRef.current &&
+      Math.abs(dx) < 3
+    ) {
+      m.dv += LAND_IMPULSE;
+      m.landed = true;
+    }
+
+    /* Oscillateur sous-amorti de la gelée */
+
+    m.dv += -m.d * WOBBLE_STIFFNESS;
+    m.dv *= WOBBLE_DAMPING;
+    m.d += m.dv;
+
     const speed = Math.min(
       Math.abs(m.v) / SPEED_REF,
       1
     );
 
     const grow = 1 + m.press * MAX_GROW;
-    const scaleX = grow * (1 + speed * MAX_STRETCH);
-    const scaleY = grow * (1 - speed * MAX_SQUASH);
+
+    const scaleX =
+      grow *
+      (1 + speed * MAX_STRETCH + m.d * WOBBLE_X);
+
+    const scaleY =
+      grow *
+      (1 - speed * MAX_SQUASH - m.d * WOBBLE_Y);
 
     el.style.transform =
       `translate3d(${m.x}px, 0, 0)` +
@@ -154,12 +217,16 @@ export default function Navbar() {
     const settled =
       Math.abs(dx) < 0.15 &&
       Math.abs(m.v) < 0.15 &&
-      Math.abs(m.pressTarget - m.press) < 0.005;
+      Math.abs(m.pressTarget - m.press) < 0.005 &&
+      Math.abs(m.d) < 0.002 &&
+      Math.abs(m.dv) < 0.002;
 
     if (settled) {
       m.x = m.target;
       m.v = 0;
       m.press = m.pressTarget;
+      m.d = 0;
+      m.dv = 0;
 
       const rest = 1 + m.press * MAX_GROW;
 
@@ -208,11 +275,18 @@ export default function Navbar() {
 
       const m = motion.current;
 
-      m.target = el.offsetLeft + PILL_INSET;
+      const nextTarget = el.offsetLeft + PILL_INSET;
+
+      if (Math.abs(nextTarget - m.target) > 1) {
+        m.landed = false;
+      }
+
+      m.target = nextTarget;
 
       if (!m.ready) {
         m.x = m.target;
         m.ready = true;
+        m.landed = true;
       }
 
       kick();
@@ -319,7 +393,10 @@ export default function Navbar() {
     draggingRef.current = true;
     setIsDragging(true);
 
+    /* On l'attrape : elle se boudine sous le doigt. */
+
     motion.current.pressTarget = 1;
+    motion.current.dv += GRAB_IMPULSE;
 
     scrub(e.clientX);
   };
@@ -352,6 +429,10 @@ export default function Navbar() {
       if (el) {
         motion.current.target =
           el.offsetLeft + PILL_INSET;
+
+        /* Nouvelle destination : on réarme le rebond
+           d'arrivée. */
+        motion.current.landed = false;
       }
 
       if (finalIndex !== activeIndex) {
