@@ -2930,3 +2930,468 @@ a {
   color: var(--accent-light);
 }
 
+
+/* =========================================================
+   HUB — MENU LATÉRAL
+   ========================================================= */
+
+/*
+ * Le bouton du menu reprend exactement le verre de la barre
+ * d'onglets : trait cheveu, flou faible, reflet d'un
+ * demi-pixel. Il est fixe pour rester atteignable quel que
+ * soit le défilement.
+ */
+
+.hub-menu-button {
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top));
+  left: 14px;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--nav-surface);
+  color: var(--nav-text-active);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen),
+    0 8px 24px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
+  transition: transform var(--ease-spring);
+}
+
+.hub-menu-button:active {
+  transform: scale(0.92);
+}
+
+.hub-menu-button-icon {
+  font-size: 17px;
+  line-height: 1;
+}
+
+/*
+ * Le voile derrière le panneau. `visibility` en plus de
+ * l'opacité : sans elle il resterait cliquable une fois
+ * transparent et intercepterait tous les taps de la page.
+ */
+
+.hub-menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  visibility: hidden;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  transition:
+    opacity var(--ease),
+    visibility var(--ease);
+}
+
+.hub-menu-scrim.is-open {
+  visibility: visible;
+  opacity: 1;
+}
+
+.hub-menu {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  width: min(300px, 82vw);
+  padding: calc(20px + env(safe-area-inset-top)) 14px
+    20px;
+  border-right: 0.5px solid var(--nav-hairline);
+  background: var(--surface-solid);
+  box-shadow: 12px 0 40px rgba(0, 0, 0, 0.45);
+  transform: translateX(-100%);
+  transition: transform var(--ease-spring);
+}
+
+.hub-menu.is-open {
+  transform: translateX(0);
+}
+
+.hub-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding: 0 6px;
+}
+
+.hub-menu-title {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+.hub-menu-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-strong);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.hub-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hub-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 12px;
+  border: 0.5px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text);
+  transition:
+    background var(--ease),
+    border-color var(--ease),
+    transform var(--ease-spring);
+}
+
+.hub-menu-row:active {
+  transform: scale(0.97);
+}
+
+.hub-menu-row.is-active {
+  border-color: var(--border-strong);
+  background: var(--surface-strong);
+}
+
+.hub-menu-row-icon {
+  flex: 0 0 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  font-size: 16px;
+  line-height: 34px;
+  text-align: center;
+}
+
+.hub-menu-row.is-active .hub-menu-row-icon {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.hub-menu-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hub-menu-row-text strong {
+  font-size: 14px;
+}
+
+.hub-menu-row-text small {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* =========================================================
+   HUB — ACCUEIL
+   ========================================================= */
+
+/*
+ * L'accueil n'a pas de barre d'onglets en bas, mais garde de
+ * la marge basse pour ne pas coller au bord de l'écran.
+ * En haut, la marge dégage le bouton du menu, qui est fixe et
+ * ne pousse donc rien.
+ */
+
+.hub-page {
+  padding-top: calc(72px + env(safe-area-inset-top));
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
+}
+
+.hub-header {
+  margin-bottom: 20px;
+}
+
+.hub-header h1 {
+  margin-top: 4px;
+  font-size: 27px;
+  font-weight: 750;
+  letter-spacing: -0.6px;
+  /* Réserve la hauteur d'une ligne : la date n'est calculée
+     qu'après le montage, sans ça la page sursaute. */
+  min-height: 34px;
+}
+
+.hub-tile {
+  margin-bottom: 14px;
+  padding: 16px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.hub-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.hub-tile-label {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+}
+
+.hub-tile-empty p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.hub-weather {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hub-weather-icon {
+  flex: 0 0 auto;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.hub-weather-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hub-weather-main strong {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.hub-weather-main span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.hub-weather-side {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.hub-section {
+  margin-bottom: 22px;
+}
+
+/* --- Tâches --- */
+
+.todo-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.todo-input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 16px;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass);
+  color: var(--text);
+  font-size: 16px;
+  outline: 0;
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
+  transition:
+    border-color var(--ease),
+    background var(--ease);
+}
+
+.todo-input::placeholder {
+  color: var(--text-dim);
+}
+
+.todo-input:focus {
+  border-color: var(--nav-hairline-strong);
+  background: var(--surface-glass-hover);
+}
+
+.todo-add {
+  flex: 0 0 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 21px;
+  line-height: 1;
+  transition:
+    transform var(--ease-spring),
+    opacity var(--ease);
+}
+
+.todo-add:active {
+  transform: scale(0.9);
+}
+
+.todo-add:disabled {
+  opacity: 0.35;
+}
+
+.todo-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.todo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition: opacity var(--ease);
+}
+
+.todo-row.is-done {
+  opacity: 0.45;
+}
+
+.todo-check {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent-ink);
+  font-size: 12px;
+  line-height: 1;
+  transition:
+    background var(--ease),
+    border-color var(--ease),
+    transform var(--ease-spring);
+}
+
+.todo-check:active {
+  transform: scale(0.85);
+}
+
+.todo-row.is-done .todo-check {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.todo-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.todo-row.is-done .todo-text {
+  text-decoration: line-through;
+}
+
+.todo-remove {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+/* --- Raccourcis vers les deux applications --- */
+
+.hub-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hub-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  transition: transform var(--ease-spring);
+}
+
+.hub-shortcut:active {
+  transform: scale(0.98);
+}
+
+.hub-shortcut-icon {
+  flex: 0 0 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  font-size: 16px;
+  line-height: 38px;
+  text-align: center;
+}
+
+.hub-shortcut-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hub-shortcut-text strong {
+  font-size: 14px;
+}
+
+.hub-shortcut-text small {
+  color: var(--text-dim);
+  font-size: 11px;
+}
