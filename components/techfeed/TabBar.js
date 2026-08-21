@@ -432,13 +432,28 @@ export default function TabBar({
           ? 'tab-bar is-pressed'
           : 'tab-bar'
       }
-      ref={trackRef}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={endPress}
-      onPointerCancel={endPress}
-      onContextMenu={(e) => e.preventDefault()}
     >
+
+      {/*
+        Le defilement horizontal vit dans cette piste, pas sur
+        la barre elle-meme. Raison : `overflow-x: auto` rogne
+        AUSSI verticalement (des qu'un axe est rogne, l'autre
+        cesse d'etre visible), et la pastille ne pouvait donc
+        jamais depasser de la barre en gonflant. La piste
+        deborde volontairement de 14px en haut et en bas grace
+        a une marge negative, ce qui repousse la frontiere de
+        rognage hors du verre.
+      */}
+
+      <div
+        className="tab-scroll"
+        ref={trackRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endPress}
+        onPointerCancel={endPress}
+        onContextMenu={(e) => e.preventDefault()}
+      >
 
       <span
         className={
@@ -507,6 +522,8 @@ export default function TabBar({
           </button>
         );
       })}
+
+      </div>
 
     </nav>
   );
