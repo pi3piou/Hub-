@@ -191,7 +191,7 @@ class PageBoundary extends Component<
             <p>{this.state.error}</p>
 
             <Link
-              href="/"
+              href="/anime"
               className="primary-button"
             >
               Retour à l&apos;accueil
@@ -1257,7 +1257,7 @@ function AnimeInfoPageContent({
         <div className="hero-float-buttons">
 
           <Link
-            href="/"
+            href="/anime"
             className="hero-round-button"
             aria-label="Retour"
           >
@@ -1300,7 +1300,7 @@ function AnimeInfoPageContent({
           </p>
 
           <Link
-            href="/"
+            href="/anime"
             className="primary-button"
           >
             Retour à l&apos;accueil
@@ -1328,7 +1328,7 @@ function AnimeInfoPageContent({
       <div className="hero-float-buttons">
 
         <Link
-          href="/"
+          href="/anime"
           className="hero-round-button"
           aria-label="Retour"
         >
