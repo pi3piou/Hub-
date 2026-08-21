@@ -4263,10 +4263,8 @@ main:has(.reader-page) { overflow-x: clip; }
   left: 50%;
   z-index: 100;
   display: flex;
-  gap: 2px;
   max-width: calc(100vw - 20px);
   padding: 5px;
-  overflow-x: auto;
   border: 0.5px solid var(--nav-hairline);
   border-radius: var(--radius-pill);
   background: var(--nav-surface);
@@ -4279,12 +4277,59 @@ main:has(.reader-page) { overflow-x: clip; }
   transition:
     background var(--ease),
     border-color var(--ease);
+  /* La barre ne rogne rien : c'est la piste interieure qui
+     s'en charge, et seulement horizontalement. */
+  overflow: visible;
+}
+
+/*
+ * PISTE DEFILANTE — le point delicat de toute cette barre.
+ *
+ * `overflow-x: auto` ne rogne jamais un seul axe : des que
+ * l'un est rogne, l'autre cesse d'etre `visible`. Poser le
+ * defilement sur la barre elle-meme coupait donc la pastille
+ * au ras du verre, et elle ne pouvait pas deborder en
+ * gonflant sous le doigt.
+ *
+ * D'ou la marge negative verticale compensee par un padding
+ * egal : la boite de rognage descend 14px plus bas et monte
+ * 14px plus haut que le verre, sans decaler les onglets d'un
+ * pixel. La pastille a donc la place de sortir.
+ *
+ * Le masque en degrade remplace le rognage arrondi qu'on
+ * perd : sans lui, un onglet a moitie defile depasserait des
+ * extremites arrondies de la barre.
+ */
+
+.tab-scroll {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  margin: -14px 0;
+  padding: 14px 0;
+  overflow-x: auto;
+  overflow-y: visible;
   scrollbar-width: none;
   touch-action: none;
   -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
 }
 
-.tab-bar::-webkit-scrollbar {
+.tab-scroll::-webkit-scrollbar {
   display: none;
 }
 
@@ -4302,8 +4347,10 @@ main:has(.reader-page) { overflow-x: clip; }
 
 .tab-thumb {
   position: absolute;
-  top: 5px;
-  bottom: 5px;
+  /* Alignee sur les onglets : 14px, soit exactement le
+     padding de compensation de la piste. */
+  top: 14px;
+  bottom: 14px;
   left: 0;
   z-index: 0;
   transform-origin: center center;
