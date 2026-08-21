@@ -1,828 +1,488 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-
-import {
-  getCachedInfo,
-  loadAnimeInfo,
-  loadEpisodes,
-} from '@/lib/animeCache';
-
-import {
-  PlanningItem,
-  formatPlanningDay,
-  formatPlanningTime,
-  loadPlanning,
-} from '@/lib/planning';
-
-import {
-  getSeasonProgress,
-  isSeasonComplete,
-  readMergedProgress,
-  readWatched,
-  writeSeasonProgress,
-} from '@/lib/watchState';
-
-interface AnimeItem {
-  name: string;
-  slug: string;
-  image?: string;
-}
-
-interface ContinueItem {
-  slug: string;
-  name: string;
-  image?: string;
-  season: number;
-  episode: number;
-  lang: 'vostfr' | 'vf';
-  updatedAt: number;
-}
-
-/* Élément prêt à afficher, avec sa progression */
-interface ResumeItem extends ContinueItem {
-  targetSeason: number;
-  targetEpisode: number;
-  isNextSeason: boolean;
-  watchedCount: number;
-  totalCount: number;
-}
-
-interface HomeStats {
-  totalWatched: number;
-  seriesTracked: number;
-  favoritesCount: number;
-}
-
-function readHistory(): ContinueItem[] {
-  try {
-    const raw = localStorage.getItem(
-      'anime_history'
-    );
-
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw);
-
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter(
-        (item) =>
-          item &&
-          item.slug &&
-          Number.isInteger(item.season) &&
-          Number.isInteger(item.episode)
-      )
-      .sort((a, b) => b.updatedAt - a.updatedAt);
-  } catch {
-    return [];
-  }
-}
-
-/* Slugs seulement : suffisant pour les stats et l'exclusion */
-function readFavoriteSlugs(): string[] {
-  try {
-    const raw = localStorage.getItem(
-      'anime_favorites'
-    );
-
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw);
-
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .map((item) =>
-        typeof item === 'string'
-          ? item
-          : item?.slug
-      )
-      .filter(Boolean) as string[];
-  } catch {
-    return [];
-  }
-}
+import { useEffect, useRef, useState } from 'react';
 
 /*
- * Stats calculées uniquement à partir du localStorage :
- * aucune requête réseau, donc disponibles instantanément
- * au chargement de la page.
+ * =============================================================
+ * ACCUEIL DU HUB — la page qui répond à "qu'est-ce qu'il se
+ * passe aujourd'hui" : la date, la météo, la production
+ * solaire, puis les tâches du jour. Les deux applications
+ * (News et Anime Stream) s'atteignent par le menu latéral.
+ * =============================================================
  */
-function computeStats(
-  slugs: string[],
-  favoritesCount: number
-): HomeStats {
-  let totalWatched = 0;
-  let seriesTracked = 0;
 
-  for (const slug of slugs) {
-    const merged = readMergedProgress(slug);
+const COORDS_KEY = 'hub_coords';
+const TODOS_KEY = 'hub_todos';
 
-    if (merged.size > 0) seriesTracked++;
+type Weather = {
+  temperature: number;
+  feltAs: number;
+  label: string;
+  icon: string;
+  max: number;
+  min: number;
+};
 
-    merged.forEach((item) => {
-      totalWatched += item.watched;
-    });
-  }
+type Todo = {
+  id: string;
+  text: string;
+  done: boolean;
+};
 
-  return { totalWatched, seriesTracked, favoritesCount };
-}
+type GeoState =
+  | 'idle'
+  | 'asking'
+  | 'ready'
+  | 'refused'
+  | 'failed';
 
-/*
- * Un anime par carte : la sortie la plus proche parmi
- * celles à venir, en excluant ce que tu suis déjà.
- */
-function buildDiscovery(
-  planning: PlanningItem[],
-  excludeSlugs: Set<string>
-) {
-  const now = Date.now();
-
-  const bySlug = new Map<string, PlanningItem>();
-
-  for (const item of planning) {
-    if (excludeSlugs.has(item.slug)) continue;
-
-    if (item.releaseTs * 1000 <= now) continue;
-
-    const existing = bySlug.get(item.slug);
-
-    if (
-      !existing ||
-      item.releaseTs < existing.releaseTs
-    ) {
-      bySlug.set(item.slug, item);
+function formatToday() {
+  const formatted = new Date().toLocaleDateString(
+    'fr-FR',
+    {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
     }
-  }
-
-  return Array.from(bySlug.values())
-    .sort((a, b) => a.releaseTs - b.releaseTs)
-    .slice(0, 8);
-}
-
-/*
- * =========================================================
- * DÉCISION D'AFFICHAGE (Continuer la lecture)
- *
- * Un anime quitte la file d'attente quand sa saison
- * est terminée, sauf si une saison suivante existe
- * ou si un nouvel épisode vient de sortir.
- * =========================================================
- */
-async function resolveResume(
-  item: ContinueItem,
-  planning: PlanningItem[]
-): Promise<ResumeItem | null> {
-  const progress = getSeasonProgress(
-    item.slug,
-    item.season,
-    item.lang
   );
 
-  if (!isSeasonComplete(progress)) {
-    return {
-      ...item,
-      targetSeason: item.season,
-      targetEpisode: item.episode,
-      isNextSeason: false,
-      watchedCount: progress?.watched ?? 0,
-      totalCount: progress?.total ?? 0,
-    };
-  }
-
-  const release = planning.find(
-    (entry) =>
-      entry.slug === item.slug &&
-      entry.season === item.season &&
-      entry.releaseTs * 1000 <= Date.now()
+  return (
+    formatted.charAt(0).toUpperCase() + formatted.slice(1)
   );
-
-  if (release && progress) {
-    try {
-      const fresh = await loadEpisodes(
-        item.slug,
-        item.season,
-        item.lang
-      );
-
-      const total =
-        fresh.players[fresh.defaultPlayerIndex]
-          ?.urls.length || fresh.totalEpisodes;
-
-      if (total > progress.total) {
-        const watched = readWatched(
-          item.slug,
-          item.season,
-          item.lang
-        );
-
-        writeSeasonProgress(
-          item.slug,
-          item.lang,
-          {
-            ...progress,
-            total,
-            updatedAt: Date.now(),
-          }
-        );
-
-        return {
-          ...item,
-          targetSeason: item.season,
-          targetEpisode: Math.min(
-            watched.length,
-            total - 1
-          ),
-          isNextSeason: false,
-          watchedCount: watched.length,
-          totalCount: total,
-        };
-      }
-    } catch {
-      // Comportement par défaut
-    }
-  }
-
-  let info = getCachedInfo(item.slug);
-
-  if (!info) {
-    try {
-      info = await loadAnimeInfo(item.slug);
-    } catch {
-      info = null;
-    }
-  }
-
-  const nextSeason = info?.seasons
-    ?.filter((number) => number > item.season)
-    .sort((a, b) => a - b)[0];
-
-  if (nextSeason) {
-    const nextProgress = getSeasonProgress(
-      item.slug,
-      nextSeason,
-      item.lang
-    );
-
-    if (isSeasonComplete(nextProgress)) {
-      return null;
-    }
-
-    return {
-      ...item,
-      targetSeason: nextSeason,
-      targetEpisode:
-        nextProgress?.lastEpisode ?? 0,
-      isNextSeason: !nextProgress,
-      watchedCount: nextProgress?.watched ?? 0,
-      totalCount: nextProgress?.total ?? 0,
-    };
-  }
-
-  return null;
 }
 
-export default function Home() {
-  const [query, setQuery] = useState('');
+export default function HubHome() {
+  const [today, setToday] = useState('');
 
-  const [results, setResults] = useState<
-    AnimeItem[]
-  >([]);
+  const [weather, setWeather] = useState<Weather | null>(
+    null
+  );
 
-  const [resume, setResume] = useState<
-    ResumeItem[]
-  >([]);
+  const [geoState, setGeoState] = useState<GeoState>(
+    'idle'
+  );
 
-  const [discovery, setDiscovery] = useState<
-    PlanningItem[]
-  >([]);
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [draft, setDraft] = useState('');
+  const [todosReady, setTodosReady] = useState(false);
 
-  const [stats, setStats] =
-    useState<HomeStats | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const [searching, setSearching] =
-    useState(false);
-
-  const [mounted, setMounted] = useState(false);
+  /*
+   * =======================================================
+   * DATE — calculée après le montage et jamais pendant le
+   * rendu serveur. Le serveur et le téléphone ne sont pas
+   * forcément dans le même fuseau : afficher la date rendue
+   * côté serveur provoquerait un décalage visible d'un jour
+   * pour un utilisateur couché tard, et une erreur
+   * d'hydratation React.
+   * =======================================================
+   */
 
   useEffect(() => {
-    const entries = readHistory();
+    setToday(formatToday());
+  }, []);
 
-    const favoriteSlugs = readFavoriteSlugs();
+  /*
+   * =======================================================
+   * MÉTÉO — la position est demandée une seule fois puis
+   * conservée. Redemander à chaque ouverture ferait
+   * réapparaître la fenêtre d'autorisation du navigateur et
+   * consommerait le GPS pour rien.
+   * =======================================================
+   */
 
-    setMounted(true);
+  useEffect(() => {
+    let cancelled = false;
 
-    /* Stats : synchrone, aucun réseau */
-    const allSlugs = Array.from(
-      new Set([
-        ...favoriteSlugs,
-        ...entries.map((item) => item.slug),
-      ])
-    );
-
-    setStats(
-      computeStats(allSlugs, favoriteSlugs.length)
-    );
-
-    let active = true;
-
-    (async () => {
-      let planning: PlanningItem[] = [];
-
+    const fetchFor = async (
+      lat: number,
+      lon: number
+    ) => {
       try {
-        planning = await loadPlanning();
+        const res = await fetch(
+          `/api/weather?lat=${lat}&lon=${lon}`
+        );
+
+        if (!res.ok) throw new Error('meteo');
+
+        const data = await res.json();
+
+        if (!cancelled) {
+          setWeather(data);
+          setGeoState('ready');
+        }
       } catch {
-        planning = [];
+        if (!cancelled) setGeoState('failed');
       }
+    };
 
-      const resolved = await Promise.all(
-        entries
-          .slice(0, 8)
-          .map((item) =>
-            resolveResume(item, planning).catch(
-              () => null
-            )
-          )
-      );
+    let stored: { lat: number; lon: number } | null =
+      null;
 
-      if (!active) return;
+    try {
+      const raw = localStorage.getItem(COORDS_KEY);
+      if (raw) stored = JSON.parse(raw);
+    } catch {
+      stored = null;
+    }
 
-      setResume(
-        resolved.filter(
-          (item): item is ResumeItem =>
-            item !== null
-        )
-      );
+    if (
+      stored &&
+      Number.isFinite(stored.lat) &&
+      Number.isFinite(stored.lon)
+    ) {
+      fetchFor(stored.lat, stored.lon);
+      return () => {
+        cancelled = true;
+      };
+    }
 
-      setDiscovery(
-        buildDiscovery(
-          planning,
-          new Set(allSlugs)
-        )
-      );
-    })();
+    if (!navigator.geolocation) {
+      setGeoState('failed');
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setGeoState('asking');
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        try {
+          localStorage.setItem(
+            COORDS_KEY,
+            JSON.stringify({ lat, lon })
+          );
+        } catch {
+          // localStorage indisponible
+        }
+
+        fetchFor(lat, lon);
+      },
+      () => {
+        if (!cancelled) setGeoState('refused');
+      },
+      { timeout: 8000, maximumAge: 600000 }
+    );
 
     return () => {
-      active = false;
+      cancelled = true;
     };
   }, []);
 
-  useEffect(() => {
-    const value = query.trim();
+  /*
+   * =======================================================
+   * TÂCHES — lues au montage, puis réécrites à chaque
+   * changement. `todosReady` évite d'écraser la liste
+   * enregistrée par le tableau vide du tout premier rendu.
+   * =======================================================
+   */
 
-    if (value.length < 2) {
-      setResults([]);
-      setSearching(false);
-      return;
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(TODOS_KEY);
+
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setTodos(parsed);
+      }
+    } catch {
+      // localStorage indisponible
     }
 
-    const controller = new AbortController();
+    setTodosReady(true);
+  }, []);
 
-    const timer = window.setTimeout(async () => {
-      setSearching(true);
+  useEffect(() => {
+    if (!todosReady) return;
 
-      try {
-        const response = await fetch(
-          `/api/search?q=${encodeURIComponent(
-            value
-          )}`,
-          {
-            signal: controller.signal,
-            cache: 'no-store',
-          }
-        );
+    try {
+      localStorage.setItem(
+        TODOS_KEY,
+        JSON.stringify(todos)
+      );
+    } catch {
+      // localStorage indisponible
+    }
+  }, [todos, todosReady]);
 
-        if (!response.ok) {
-          setResults([]);
-          return;
-        }
+  const addTodo = () => {
+    const text = draft.trim();
 
-        const data = await response.json();
+    if (!text) return;
 
-        setResults(
-          Array.isArray(data.results)
-            ? data.results
-            : []
-        );
-      } catch (error) {
-        if (
-          (error as Error).name !== 'AbortError'
-        ) {
-          console.error(error);
-        }
-      } finally {
-        setSearching(false);
-      }
-    }, 350);
+    setTodos((prev) => [
+      ...prev,
+      {
+        id:
+          Date.now().toString(36) +
+          Math.random().toString(36).slice(2, 6),
+        text,
+        done: false,
+      },
+    ]);
 
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [query]);
+    setDraft('');
+    inputRef.current?.focus();
+  };
 
-  const heroItem = resume[0] || null;
+  const toggleTodo = (id: string) => {
+    setTodos((prev) =>
+      prev.map((todo) =>
+        todo.id === id
+          ? { ...todo, done: !todo.done }
+          : todo
+      )
+    );
+  };
 
-  const restOfResume = resume.slice(1, 5);
+  const removeTodo = (id: string) => {
+    setTodos((prev) =>
+      prev.filter((todo) => todo.id !== id)
+    );
+  };
 
-  const showStats = Boolean(
-    stats &&
-      (stats.favoritesCount > 0 ||
-        stats.seriesTracked > 0)
-  );
-
-  const nothingAtAll =
-    mounted &&
-    resume.length === 0 &&
-    discovery.length === 0;
+  const remaining = todos.filter((t) => !t.done).length;
 
   return (
-    <main className="page">
+    <main className="page hub-page">
 
-      <header className="hero-mini">
-        <span className="eyebrow">
-          ANIME STREAM
-        </span>
+      <header className="hub-header">
+
+        <span className="eyebrow">AUJOURD&apos;HUI</span>
+
+        <h1>{today || ' '}</h1>
+
       </header>
 
-      {/* RECHERCHE */}
+      {/* ---------------------------------------------
+          MÉTÉO
+          --------------------------------------------- */}
 
-      <section className="search-section">
+      <section className="hub-tile hub-weather">
 
-        <div className="search-box">
+        {weather ? (
+          <>
 
-          <span className="search-icon">⌕</span>
+            <span className="hub-weather-icon">
+              {weather.icon}
+            </span>
 
-          <input
-            value={query}
-            onChange={(event) =>
-              setQuery(event.target.value)
-            }
-            placeholder="Rechercher un anime..."
-            autoComplete="off"
-            spellCheck={false}
-          />
+            <div className="hub-weather-main">
 
-          {query && (
-            <button
-              className="clear-button"
-              onClick={() => setQuery('')}
-              aria-label="Effacer"
-            >
-              ×
-            </button>
-          )}
+              <strong>{weather.temperature}°</strong>
 
-        </div>
+              <span>{weather.label}</span>
 
-        {query.trim().length >= 2 && (
-          <div className="search-results">
+            </div>
 
-            {searching ? (
-              <div className="search-state">
-                <span className="loader" />
-                Recherche…
-              </div>
-            ) : results.length === 0 ? (
-              <div className="search-state">
-                Aucun résultat
-              </div>
-            ) : (
-              results.map((item) => (
-                <Link
-                  key={item.slug}
-                  href={`/anime/${encodeURIComponent(
-                    item.slug
-                  )}`}
-                  className="search-result"
-                  onClick={() => setQuery('')}
-                >
+            <div className="hub-weather-side">
 
-                  <div className="search-cover">
-                    {item.image && (
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        loading="lazy"
-                        onError={(event) => {
-                          event.currentTarget.style.display =
-                            'none';
-                        }}
-                      />
-                    )}
-                  </div>
+              <span>
+                Ressenti {weather.feltAs}°
+              </span>
 
-                  <div className="search-result-info">
-                    <strong>{item.name}</strong>
-                    <span>{item.slug}</span>
-                  </div>
+              <span>
+                {weather.min}° / {weather.max}°
+              </span>
 
-                  <span className="arrow">›</span>
+            </div>
 
-                </Link>
-              ))
+          </>
+        ) : (
+          <div className="hub-tile-empty">
+
+            {geoState === 'asking' && (
+              <p>Localisation en cours…</p>
             )}
+
+            {geoState === 'refused' && (
+              <p>
+                Localisation refusée. Autorise-la dans
+                les réglages du navigateur pour voir la
+                météo.
+              </p>
+            )}
+
+            {geoState === 'failed' && (
+              <p>Météo indisponible pour le moment.</p>
+            )}
+
+            {geoState === 'idle' && <p>Météo…</p>}
 
           </div>
         )}
 
       </section>
 
-      {/* HERO */}
+      {/* ---------------------------------------------
+          SOLAIRE — en attente d'une source de données.
+          Voir le commentaire plus bas.
+          --------------------------------------------- */}
 
-      {mounted && heroItem ? (
-        <section className="home-hero">
+      <section className="hub-tile hub-solar">
 
-          <div
-            className="home-hero-visual"
-            style={
-              heroItem.image
-                ? {
-                    backgroundImage: `url(${heroItem.image})`,
-                  }
-                : undefined
-            }
-          >
+        <div className="hub-tile-head">
 
-            <div className="home-hero-overlay" />
-
-            <div className="home-hero-content">
-
-              <span className="section-eyebrow">
-                REPRENDRE
-              </span>
-
-              <h2>{heroItem.name}</h2>
-
-              <p>
-                Saison {heroItem.targetSeason}
-                {' · '}
-                Épisode{' '}
-                {heroItem.targetEpisode + 1}
-                {heroItem.totalCount > 0 && (
-                  <>
-                    {' sur '}
-                    {heroItem.totalCount}
-                  </>
-                )}
-              </p>
-
-              <Link
-                href={`/anime/${encodeURIComponent(
-                  heroItem.slug
-                )}?season=${
-                  heroItem.targetSeason
-                }&episode=${heroItem.targetEpisode}`}
-                className="primary-button hero-cta"
-              >
-                {heroItem.isNextSeason
-                  ? '▶ Nouvelle saison'
-                  : '▶ Continuer'}
-              </Link>
-
-            </div>
-
-          </div>
-
-        </section>
-      ) : (
-        mounted && (
-          <section className="home-hero">
-
-            <div className="home-hero-empty">
-
-              <span className="eyebrow">
-                BIENVENUE
-              </span>
-
-              <h1>Regarde ton anime.</h1>
-
-              <p>
-                Cherche un titre pour commencer à
-                le suivre.
-              </p>
-
-            </div>
-
-          </section>
-        )
-      )}
-
-      {/* STATS */}
-
-      {mounted && showStats && stats && (
-        <div className="home-stats">
-
-          <div className="home-stat">
-            <strong>{stats.totalWatched}</strong>
-            <span>épisodes vus</span>
-          </div>
-
-          <div className="home-stat">
-            <strong>
-              {stats.seriesTracked}
-            </strong>
-            <span>séries suivies</span>
-          </div>
-
-          <div className="home-stat">
-            <strong>
-              {stats.favoritesCount}
-            </strong>
-            <span>favoris</span>
-          </div>
+          <span className="hub-tile-label">
+            SOLAIRE
+          </span>
 
         </div>
-      )}
 
-      {/* SUITE DE LA LISTE CONTINUER */}
-
-      {mounted && restOfResume.length > 0 && (
-        <section className="section">
-
-          <div className="section-header">
-
-            <div>
-
-              <span className="section-eyebrow">
-                REPRENDRE
-              </span>
-
-              <h2>Aussi en cours</h2>
-
-            </div>
-
-          </div>
-
-          <div className="continue-list">
-
-            {restOfResume.map((item) => {
-
-              const percentage =
-                item.totalCount > 0
-                  ? Math.min(
-                      100,
-                      (item.watchedCount /
-                        item.totalCount) *
-                        100
-                    )
-                  : 0;
-
-              return (
-                <Link
-                  key={`${item.slug}-${item.targetSeason}-${item.lang}`}
-                  href={`/anime/${encodeURIComponent(
-                    item.slug
-                  )}?season=${
-                    item.targetSeason
-                  }&episode=${item.targetEpisode}`}
-                  className="continue-card"
-                >
-
-                  <div className="continue-cover">
-                    {item.image && (
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        loading="lazy"
-                      />
-                    )}
-                  </div>
-
-                  <div className="continue-info">
-
-                    <strong>{item.name}</strong>
-
-                    <span>
-                      Saison {item.targetSeason}
-                      {' • '}
-                      Épisode{' '}
-                      {item.targetEpisode + 1}
-                      {item.totalCount > 0 && (
-                        <>
-                          {' sur '}
-                          {item.totalCount}
-                        </>
-                      )}
-                    </span>
-
-                    <div className="continue-progress">
-                      <span
-                        style={{
-                          width: `${percentage}%`,
-                        }}
-                      />
-                    </div>
-
-                    <small>
-                      {item.isNextSeason
-                        ? '▶ Nouvelle saison'
-                        : '▶ Reprendre'}
-                    </small>
-
-                  </div>
-
-                  <span className="arrow">›</span>
-
-                </Link>
-              );
-            })}
-
-          </div>
-
-        </section>
-      )}
-
-      {/* DÉCOUVERTE */}
-
-      {mounted && discovery.length > 0 && (
-        <section className="section">
-
-          <div className="section-header">
-
-            <div>
-
-              <span className="section-eyebrow">
-                DÉCOUVRIR
-              </span>
-
-              <h2>Prochaines sorties</h2>
-
-            </div>
-
-            <Link
-              href="/planning"
-              className="see-all"
-            >
-              Tout voir
-            </Link>
-
-          </div>
-
-          <div className="discovery-scroll">
-
-            {discovery.map((item) => (
-              <Link
-                key={`${item.slug}-${item.season}-${item.lang}-${item.releaseTs}`}
-                href={`/anime/${encodeURIComponent(
-                  item.slug
-                )}?season=${item.season}`}
-                className="discovery-card"
-              >
-
-                <div className="discovery-cover">
-                  {item.image && (
-                    <img
-                      src={item.image}
-                      alt={item.title}
-                      loading="lazy"
-                    />
-                  )}
-                </div>
-
-                <strong>{item.title}</strong>
-
-                <span>
-                  {formatPlanningDay(
-                    new Date(
-                      item.releaseTs * 1000
-                    )
-                      .toISOString()
-                      .slice(0, 10)
-                  )}
-                  {' · '}
-                  {formatPlanningTime(
-                    item.releaseTs
-                  )}
-                </span>
-
-              </Link>
-            ))}
-
-          </div>
-
-        </section>
-      )}
-
-      {/* ULTIME FILET DE SÉCURITÉ */}
-
-      {nothingAtAll && (
-        <div className="empty-card">
-
-          <div className="empty-icon">▶</div>
-
-          <h3>Rien à afficher</h3>
+        <div className="hub-tile-empty">
 
           <p>
-            Recherche un anime pour commencer à
-            le suivre.
+            Pas encore relié à l&apos;onduleur. Ses
+            données ne sortent pas du réseau local :
+            il faut un appareil allumé en permanence à
+            la maison pour les relayer.
           </p>
 
         </div>
-      )}
+
+      </section>
+
+      {/* ---------------------------------------------
+          TÂCHES
+          --------------------------------------------- */}
+
+      <section className="hub-section">
+
+        <div className="hub-tile-head">
+
+          <span className="hub-tile-label">
+            À FAIRE
+          </span>
+
+          {remaining > 0 && (
+            <span className="count-badge">
+              {remaining}
+            </span>
+          )}
+
+        </div>
+
+        <div className="todo-input-row">
+
+          <input
+            ref={inputRef}
+            className="todo-input"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') addTodo();
+            }}
+            placeholder="Ajouter une tâche"
+          />
+
+          <button
+            type="button"
+            className="todo-add"
+            onClick={addTodo}
+            disabled={draft.trim().length === 0}
+            aria-label="Ajouter"
+          >
+            +
+          </button>
+
+        </div>
+
+        {todos.length === 0 ? (
+          <p className="todo-empty">
+            Rien de prévu pour l&apos;instant.
+          </p>
+        ) : (
+          <ul className="todo-list">
+
+            {todos.map((todo) => (
+              <li
+                key={todo.id}
+                className={
+                  todo.done
+                    ? 'todo-row is-done'
+                    : 'todo-row'
+                }
+              >
+
+                <button
+                  type="button"
+                  className="todo-check"
+                  onClick={() => toggleTodo(todo.id)}
+                  aria-label={
+                    todo.done
+                      ? 'Marquer comme à faire'
+                      : 'Marquer comme fait'
+                  }
+                >
+                  {todo.done ? '✓' : ''}
+                </button>
+
+                <span className="todo-text">
+                  {todo.text}
+                </span>
+
+                <button
+                  type="button"
+                  className="todo-remove"
+                  onClick={() => removeTodo(todo.id)}
+                  aria-label="Supprimer"
+                >
+                  ✕
+                </button>
+
+              </li>
+            ))}
+
+          </ul>
+        )}
+
+      </section>
+
+      {/* ---------------------------------------------
+          RACCOURCIS VERS LES DEUX APPLICATIONS
+          --------------------------------------------- */}
+
+      <section className="hub-section">
+
+        <div className="hub-shortcuts">
+
+          <Link href="/tech" className="hub-shortcut">
+
+            <span className="hub-shortcut-icon">◈</span>
+
+            <span className="hub-shortcut-text">
+
+              <strong>News</strong>
+
+              <small>Actualité tech</small>
+
+            </span>
+
+          </Link>
+
+          <Link href="/anime" className="hub-shortcut">
+
+            <span className="hub-shortcut-icon">▶</span>
+
+            <span className="hub-shortcut-text">
+
+              <strong>Anime Stream</strong>
+
+              <small>Séries et planning</small>
+
+            </span>
+
+          </Link>
+
+        </div>
+
+      </section>
 
     </main>
   );
