@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import HubMenu from '@/components/HubMenu';
 import Navbar from '@/components/Navbar';
 import ProfileGate from '@/components/ProfileGate';
 
 export const metadata: Metadata = {
-  title: 'Anime Stream',
-  description: 'Anime Stream',
+  title: 'Hub',
+  description: 'Accueil, actualité tech et anime',
 };
 
 export const viewport: Viewport = {
@@ -38,6 +39,7 @@ export default function RootLayout({
       <body>
         <ProfileGate>
           {children}
+          <HubMenu />
           <Navbar />
         </ProfileGate>
       </body>
