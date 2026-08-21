@@ -6,8 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 
 const items = [
   {
-    href: '/',
-    label: 'Accueil',
+    href: '/anime',
+    label: 'Anime',
     icon: '⌂',
   },
   {
@@ -23,6 +23,15 @@ const items = [
 ];
 
 const THEME_KEY = 'anime_theme';
+
+/* Routes qui composent la section Anime Stream — la barre du
+   bas ne s'affiche que là. */
+
+const ANIME_ROUTES = [
+  '/anime',
+  '/planning',
+  '/favorites',
+];
 
 /*
  * La bulle ne remplit pas tout l'onglet bord à bord : elle
@@ -96,8 +105,8 @@ const WOBBLE_Y = 0.3;
 /* Pichenettes : à la prise en main, et à l'arrivée sur
    l'onglet. */
 
-const GRAB_IMPULSE = 0.9;
-const LAND_IMPULSE = 0.75;
+const GRAB_IMPULSE = 1.2;
+const LAND_IMPULSE = 0.95;
 
 /* Sous le doigt la bulle DÉBORDE de la barre. La piste fait
    la hauteur des onglets et la barre y ajoute son padding :
@@ -117,8 +126,9 @@ export default function Navbar() {
   );
 
   const activeIndex = items.findIndex((item) =>
-    item.href === '/'
-      ? pathname === '/'
+    item.href === '/anime'
+      ? pathname === '/anime' ||
+        pathname.startsWith('/anime/')
       : pathname.startsWith(item.href)
   );
 
@@ -513,6 +523,25 @@ export default function Navbar() {
       // localStorage indisponible
     }
   };
+
+  /*
+   * Cette barre appartient à la section Anime Stream. Le hub a
+   * son propre accueil et Techfeed sa propre barre de sources,
+   * donc on ne l'affiche pas ailleurs.
+   *
+   * Le test est fait ICI, après tous les hooks : React exige
+   * qu'ils soient appelés dans le même ordre à chaque rendu.
+   * Un retour anticipé placé plus haut casserait l'app au
+   * premier changement de section.
+   */
+
+  const inAnimeSection = ANIME_ROUTES.some(
+    (route) =>
+      pathname === route ||
+      pathname.startsWith(route + '/')
+  );
+
+  if (!inAnimeSection) return null;
 
   return (
     <nav className="bottom-nav">
