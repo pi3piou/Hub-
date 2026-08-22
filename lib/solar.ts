@@ -277,16 +277,33 @@ export function normalizePowerflow(
   payload: unknown
 ): SolarReading {
   const load = deepFind(payload, ['P_Load']);
+  const grid = deepFind(payload, ['P_Grid']);
+  const pv = deepFind(payload, ['P_PV']);
+
+  /*
+   * La nuit, l'onduleur dort et publie `P_PV: null` — pas
+   * zéro, mais "pas de valeur". Tel quel, ça creuserait un
+   * trou dans la courbe entre le coucher et le lever du
+   * soleil, là où la bonne lecture est une ligne à zéro.
+   *
+   * On ne comble que si le reste de la charge utile est
+   * exploitable : si ni la puissance réseau ni la charge ne
+   * sont chiffrées, c'est que le relevé est vraiment vide, et
+   * inventer un zéro masquerait une panne de collecte.
+   */
+
+  const production =
+    pv === null && (grid !== null || load !== null) ? 0 : pv;
 
   return {
-    production: deepFind(payload, ['P_PV']),
+    production,
     /*
      * Fronius exprime la charge en négatif, puisque c'est une
      * consommation. On la retourne en positif : afficher
      * "-450 W consommés" n'a aucun sens pour un lecteur.
      */
     consumption: load === null ? null : Math.abs(load),
-    grid: deepFind(payload, ['P_Grid']),
+    grid,
     battery: deepFind(payload, ['P_Akku']),
     autonomy: deepFind(payload, ['rel_Autonomy']),
     selfConsumption: deepFind(payload, [
@@ -541,21 +558,26 @@ export async function loadTotals(
 ): Promise<DayTotals> {
   /*
    * Production : le compteur du jour de l'onduleur, dont on
-   * garde la plus grande valeur vue. Il ne recule jamais avant
-   * minuit, donc son maximum est bien le total de la journée —
-   * y compris si les derniers relevés du soir manquent.
+   * garde la DERNIÈRE valeur connue de la journée.
+   *
+   * Prendre le maximum serait un piège. Fronius remet ce
+   * compteur à zéro au réveil de l'onduleur, pas à minuit :
+   * entre minuit et le lever du soleil, les relevés portent
+   * encore le total de la VEILLE. Avec un maximum, une journée
+   * moins productive que la précédente hériterait
+   * définitivement du total de la veille — une erreur
+   * silencieuse, impossible à repérer à l'œil.
+   *
+   * La dernière valeur, elle, se corrige d'elle-même dès que
+   * le compteur repart de zéro, et vaut le total complet une
+   * fois la journée finie.
    */
 
   let productionWh: number | null = null;
 
   for (const point of series) {
     if (point.energyToday === null) continue;
-    if (
-      productionWh === null ||
-      point.energyToday > productionWh
-    ) {
-      productionWh = point.energyToday;
-    }
+    productionWh = point.energyToday;
   }
 
   /*
