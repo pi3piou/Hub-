@@ -4539,3 +4539,93 @@ main:has(.reader-page) { overflow-x: clip; }
 .hub-menu-theme:active {
   transform: scale(0.97);
 }
+
+/* =========================================================
+   TECHFEED — CORRECTIF DE SCINTILLEMENT
+
+   Chaque carte de la liste portait un `backdrop-filter`.
+   Multiplie par plusieurs centaines de cartes, iOS n'arrive
+   plus a garder les couches composees en memoire : il les
+   jette et les repeint sans arret, et les images clignotent.
+
+   Le flou n'apportait par ailleurs quasiment rien ici : les
+   cartes reposent sur le fond uni de la page, pas sur une
+   image. On garde la teinte par source, on retire le flou.
+   ========================================================= */
+
+.card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/*
+ * Le fondu d'apparition des vignettes est supprime. Il
+ * dependait d'une classe posee a la main sur le noeud DOM au
+ * chargement de l'image — une manipulation hors de React, qui
+ * ne survit pas forcement au rendu suivant. L'emplacement
+ * reserve suffit a eviter tout decalage, sans animation.
+ */
+
+.card-thumb {
+  opacity: 1;
+  transition: none;
+}
+
+/* =========================================================
+   TECHFEED — BANDEAU "NOUVEAUX ARTICLES" ET TRACTION
+
+   Le bandeau etait en position fixe : il flottait au-dessus
+   de la liste et masquait le premier article, qu'on ne
+   pouvait plus lire ni toucher. Il reprend sa place dans le
+   flux et pousse donc la liste vers le bas.
+   ========================================================= */
+
+.new-articles-pill {
+  position: static;
+  display: block;
+  margin: 0 auto 14px;
+  padding: 9px 18px;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--nav-surface);
+  color: var(--nav-text-active);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen),
+    0 6px 20px rgba(0, 0, 0, 0.24);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
+  transform: none;
+  transition: transform var(--ease-spring);
+}
+
+.new-articles-pill:active {
+  transform: scale(0.95);
+}
+
+/*
+ * La roue suit le doigt pendant la traction (rotation posee
+ * en ligne par le JS) et change de couleur une fois le seuil
+ * franchi : on sait qu'on peut lacher sans avoir a deviner.
+ */
+
+.pull-spinner {
+  border-color: var(--border);
+  border-top-color: var(--text-dim);
+  transition: border-color var(--ease);
+}
+
+.pull-spinner.is-armed {
+  border-top-color: var(--text);
+}
+
+/*
+ * iOS ne doit pas faire rebondir la page par-dessus notre
+ * propre geste de traction.
+ */
+
+.tech-page {
+  overscroll-behavior-y: contain;
+}
