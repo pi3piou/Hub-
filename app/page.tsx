@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
+import SolarFlow from '@/components/SolarFlow';
+
 /*
  * =============================================================
  * ACCUEIL DU HUB — la page qui répond à "qu'est-ce qu'il se
@@ -30,6 +32,16 @@ type Todo = {
   done: boolean;
 };
 
+type Solar = {
+  production: number | null;
+  consumption: number | null;
+  grid: number | null;
+  battery: number | null;
+  autonomy: number | null;
+  energyToday: number | null;
+  receivedAt: number;
+};
+
 type GeoState =
   | 'idle'
   | 'asking'
@@ -52,6 +64,40 @@ function formatToday() {
   );
 }
 
+/*
+ * Au-dessus du kilowatt on bascule d'unité : "3400 W" se lit
+ * moins bien que "3,4 kW" sur une tuile qu'on survole du
+ * regard.
+ */
+
+function formatWatts(value: number | null) {
+  if (value === null) return '—';
+
+  const watts = Math.round(value);
+
+  if (Math.abs(watts) >= 1000) {
+    return (
+      (watts / 1000)
+        .toFixed(1)
+        .replace('.', ',') + ' kW'
+    );
+  }
+
+  return watts + ' W';
+}
+
+function formatAge(seconds: number) {
+  if (seconds < 90) return 'à l\'instant';
+
+  const minutes = Math.round(seconds / 60);
+
+  if (minutes < 60) return 'il y a ' + minutes + ' min';
+
+  const hours = Math.round(minutes / 60);
+
+  return 'il y a ' + hours + ' h';
+}
+
 export default function HubHome() {
   const [today, setToday] = useState('');
 
@@ -62,6 +108,16 @@ export default function HubHome() {
   const [geoState, setGeoState] = useState<GeoState>(
     'idle'
   );
+
+  const [solar, setSolar] = useState<Solar | null>(
+    null
+  );
+
+  const [solarAge, setSolarAge] = useState<number | null>(
+    null
+  );
+
+  const [solarReady, setSolarReady] = useState(false);
 
   const [todos, setTodos] = useState<Todo[]>([]);
   const [draft, setDraft] = useState('');
@@ -172,6 +228,57 @@ export default function HubHome() {
 
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  /*
+   * =======================================================
+   * SOLAIRE — on interroge notre propre API, qui relit le
+   * dernier relevé poussé par l'onduleur. Rafraîchi toutes
+   * les 60 secondes tant que la page est visible : inutile
+   * de solliciter le stockage quand le téléphone est dans
+   * une poche.
+   * =======================================================
+   */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      if (document.visibilityState !== 'visible') return;
+
+      try {
+        const res = await fetch('/api/solar');
+        const data = await res.json();
+
+        if (cancelled) return;
+
+        setSolar(data.reading || null);
+        setSolarAge(
+          typeof data.ageSeconds === 'number'
+            ? data.ageSeconds
+            : null
+        );
+      } catch {
+        if (!cancelled) setSolar(null);
+      } finally {
+        if (!cancelled) setSolarReady(true);
+      }
+    };
+
+    load();
+
+    const timer = setInterval(load, 60000);
+
+    document.addEventListener('visibilitychange', load);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener(
+        'visibilitychange',
+        load
+      );
     };
   }, []);
 
@@ -333,18 +440,45 @@ export default function HubHome() {
             SOLAIRE
           </span>
 
+          {solar && solarAge !== null && (
+            <span
+              className={
+                solarAge > 600
+                  ? 'solar-age is-stale'
+                  : 'solar-age'
+              }
+            >
+              {formatAge(solarAge)}
+            </span>
+          )}
+
         </div>
 
-        <div className="hub-tile-empty">
+        {solar ? (
+          <>
 
-          <p>
-            Pas encore relié à l&apos;onduleur. Ses
-            données ne sortent pas du réseau local :
-            il faut un appareil allumé en permanence à
-            la maison pour les relayer.
-          </p>
+            <SolarFlow
+              production={solar.production}
+              consumption={solar.consumption}
+              grid={solar.grid}
+            />
 
-        </div>
+            <Link href="/solaire" className="solar-more">
+              Voir la journée ›
+            </Link>
+
+          </>
+        ) : (
+          <div className="hub-tile-empty">
+
+            <p>
+              {solarReady
+                ? "Aucun relevé reçu de l'onduleur pour l'instant."
+                : 'Lecture du dernier relevé…'}
+            </p>
+
+          </div>
+        )}
 
       </section>
 
