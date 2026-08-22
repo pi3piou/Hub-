@@ -10,9 +10,32 @@ import {
 } from '@/lib/techfeed/prefs';
 
 const PREFETCH_CONCURRENCY = 2;
-const PULL_THRESHOLD = 70;
+/*
+ * Seuil abaisse a 52px, et surtout : le doigt tire desormais
+ * la liste au 1 pour 1 jusqu'a ce seuil. Avant, chaque pixel
+ * de doigt ne donnait que 0,6px de traction et il fallait
+ * declencher a 70px — soit pres de 120px de geste reel avant
+ * que quoi que ce soit se declenche.
+ */
+
+const PULL_THRESHOLD = 52;
+const PULL_MAX = 110;
+const PULL_RESISTANCE = 0.35;
 const REFRESH_MIN_INTERVAL = 60 * 1000;
-const LIST_KEY = 'techfeed-list-cache';
+/*
+ * Le suffixe de version compte. La liste d'articles est
+ * conservee en localStorage AVEC ses vignettes, calculees au
+ * moment ou l'article a ete recupere. Corriger l'extraction
+ * des images cote serveur ne change donc rien aux articles
+ * deja en cache : ils gardent l'ancienne vignette jusqu'a
+ * disparaitre de la liste, ce qui peut prendre des jours.
+ *
+ * Changer cette cle repart d'une liste vide et force un
+ * nouveau calcul. A refaire a chaque correction touchant au
+ * contenu stocke ici.
+ */
+
+const LIST_KEY = 'techfeed-list-cache-v2';
 const LIST_MAX = 300;
 
 function loadListCache() {
@@ -41,7 +64,19 @@ export default function FeedList() {
   const [selected, setSelected] = useState(null);
   const [fullContent, setFullContent] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [contentCache, setContentCache] = useState({});
+  /*
+   * Le contenu des articles n'est PLUS un etat React.
+   *
+   * Il etait prefetche article par article, et chaque reponse
+   * declenchait un setState, donc un rendu complet de la liste
+   * — jusqu'a 300 rendus d'affilee au chargement. Avec le flou
+   * d'arriere-plan que portait chaque carte, ca repeignait la
+   * page en continu : c'est ce qui faisait scintiller les
+   * images.
+   *
+   * Le contenu vit maintenant dans `storedCache`, une ref :
+   * meme donnee, aucun rendu declenche.
+   */
   const [imageCache, setImageCache] = useState({});
   const [readLinks, setReadLinks] = useState([]);
   const [appName, setAppName] = useState('TechFeed');
@@ -73,13 +108,10 @@ export default function FeedList() {
   useEffect(() => {
     const stored = loadCache();
     storedCache.current = stored;
-    const asContent = {};
     const asImage = {};
     for (const key of Object.keys(stored)) {
-      asContent[key] = stored[key].content;
       if (stored[key].image) asImage[key] = stored[key].image;
     }
-    setContentCache(asContent);
     setImageCache(asImage);
     setReadLinks(loadRead());
     setAppName(loadAppName());
@@ -354,39 +386,101 @@ export default function FeedList() {
     return y <= 0;
   }
 
-  function handlePullStart(e) {
-    const target = e.target;
-    if (target && target.closest && target.closest('.tab-bar')) {
-      pullStartY.current = null;
-      return;
-    }
-    if (!atTop()) {
-      pullStartY.current = null;
-      return;
-    }
-    pullStartY.current = e.touches[0].clientY;
-  }
+  /*
+   * =======================================================
+   * TIRER POUR RAFRAICHIR
+   *
+   * Les ecouteurs sont poses a la main, en NON PASSIF. React
+   * attache ses gestionnaires tactiles en mode passif : on ne
+   * peut donc pas y appeler preventDefault, et iOS continuait
+   * de faire rebondir la page pendant qu'on tirait. Le geste
+   * luttait contre l'elastique du systeme — d'ou la sensation
+   * de devoir forcer.
+   * =======================================================
+   */
 
-  function handlePullMove(e) {
-    if (pullStartY.current === null) return;
-    const dy = e.touches[0].clientY - pullStartY.current;
-    if (dy <= 0) {
-      setPullDistance(0);
-      return;
-    }
-    if (!atTop()) {
-      pullStartY.current = null;
-      setPullDistance(0);
-      return;
-    }
-    setPullDistance(Math.min(dy * 0.6, 100));
-  }
+  const pullZoneRef = useRef(null);
+  const pullDistanceRef = useRef(0);
 
-  function handlePullEnd() {
-    if (pullDistance >= PULL_THRESHOLD) refreshFeed();
-    setPullDistance(0);
-    pullStartY.current = null;
-  }
+  useEffect(() => {
+    const zone = pullZoneRef.current;
+
+    if (!zone) return;
+
+    const setPull = (value) => {
+      pullDistanceRef.current = value;
+      setPullDistance(value);
+    };
+
+    function onStart(e) {
+      const target = e.target;
+
+      if (target && target.closest && target.closest('.tab-bar')) {
+        pullStartY.current = null;
+        return;
+      }
+
+      if (!atTop()) {
+        pullStartY.current = null;
+        return;
+      }
+
+      pullStartY.current = e.touches[0].clientY;
+    }
+
+    function onMove(e) {
+      if (pullStartY.current === null) return;
+
+      const dy = e.touches[0].clientY - pullStartY.current;
+
+      if (dy <= 0) {
+        setPull(0);
+        return;
+      }
+
+      if (!atTop()) {
+        pullStartY.current = null;
+        setPull(0);
+        return;
+      }
+
+      /* Tant qu'on tire vers le bas depuis le haut de la
+         liste, le geste nous appartient : on empeche iOS de
+         faire rebondir la page par-dessus. */
+      if (e.cancelable) e.preventDefault();
+
+      /* 1 pour 1 jusqu'au seuil, puis resistance croissante :
+         c'est la courbe des listes natives d'iOS. */
+      const pulled =
+        dy <= PULL_THRESHOLD
+          ? dy
+          : PULL_THRESHOLD +
+            (dy - PULL_THRESHOLD) * PULL_RESISTANCE;
+
+      setPull(Math.min(pulled, PULL_MAX));
+    }
+
+    function onEnd() {
+      if (pullDistanceRef.current >= PULL_THRESHOLD) {
+        refreshFeed();
+      }
+
+      setPull(0);
+      pullStartY.current = null;
+    }
+
+    zone.addEventListener('touchstart', onStart, { passive: true });
+    zone.addEventListener('touchmove', onMove, { passive: false });
+    zone.addEventListener('touchend', onEnd);
+    zone.addEventListener('touchcancel', onEnd);
+
+    return () => {
+      zone.removeEventListener('touchstart', onStart);
+      zone.removeEventListener('touchmove', onMove);
+      zone.removeEventListener('touchend', onEnd);
+      zone.removeEventListener('touchcancel', onEnd);
+    };
+  });
 
   async function fetchArticleContent(article) {
     const key = article.link;
@@ -398,7 +492,6 @@ export default function FeedList() {
       const content = data.content;
       if (content) {
         storedCache.current = saveEntry(storedCache.current, key, content, data.image);
-        setContentCache((prev) => ({ ...prev, [key]: content }));
         if (data.image) setImageCache((prev) => ({ ...prev, [key]: data.image }));
       }
       return content;
@@ -428,7 +521,11 @@ export default function FeedList() {
     if (toPrefetch.length === 0) return;
     queue.current.push(...toPrefetch);
     drainQueue();
-  }, [articles, pending, contentCache]);
+    /* `contentCache` a disparu des dependances : l'effet se
+       relancait apres CHAQUE article recupere, refiltrant
+       toute la liste a chaque fois. La file se vide toute
+       seule par recursion dans drainQueue. */
+  }, [articles, pending]);
 
   /*
    * L'observateur d'intersection qui posait/retirait la classe
@@ -442,8 +539,10 @@ export default function FeedList() {
 
   useEffect(() => {
     if (!selected) return;
-    if (contentCache[selected.link] !== undefined) {
-      setFullContent(contentCache[selected.link]);
+    const cached = storedCache.current[selected.link];
+
+    if (cached && cached.content !== undefined) {
+      setFullContent(cached.content);
       setLoading(false);
       return;
     }
@@ -544,11 +643,7 @@ export default function FeedList() {
   }
 
   return (
-    <div
-      onTouchStart={handlePullStart}
-      onTouchMove={handlePullMove}
-      onTouchEnd={handlePullEnd}
-    >
+    <div ref={pullZoneRef}>
       <Drawer
         onSourcesChange={handleSourcesChange}
         onOpenSource={openSource}
@@ -565,11 +660,28 @@ export default function FeedList() {
       <div
         className={'pull-indicator' + (refreshing ? ' spinning' : '')}
         style={{
-          height: refreshing ? 44 : Math.max(pullDistance, 0),
-          opacity: refreshing || pullDistance > 4 ? 1 : 0,
+          height: refreshing
+            ? 44
+            : Math.max(pullDistance, 0),
+          opacity: refreshing
+            ? 1
+            : Math.min(pullDistance / 18, 1),
         }}
       >
-        <span className="pull-spinner" />
+        <span
+          className={
+            !refreshing && pullDistance >= PULL_THRESHOLD
+              ? 'pull-spinner is-armed'
+              : 'pull-spinner'
+          }
+          style={
+            refreshing
+              ? undefined
+              : {
+                  transform: `rotate(${pullDistance * 4}deg)`,
+                }
+          }
+        />
       </div>
 
       <div className="feed" style={{ transform: `translateY(${pullDistance * 0.3}px)` }}>
@@ -607,16 +719,21 @@ export default function FeedList() {
                     src={a.thumbnail || imageCache[a.link]}
                     alt=""
                     loading="lazy"
+                    decoding="async"
                     referrerPolicy="no-referrer"
                     draggable={false}
-                    onLoad={(e) => {
-                      e.currentTarget.classList.add('is-loaded');
-                    }}
                     onError={(e) => {
-                      /* Image morte ou hotlink refuse : on la
-                         retire au lieu de laisser l'icone de
-                         document casse. */
-                      e.currentTarget.remove();
+                      /*
+                        Image morte ou hotlink refuse : on la
+                        masque pour ne pas laisser l'icone de
+                        document casse. On MASQUE au lieu de
+                        retirer le noeud : le retirer du DOM
+                        derriere le dos de React le poussait a
+                        le reinserer au rendu suivant, l'image
+                        echouait a nouveau, et la carte
+                        clignotait en boucle.
+                      */
+                      e.currentTarget.style.visibility = 'hidden';
                     }}
                   />
                 )}
