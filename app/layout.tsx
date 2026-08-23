@@ -9,9 +9,24 @@ export const metadata: Metadata = {
   description: 'Accueil, actualité tech et anime',
 };
 
+/*
+ * `maximumScale: 1` désactive le zoom à deux doigts sur toute
+ * l'application. C'est un vrai renoncement : le zoom est une
+ * échappatoire d'accessibilité, et l'enlever la retire à tout
+ * le monde, pas seulement dans les News.
+ *
+ * On l'assume ici parce que c'est une app personnelle,
+ * installée sur l'écran d'accueil, où le pincement accidentel
+ * pendant un défilement est bien plus fréquent qu'un besoin
+ * réel d'agrandir. Une seule ligne à retirer pour revenir en
+ * arrière.
+ */
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: 'cover',
   themeColor: '#050508',
 };
