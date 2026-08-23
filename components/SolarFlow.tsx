@@ -23,7 +23,7 @@
  */
 
 const VW = 320;
-const VH = 138;
+const VH = 154;
 
 const NODE_R = 27;
 const NODE_Y = 40;
@@ -32,8 +32,25 @@ const SUN_X = 42;
 const HOUSE_X = 160;
 const GRID_X = 278;
 
-/* Hauteur du couloir où circulent les billes. */
-const LANE_Y = 108;
+/*
+ * DEUX couloirs, à deux profondeurs, et c'est le cœur de la
+ * correction.
+ *
+ * Le surplus ne sort pas de la maison : il n'y est jamais
+ * entré. Il part du soleil et file au réseau. Le faire
+ * démarrer de la maison racontait une histoire fausse — celle
+ * d'une électricité qui entrerait chez soi pour en ressortir
+ * aussitôt.
+ *
+ * Le couloir profond part donc du soleil et PASSE SOUS la
+ * maison sans s'y arrêter, ce qui se lit immédiatement. Le
+ * couloir proche sert aux deux échanges qui concernent
+ * vraiment la maison : ce qu'elle prend au soleil, et ce
+ * qu'elle prend au réseau.
+ */
+
+const LANE_NEAR = 98;
+const LANE_FAR = 126;
 
 const BEADS = [0, 1, 2, 3];
 
@@ -76,10 +93,14 @@ function formatWatts(value: number | null) {
 
 /* Trajet en U : on descend, on longe, on remonte. */
 
-function lanePath(fromX: number, toX: number) {
+function lanePath(
+  fromX: number,
+  toX: number,
+  laneY: number
+) {
   return (
     `M${fromX} ${NODE_Y + NODE_R}` +
-    ` V${LANE_Y}` +
+    ` V${laneY}` +
     ` H${toX}` +
     ` V${NODE_Y + NODE_R}`
   );
@@ -197,28 +218,37 @@ export default function SolarFlow({
         <defs>
           <path
             id="flow-sun-house"
-            d={lanePath(SUN_X, HOUSE_X)}
+            d={lanePath(SUN_X, HOUSE_X, LANE_NEAR)}
           />
           <path
-            id="flow-house-grid"
-            d={lanePath(HOUSE_X, GRID_X)}
+            id="flow-sun-grid"
+            d={lanePath(SUN_X, GRID_X, LANE_FAR)}
           />
           <path
             id="flow-grid-house"
-            d={lanePath(GRID_X, HOUSE_X)}
+            d={lanePath(GRID_X, HOUSE_X, LANE_NEAR)}
           />
         </defs>
 
-        {/* --- les couloirs, en trait fin --- */}
+        {/* --- les couloirs, en trait fin ---
+
+            Seul le couloir réellement emprunté est tracé :
+            afficher en permanence les trois donnerait un
+            écheveau de lignes dont deux ne servent à rien à
+            l'instant où on regarde. */}
 
         <path
           className="flow-lane"
-          d={lanePath(SUN_X, HOUSE_X)}
+          d={lanePath(SUN_X, HOUSE_X, LANE_NEAR)}
         />
 
         <path
           className="flow-lane"
-          d={lanePath(HOUSE_X, GRID_X)}
+          d={
+            importing
+              ? lanePath(GRID_X, HOUSE_X, LANE_NEAR)
+              : lanePath(SUN_X, GRID_X, LANE_FAR)
+          }
         />
 
         {/* --- SOLEIL --- */}
@@ -299,9 +329,7 @@ export default function SolarFlow({
 
         <Beads
           id={
-            importing
-              ? 'flow-grid-house'
-              : 'flow-house-grid'
+            importing ? 'flow-grid-house' : 'flow-sun-grid'
           }
           watts={net}
         />
