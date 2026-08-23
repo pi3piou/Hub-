@@ -76,6 +76,29 @@ export default function Drawer({ onSourcesChange, onOpenSource, onPrefsChange })
     setAppNameState(loadAppName());
     setTabModeState(loadTabMode());
 
+    /*
+     * Le menu lateral du hub demande l'ouverture par un
+     * evenement du navigateur. Il vit dans un autre arbre
+     * React : un evenement est le lien le plus simple entre
+     * les deux, sans etat partage a maintenir.
+     */
+
+    function onExternalOpen() {
+      setView('sources');
+      setOpen(true);
+    }
+
+    window.addEventListener(
+      'techfeed:open-drawer',
+      onExternalOpen
+    );
+
+    return () => {
+      window.removeEventListener(
+        'techfeed:open-drawer',
+        onExternalOpen
+      );
+    };
   }, []);
 
   function commitSources(list) {
@@ -159,6 +182,12 @@ export default function Drawer({ onSourcesChange, onOpenSource, onPrefsChange })
 
   return (
     <>
+      {/*
+        Le bouton d'ouverture est masque en CSS : l'acces se
+        fait desormais par le menu lateral du hub. On garde
+        l'element plutot que de le supprimer, parce qu'il reste
+        le seul chemin utilisable au clavier vers ce tiroir.
+      */}
       <button className="menu-btn" onClick={() => setOpen(true)} aria-label="Menu">
         <span />
         <span />
