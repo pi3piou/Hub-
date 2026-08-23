@@ -4663,23 +4663,29 @@ main:has(.reader-page) { overflow-x: clip; }
    son script sur les DEUX thèmes : écart suffisant pour un
    daltonien, contraste suffisant sur le fond.
 
-   Production et autoconsommation partagent la même teinte à
-   deux intensités, et c'est voulu : l'autoconsommation est
-   une PARTIE de la production. Deux teintes distinctes — un
-   orange et un jaune, par exemple — échouaient d'ailleurs au
-   test de séparation, ce qui confirmait qu'elles se
-   ressemblaient trop pour être lues comme indépendantes.
+   Un jaune FRANC et un orange FRANC se séparent très bien :
+   écart de 25,7 en vision daltonienne, 29,9 en vision
+   normale, là où il en faut 8 et 15. C'est l'ambre de la
+   version précédente qui échouait — trop proche de l'orange.
+
+   Une réserve assumée : en thème sombre, le jaune sort de la
+   plage de luminosité recommandée pour une série. Cette règle
+   protège contre une courbe qui écrase les autres ; ici la
+   production EST le sujet, et c'est une grande aire, pas un
+   trait fin. Toutes les vérifications de lisibilité passent
+   avec une large marge. Si le jaune éblouit à l'usage,
+   #b38f00 respecte la plage — au prix d'un jaune moutarde.
    ========================================================= */
 
 :root {
-  --solar-production: #773115;
-  --solar-self: #d95926;
+  --solar-production: #ffcc00;
+  --solar-self: #e8590c;
   --solar-consumption: #3987e5;
 }
 
 :root[data-theme="light"] {
-  --solar-production: #ed9877;
-  --solar-self: #eb6834;
+  --solar-production: #e0a800;
+  --solar-self: #e8590c;
   --solar-consumption: #2a78d6;
 }
 
@@ -4687,160 +4693,127 @@ main:has(.reader-page) { overflow-x: clip; }
    SOLAIRE — FLUX ANIMÉ DE L'ACCUEIL
    ========================================================= */
 
-.flow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 4px;
+.flow-svg {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
-.flow-node {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 84px;
-  text-align: center;
+/* Le couloir que suivent les billes : un trait fin, une
+   nuance au-dessus du fond, qui ne concurrence jamais les
+   billes elles-mêmes. */
+
+.flow-lane {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.flow-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 52px;
-  height: 52px;
-  border: 0.5px solid var(--border);
-  border-radius: 50%;
-  background: var(--surface-strong);
-  font-size: 22px;
-  line-height: 1;
+.flow-ring {
+  fill: var(--surface-strong);
+  stroke: var(--border);
+  stroke-width: 1;
 }
 
-.flow-icon.is-sun {
-  border-color: var(--solar-self);
-  color: var(--solar-self);
+.flow-ring.is-sun {
+  stroke: var(--solar-production);
 }
 
-.flow-icon.is-house {
-  border-color: var(--solar-consumption);
-  color: var(--solar-consumption);
+.flow-ring.is-house {
+  stroke: var(--solar-consumption);
 }
 
-.flow-node strong {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-}
-
-.flow-node small {
-  color: var(--text-dim);
-  font-size: 10px;
-  font-weight: 600;
+.flow-glyph.is-sun {
+  fill: var(--solar-production);
 }
 
 /*
- * La piste des billes. Elle est centrée sur la hauteur des
- * pastilles, pas de la carte : sans ce décalage elle
- * flotterait au milieu du texte sous les cercles.
+ * Les pictogrammes sont tracés, jamais remplis : une même
+ * épaisseur de trait pour les trois, et un dessin qui reste
+ * net quelle que soit la taille d'écran.
  */
 
-.flow-track {
-  position: relative;
-  flex: 1 1 auto;
-  height: 52px;
-  min-width: 26px;
+.flow-glyph-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.flow-line {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  left: 0;
-  height: 1px;
-  background: var(--border);
+.flow-glyph-line.is-sun {
+  stroke: var(--solar-production);
 }
+
+.flow-glyph-line.is-house {
+  stroke: var(--solar-consumption);
+}
+
+.flow-glyph-line.is-grid {
+  stroke: var(--text-muted);
+}
+
+/*
+ * La bille : sa POSITION est animée en SMIL (voir
+ * SolarFlow.tsx), sa COULEUR ici. SMIL ne sait pas interpoler
+ * une variable CSS, le CSS ne sait pas suivre un tracé — d'où
+ * ce partage, les deux animations partageant durée et phase.
+ */
 
 .flow-bead {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 6px;
-  height: 6px;
-  margin-top: -3px;
-  border-radius: 50%;
-  background: var(--solar-self);
-  animation-name: flow-bead-run;
+  fill: var(--solar-production);
+  animation-name: flow-bead-color;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
 
-/*
- * La bille change de couleur pendant son trajet — c'est le
- * dégradé demandé. Il est porté par l'animation elle-même et
- * non par un dégradé de fond : une bille de six pixels ne
- * peut pas contenir un dégradé lisible, alors qu'une couleur
- * qui évolue au fil de la course, si.
- */
-
-@keyframes flow-bead-run {
+@keyframes flow-bead-color {
   0% {
-    left: 0;
-    background: var(--solar-self);
-    opacity: 0;
-  }
-  12% {
-    opacity: 1;
-  }
-  88% {
-    opacity: 1;
+    fill: var(--solar-production);
   }
   100% {
-    left: 100%;
-    background: var(--solar-consumption);
-    opacity: 0;
+    fill: var(--solar-consumption);
   }
-}
-
-/* Sens inverse : le réseau alimente la maison. */
-
-.flow-track.is-reversed .flow-bead {
-  animation-name: flow-bead-run-back;
-}
-
-@keyframes flow-bead-run-back {
-  0% {
-    left: 100%;
-    background: var(--solar-consumption);
-    opacity: 0;
-  }
-  12% {
-    opacity: 1;
-  }
-  88% {
-    opacity: 1;
-  }
-  100% {
-    left: 0;
-    background: var(--solar-consumption);
-    opacity: 0;
-  }
-}
-
-.flow-track.is-active .flow-line {
-  background: var(--border-strong);
 }
 
 /*
- * Mouvement réduit : les billes s'arrêtent. Un défilement
+ * Mouvement réduit : les billes disparaissent. Un défilement
  * perpétuel est une gêne réelle pour qui y est sensible, et
- * l'information reste entière dans les chiffres.
+ * l'information reste entière dans les chiffres en dessous.
  */
 
 @media (prefers-reduced-motion: reduce) {
   .flow-bead {
     display: none;
   }
+}
+
+.flow-values {
+  display: flex;
+  margin-top: 2px;
+}
+
+.flow-value {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+
+.flow-value strong {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.flow-value small {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 600;
 }
 
 .solar-more {
@@ -4978,6 +4951,7 @@ main:has(.reader-page) { overflow-x: clip; }
 /* --- Légende --- */
 
 .solar-legend {
+  margin-top: 28px;
   margin-bottom: 16px;
   padding: 14px 16px;
   border: 0.5px solid var(--border);
