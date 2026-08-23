@@ -4951,7 +4951,7 @@ main:has(.reader-page) { overflow-x: clip; }
 /* --- Légende --- */
 
 .solar-legend {
-  margin-top: 28px;
+  margin-top: 46px;
   margin-bottom: 16px;
   padding: 14px 16px;
   border: 0.5px solid var(--border);
@@ -5076,4 +5076,85 @@ main:has(.reader-page) { overflow-x: clip; }
   margin: 10px 0 0;
   color: var(--text-dim);
   font-size: 11px;
+}
+
+/* =========================================================
+   SOLAIRE — SÉLECTEUR D'ÉCHELLE ET BARRES
+   ========================================================= */
+
+.solar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.solar-scopes {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.solar-scopes button {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  transition:
+    background var(--ease),
+    color var(--ease);
+}
+
+.solar-scopes button.is-active {
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+/*
+ * Les barres. Un intervalle de fond sépare les deux segments
+ * empilés plutôt qu'un contour : un trait autour de chaque
+ * segment alourdirait le tracé, et un contact direct ferait
+ * fondre l'orange dans le jaune.
+ */
+
+.solar-bar-self {
+  fill: var(--solar-self);
+}
+
+.solar-bar-export {
+  fill: var(--solar-production);
+}
+
+.solar-bar-consumption {
+  stroke: var(--solar-consumption);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* Zone tactile invisible, bien plus large que la barre :
+   viser cinq pixels au doigt est impossible. */
+
+.solar-bar-hit {
+  fill: transparent;
+}
+
+.solar-bar.is-picked .solar-bar-hit {
+  fill: var(--surface-strong);
+}
+
+.solar-drill {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 650;
 }
