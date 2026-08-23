@@ -34,10 +34,23 @@ export interface EpisodesData {
 }
 
 
+export type SeasonKind = 'season' | 'film' | 'special';
+
+/*
+ * `path` et `kind` sont facultatifs : une fiche déjà mise en
+ * cache par une version précédente de l'application n'en a
+ * pas, et elle doit continuer à s'afficher jusqu'à
+ * l'expiration de son entrée. En leur absence, la partie est
+ * traitée comme une saison ordinaire — ce qu'elle était
+ * forcément à l'époque où le cache a été écrit.
+ */
+
 export interface SeasonEntry {
   number: number;
   label: string;
   langs: string[];
+  path?: string;
+  kind?: SeasonKind;
 }
 
 export interface AnimeInfoData {
