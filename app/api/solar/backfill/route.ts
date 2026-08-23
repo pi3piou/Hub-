@@ -44,14 +44,107 @@ function unauthorized() {
   );
 }
 
-function checkKey(request: Request) {
-  const expected = process.env.SOLAR_INGEST_KEY;
+/*
+ * Lecture BRUTE d'un parametre, sans passer par URLSearchParams.
+ *
+ * Ce detour existe pour une raison precise : dans une chaine de
+ * requete, le signe plus est l'ancienne notation de l'espace.
+ * `searchParams.get()` applique fidelement cette regle, donc une
+ * cle contenant un "+" arrive ici avec un espace a la place et
+ * ne correspond plus jamais. Les cles engendrees en base64 en
+ * contiennent tres souvent.
+ */
 
-  if (!expected) return false;
+function rawParam(url: string, name: string) {
+  const start = url.indexOf('?');
 
+  if (start < 0) return null;
+
+  const query = url.slice(start + 1).split('#')[0];
+
+  for (const part of query.split('&')) {
+    const equals = part.indexOf('=');
+
+    if (equals < 0) continue;
+    if (part.slice(0, equals) !== name) continue;
+
+    return part.slice(equals + 1);
+  }
+
+  return null;
+}
+
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+/*
+ * Toutes les formes plausibles de la cle envoyee. On compare
+ * l'attendu a chacune plutot que de parier sur une seule :
+ * l'echec silencieux d'une comparaison de chaines est
+ * indiscernable d'une mauvaise cle, et coute une redecouverte
+ * complete a chaque fois.
+ */
+
+function candidateKeys(request: Request) {
   const { searchParams } = new URL(request.url);
 
-  return searchParams.get('key') === expected;
+  const values: string[] = [];
+
+  const decoded = searchParams.get('key');
+
+  if (decoded !== null) values.push(decoded);
+
+  const raw = rawParam(request.url, 'key');
+
+  if (raw !== null) {
+    values.push(raw);
+    values.push(safeDecode(raw));
+  }
+
+  return values;
+}
+
+function keyState(request: Request) {
+  /*
+   * Le `trim` n'est pas cosmetique : une variable d'environnement
+   * collee dans un tableau de bord emporte tres facilement un
+   * retour a la ligne invisible, et la comparaison echoue alors
+   * sur une valeur qui parait pourtant identique a l'oeil.
+   */
+
+  const rawExpected = process.env.SOLAR_INGEST_KEY || '';
+  const expected = rawExpected.trim();
+
+  const candidates = candidateKeys(request);
+
+  const exact = candidates.some(
+    (value) => value === rawExpected
+  );
+
+  const trimmed = candidates.some(
+    (value) => value.trim() === expected
+  );
+
+  return {
+    definie: rawExpected.length > 0,
+    longueurAttendue: rawExpected.length,
+    longueurApresNettoyage: expected.length,
+    longueursRecues: candidates.map(
+      (value) => value.length
+    ),
+    correspondanceExacte: exact,
+    correspondanceApresNettoyage: trimmed,
+    ok: Boolean(expected) && trimmed,
+  };
+}
+
+function checkKey(request: Request) {
+  return keyState(request).ok;
 }
 
 /*
@@ -83,6 +176,46 @@ function toTotals(row: BackfillRow): DayTotals {
 const DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(request: Request) {
+  const { searchParams: query } = new URL(request.url);
+
+  /*
+   * ?diag=1 — le seul point d'entree qui ne demande pas la cle.
+   *
+   * Il ne revele jamais aucune valeur : uniquement des longueurs
+   * et des oui/non. C'est assez pour distinguer les trois causes
+   * qui se ressemblent toutes de l'exterieur — variable absente,
+   * variable avec un retour a la ligne colle par megarde, ou cle
+   * reellement differente — et ce n'est pas assez pour aider qui
+   * que ce soit a deviner la cle.
+   */
+
+  if (query.get('diag') === '1') {
+    const state = keyState(request);
+
+    return Response.json({
+      diag: true,
+
+      variableDefinie: state.definie,
+
+      longueurDeLaVariable: state.longueurAttendue,
+      longueurUneFoisNettoyee: state.longueurApresNettoyage,
+
+      espacesInvisiblesDansLaVariable:
+        state.longueurAttendue !==
+        state.longueurApresNettoyage,
+
+      longueursDeLaCleRecue: state.longueursRecues,
+
+      correspondanceExacte: state.correspondanceExacte,
+      correspondanceApresNettoyage:
+        state.correspondanceApresNettoyage,
+
+      joursDansLeFichier: Object.keys(BACKFILL).length,
+
+      upstashConfigure: isConfigured(),
+    });
+  }
+
   if (!checkKey(request)) return unauthorized();
 
   if (!isConfigured()) {
@@ -92,13 +225,11 @@ export async function GET(request: Request) {
     );
   }
 
-  const { searchParams } = new URL(request.url);
+  const probe = query.get('probe') === '1';
+  const force = query.get('force') === '1';
 
-  const probe = searchParams.get('probe') === '1';
-  const force = searchParams.get('force') === '1';
-
-  const from = searchParams.get('from') || '';
-  const to = searchParams.get('to') || '';
+  const from = query.get('from') || '';
+  const to = query.get('to') || '';
 
   /*
    * La journée en cours n'est jamais importée : elle n'est pas
