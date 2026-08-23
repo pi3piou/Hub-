@@ -5,55 +5,50 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 /*
  * =============================================================
- * JOURNÉE SOLAIRE — courbe, légende, tableau
+ * SOLAIRE — JOUR, MOIS, ANNÉE
  *
- * Trois séries, et deux façons de les distinguer, pas une :
+ * Trois échelles, deux formes de tracé, et c'est délibéré :
  *
- *   Production        aire orange pâle
- *   Autoconsommation  aire orange dense, PAR-DESSUS la
- *                     précédente — c'est la part de la
- *                     production que la maison a gardée
- *   Consommation      trait bleu
+ *   Jour   une COURBE — la puissance est continue, elle monte
+ *          et redescend, et la forme de la journée est
+ *          l'information.
  *
- * Les deux aires partagent la même teinte à deux intensités,
- * et c'est délibéré : l'autoconsommation est une PARTIE de la
- * production, pas une grandeur indépendante. Deux teintes
- * différentes suggéreraient deux choses sans rapport. La
- * consommation, elle, est une grandeur à part : autre teinte,
- * et autre forme de tracé.
+ *   Mois   des BARRES — une journée est une quantité close,
+ *          pas un instant. Relier deux journées par un trait
+ *          suggérerait un passage progressif de l'une à
+ *          l'autre, ce qui n'a aucun sens.
+ *   Année  idem, une barre par mois.
  *
- * La palette est celle du référentiel de visualisation,
- * vérifiée par son script : séparation suffisante pour un
- * daltonien, contraste suffisant sur les deux thèmes.
+ * Les couleurs racontent la même histoire aux trois échelles :
+ * l'orange est ce que la maison a gardé du soleil, le jaune ce
+ * qui est parti au réseau, et leur somme la production. Le
+ * bleu reste la consommation.
  * =============================================================
  */
 
 const SLOT_MINUTES = 5;
 const DAY_MINUTES = 24 * 60;
 
-/* Graduations horizontales tous les 2 kW, au moins jusqu'à 10. */
 const STEP_KW = 2;
 const MIN_TOP_KW = 10;
 
+const W = 360;
+
 /*
- * Géométrie du tracé, en unités du viewBox.
- *
- * La largeur est volontairement proche de la largeur réelle
- * d'affichage. Le SVG s'étire pour remplir la carte : avec un
- * viewBox deux fois plus large que la place disponible, tout
- * était divisé par deux à l'écran — les libellés d'axe
- * tombaient à cinq pixels de haut, illisibles. À 360, l'unité
- * du dessin vaut à peu près le pixel.
- *
- * La hauteur double la place occupée par le graphique.
+ * Le graphique occupe presque toute la hauteur d'écran
+ * disponible. La largeur du viewBox reste proche de la largeur
+ * réelle d'affichage : c'est ce rapport qui décide de la
+ * taille apparente des libellés d'axe, et un viewBox trop
+ * large les réduirait à quelques pixels.
  */
 
-const W = 360;
-const H = 300;
+const H = 430;
 const PAD_L = 30;
 const PAD_R = 8;
 const PAD_T = 14;
 const PAD_B = 28;
+
+type Scope = 'day' | 'month' | 'year';
 
 type Point = {
   minute: number;
@@ -71,34 +66,77 @@ type Totals = {
   estimated: boolean;
 };
 
-function todayIso() {
-  const now = new Date();
+type Row = {
+  key: string;
+  label: string;
+  totals: Totals | null;
+};
 
+/* ---------------------------------------------------------
+   DATES
+   --------------------------------------------------------- */
+
+function nowParts() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Paris',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).formatToParts(now);
+  }).formatToParts(new Date());
 
   const get = (type: string) =>
     parts.find((p) => p.type === type)?.value ?? '01';
 
-  return `${get('year')}-${get('month')}-${get('day')}`;
+  return {
+    day: `${get('year')}-${get('month')}-${get('day')}`,
+    month: `${get('year')}-${get('month')}`,
+    year: get('year'),
+  };
 }
 
-function shiftDate(iso: string, days: number) {
+function shiftDay(iso: string, days: number) {
   const d = new Date(iso + 'T12:00:00Z');
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
-function labelDate(iso: string) {
-  if (iso === todayIso()) return "Aujourd'hui";
-  if (iso === shiftDate(todayIso(), -1)) return 'Hier';
+function shiftMonth(iso: string, months: number) {
+  const [year, month] = iso.split('-').map(Number);
+  const d = new Date(Date.UTC(year, month - 1 + months, 1));
+
+  return (
+    d.getUTCFullYear() +
+    '-' +
+    String(d.getUTCMonth() + 1).padStart(2, '0')
+  );
+}
+
+function labelFor(scope: Scope, value: string) {
+  const now = nowParts();
+
+  if (scope === 'year') return value;
+
+  if (scope === 'month') {
+    const [year, month] = value.split('-').map(Number);
+
+    const formatted = new Date(
+      Date.UTC(year, month - 1, 15)
+    ).toLocaleDateString('fr-FR', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+
+    return (
+      formatted.charAt(0).toUpperCase() + formatted.slice(1)
+    );
+  }
+
+  if (value === now.day) return "Aujourd'hui";
+  if (value === shiftDay(now.day, -1)) return 'Hier';
 
   const formatted = new Date(
-    iso + 'T12:00:00Z'
+    value + 'T12:00:00Z'
   ).toLocaleDateString('fr-FR', {
     weekday: 'long',
     day: 'numeric',
@@ -111,8 +149,20 @@ function labelDate(iso: string) {
   );
 }
 
-function formatKwh(wh: number | null) {
-  if (wh === null) return '—';
+/* ---------------------------------------------------------
+   FORMATS
+   --------------------------------------------------------- */
+
+function formatKwh(wh: number | null | undefined) {
+  if (wh === null || wh === undefined) return '—';
+
+  if (Math.abs(wh) >= 100000) {
+    return (
+      Math.round(wh / 1000)
+        .toString()
+        .replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' kWh'
+    );
+  }
 
   return (wh / 1000).toFixed(1).replace('.', ',') + ' kWh';
 }
@@ -124,64 +174,159 @@ function formatKw(watts: number | null) {
 }
 
 function formatClock(minute: number) {
-  const h = Math.floor(minute / 60);
-  const m = minute % 60;
-
   return (
-    String(h).padStart(2, '0') +
+    String(Math.floor(minute / 60)).padStart(2, '0') +
     ':' +
-    String(m).padStart(2, '0')
+    String(minute % 60).padStart(2, '0')
   );
 }
 
-export default function SolarDayPage() {
-  const [date, setDate] = useState(todayIso());
+/*
+ * Graduations : on cherche un pas rond qui donne quatre à six
+ * lignes. Un pas calculé au plus juste donnerait des repères
+ * du genre « 3,7 kWh », impossibles à lire d'un coup d'œil.
+ */
+
+function niceStep(max: number) {
+  if (max <= 0) return 1;
+
+  const rough = max / 5;
+  const magnitude = Math.pow(
+    10,
+    Math.floor(Math.log10(rough))
+  );
+
+  for (const factor of [1, 2, 2.5, 5, 10]) {
+    const step = magnitude * factor;
+    if (step >= rough) return step;
+  }
+
+  return magnitude * 10;
+}
+
+export default function SolarPage() {
+  const [scope, setScope] = useState<Scope>('day');
+  const [day, setDay] = useState(() => nowParts().day);
+  const [month, setMonth] = useState(
+    () => nowParts().month
+  );
+  const [year, setYear] = useState(() => nowParts().year);
+
   const [points, setPoints] = useState<Point[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTable, setShowTable] = useState(false);
+
   const [cursor, setCursor] = useState<number | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
 
   const plotRef = useRef<SVGSVGElement | null>(null);
+  const retriesRef = useRef(0);
+
+  const current =
+    scope === 'day' ? day : scope === 'month' ? month : year;
+
+  /* ---------------------------------------------------------
+     CHARGEMENT
+     --------------------------------------------------------- */
 
   useEffect(() => {
     let cancelled = false;
 
     setLoading(true);
+    setCursor(null);
+    setPicked(null);
 
-    fetch('/api/solar/history?date=' + date)
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled) return;
+    const load = () => {
+      fetch(
+        `/api/solar/history?scope=${scope}&date=${current}`
+      )
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled) return;
 
-        setPoints(
-          Array.isArray(data.points) ? data.points : []
-        );
-        setTotals(data.totals || null);
-      })
-      .catch(() => {
-        if (!cancelled) {
+          setPoints(
+            Array.isArray(data.points) ? data.points : []
+          );
+          setRows(Array.isArray(data.rows) ? data.rows : []);
+          setTotals(data.totals || null);
+
+          /*
+           * La vue annuelle ne reconstitue que quelques mois
+           * par requête, pour ne pas dépasser le temps imparti
+           * à la fonction serveur. On relance tant qu'il en
+           * manque — mais pas indéfiniment : si un mois refuse
+           * obstinément de se calculer, mieux vaut une page
+           * incomplète qu'une boucle sans fin.
+           */
+          if (
+            data.pending > 0 &&
+            retriesRef.current < 6
+          ) {
+            retriesRef.current += 1;
+            load();
+            return;
+          }
+
+          setLoading(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+
           setPoints([]);
+          setRows([]);
           setTotals(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+          setLoading(false);
+        });
+    };
+
+    retriesRef.current = 0;
+    load();
 
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [scope, current]);
 
-  /*
-   * Le haut de l'échelle est un multiple de 2 kW, jamais moins
-   * de 10. Un plafond fixe à 10 aurait tronqué la courbe le
-   * jour où l'installation dépasse — une erreur invisible,
-   * puisqu'une courbe rognée ressemble à une courbe plate.
-   */
+  /* Cumuls d'un mois ou d'une année : la somme des lignes. */
 
-  const topKw = useMemo(() => {
+  const aggregate = useMemo(() => {
+    if (scope === 'day') return totals;
+
+    const sum = (pick: (t: Totals) => number | null) => {
+      let total = 0;
+      let seen = false;
+
+      for (const row of rows) {
+        if (!row.totals) continue;
+
+        const value = pick(row.totals);
+
+        if (value === null) continue;
+
+        total += value;
+        seen = true;
+      }
+
+      return seen ? total : null;
+    };
+
+    return {
+      productionWh: sum((t) => t.productionWh),
+      importWh: sum((t) => t.importWh),
+      exportWh: sum((t) => t.exportWh),
+      consumptionWh: sum((t) => t.consumptionWh),
+      selfConsumedWh: sum((t) => t.selfConsumedWh),
+      estimated: rows.some((r) => r.totals?.estimated),
+    } as Totals;
+  }, [scope, rows, totals]);
+
+  /* ---------------------------------------------------------
+     ÉCHELLE VERTICALE
+     --------------------------------------------------------- */
+
+  const dayTopKw = useMemo(() => {
     let peak = 0;
 
     for (const point of points) {
@@ -193,27 +338,47 @@ export default function SolarDayPage() {
       }
     }
 
-    const needed =
-      Math.ceil(peak / 1000 / STEP_KW) * STEP_KW;
-
-    return Math.max(MIN_TOP_KW, needed);
+    return Math.max(
+      MIN_TOP_KW,
+      Math.ceil(peak / 1000 / STEP_KW) * STEP_KW
+    );
   }, [points]);
 
-  const x = (minute: number) =>
-    PAD_L +
-    (minute / DAY_MINUTES) * (W - PAD_L - PAD_R);
+  const barScale = useMemo(() => {
+    let peak = 0;
 
-  const y = (watts: number) =>
+    for (const row of rows) {
+      if (!row.totals) continue;
+
+      peak = Math.max(
+        peak,
+        row.totals.productionWh ?? 0,
+        row.totals.consumptionWh ?? 0
+      );
+    }
+
+    const step = niceStep(peak / 1000);
+    const top = Math.max(step, Math.ceil(peak / 1000 / step) * step);
+
+    return { top, step };
+  }, [rows]);
+
+  const x = (minute: number) =>
+    PAD_L + (minute / DAY_MINUTES) * (W - PAD_L - PAD_R);
+
+  const yDay = (watts: number) =>
     H -
     PAD_B -
-    (watts / (topKw * 1000)) * (H - PAD_T - PAD_B);
+    (watts / (dayTopKw * 1000)) * (H - PAD_T - PAD_B);
 
-  /*
-   * Les séries sont découpées en segments continus : une
-   * coupure de collecte doit se voir comme un TROU, pas se
-   * faire enjamber par un trait droit qui inventerait des
-   * valeurs jamais mesurées.
-   */
+  const yBar = (wh: number) =>
+    H -
+    PAD_B -
+    (wh / (barScale.top * 1000)) * (H - PAD_T - PAD_B);
+
+  /* ---------------------------------------------------------
+     COURBE DU JOUR
+     --------------------------------------------------------- */
 
   const segments = useMemo(() => {
     const production: Array<Array<[number, number]>> = [];
@@ -233,18 +398,20 @@ export default function SolarDayPage() {
       cc = [];
     };
 
-    let previousMinute: number | null = null;
+    let previous: number | null = null;
 
     for (const point of points) {
-      /* Plus d'un créneau d'écart = collecte interrompue. */
+      /* Plus d'un créneau d'écart = collecte interrompue. Le
+         trou doit rester un trou : un trait droit inventerait
+         des valeurs jamais mesurées. */
       if (
-        previousMinute !== null &&
-        point.minute - previousMinute > SLOT_MINUTES
+        previous !== null &&
+        point.minute - previous > SLOT_MINUTES
       ) {
         flush();
       }
 
-      previousMinute = point.minute;
+      previous = point.minute;
 
       if (point.production !== null) {
         cp.push([point.minute, point.production]);
@@ -277,22 +444,20 @@ export default function SolarDayPage() {
           (index === 0 ? 'M' : 'L') +
           x(minute).toFixed(1) +
           ' ' +
-          y(watts).toFixed(1)
+          yDay(watts).toFixed(1)
       )
       .join(' ');
 
-    const first = segment[0][0];
-    const last = segment[segment.length - 1][0];
     const base = (H - PAD_B).toFixed(1);
 
     return (
       top +
       ' L' +
-      x(last).toFixed(1) +
+      x(segment[segment.length - 1][0]).toFixed(1) +
       ' ' +
       base +
       ' L' +
-      x(first).toFixed(1) +
+      x(segment[0][0]).toFixed(1) +
       ' ' +
       base +
       ' Z'
@@ -306,26 +471,9 @@ export default function SolarDayPage() {
           (index === 0 ? 'M' : 'L') +
           x(minute).toFixed(1) +
           ' ' +
-          y(watts).toFixed(1)
+          yDay(watts).toFixed(1)
       )
       .join(' ');
-
-  const gridLines = useMemo(() => {
-    const lines: number[] = [];
-
-    for (let kw = 0; kw <= topKw; kw += STEP_KW) {
-      lines.push(kw);
-    }
-
-    return lines;
-  }, [topKw]);
-
-  /*
-   * Curseur : le doigt glisse sur le tracé et lit les trois
-   * valeurs à cet instant. Il ne REMPLACE rien — la légende et
-   * le tableau donnent les mêmes chiffres sans geste, pour qui
-   * ne peut pas viser.
-   */
 
   const readAt = (clientX: number) => {
     const svg = plotRef.current;
@@ -335,87 +483,104 @@ export default function SolarDayPage() {
     const box = svg.getBoundingClientRect();
     const ratio = (clientX - box.left) / box.width;
 
-    const minute = Math.round(
-      (ratio * W - PAD_L) /
-        (W - PAD_L - PAD_R) *
-        DAY_MINUTES /
-        SLOT_MINUTES
-    ) * SLOT_MINUTES;
+    const minute =
+      Math.round(
+        (((ratio * W - PAD_L) / (W - PAD_L - PAD_R)) *
+          DAY_MINUTES) /
+          SLOT_MINUTES
+      ) * SLOT_MINUTES;
 
-    setCursor(
-      Math.min(Math.max(minute, 0), DAY_MINUTES)
-    );
+    setCursor(Math.min(Math.max(minute, 0), DAY_MINUTES));
   };
 
   const cursorPoint = useMemo(() => {
     if (cursor === null) return null;
 
     let best: Point | null = null;
-    let bestGap = Infinity;
+    let gap = Infinity;
 
     for (const point of points) {
-      const gap = Math.abs(point.minute - cursor);
+      const distance = Math.abs(point.minute - cursor);
 
-      if (gap < bestGap) {
-        bestGap = gap;
+      if (distance < gap) {
+        gap = distance;
         best = point;
       }
     }
 
-    return bestGap <= SLOT_MINUTES * 2 ? best : null;
+    return gap <= SLOT_MINUTES * 2 ? best : null;
   }, [cursor, points]);
 
-  /* Tableau : moyennes horaires. 288 lignes seraient
-     illisibles ; 24 se parcourent. */
+  /* ---------------------------------------------------------
+     NAVIGATION
+     --------------------------------------------------------- */
 
-  const hourly = useMemo(() => {
-    const rows: Array<{
-      hour: number;
-      production: number | null;
-      consumption: number | null;
-    }> = [];
+  const now = nowParts();
 
-    for (let hour = 0; hour < 24; hour++) {
-      const inHour = points.filter(
-        (point) =>
-          point.minute >= hour * 60 &&
-          point.minute < (hour + 1) * 60
-      );
+  const atPresent =
+    scope === 'day'
+      ? day === now.day
+      : scope === 'month'
+        ? month === now.month
+        : year === now.year;
 
-      if (inHour.length === 0) {
-        rows.push({
-          hour,
-          production: null,
-          consumption: null,
-        });
-        continue;
+  const step = (direction: number) => {
+    if (scope === 'day') setDay(shiftDay(day, direction));
+    else if (scope === 'month')
+      setMonth(shiftMonth(month, direction));
+    else setYear(String(Number(year) + direction));
+  };
+
+  /*
+   * Descendre d'un niveau : toucher un mois ouvre ce mois,
+   * toucher un jour ouvre ce jour. C'est le geste que tout le
+   * monde tente devant un graphique en barres.
+   */
+
+  const drillInto = (key: string) => {
+    if (scope === 'year') {
+      setMonth(key);
+      setScope('month');
+    } else if (scope === 'month') {
+      setDay(key);
+      setScope('day');
+    }
+  };
+
+  const pickedRow = rows.find((row) => row.key === picked);
+
+  const gridValues = useMemo(() => {
+    if (scope === 'day') {
+      const lines: number[] = [];
+      for (let kw = 0; kw <= dayTopKw; kw += STEP_KW) {
+        lines.push(kw);
       }
-
-      const mean = (
-        pick: (p: Point) => number | null
-      ) => {
-        const values = inHour
-          .map(pick)
-          .filter((v): v is number => v !== null);
-
-        if (values.length === 0) return null;
-
-        return (
-          values.reduce((a, b) => a + b, 0) / values.length
-        );
-      };
-
-      rows.push({
-        hour,
-        production: mean((p) => p.production),
-        consumption: mean((p) => p.consumption),
-      });
+      return lines;
     }
 
-    return rows;
-  }, [points]);
+    const lines: number[] = [];
+    for (
+      let value = 0;
+      value <= barScale.top + 0.0001;
+      value += barScale.step
+    ) {
+      lines.push(Number(value.toFixed(3)));
+    }
+    return lines;
+  }, [scope, dayTopKw, barScale]);
 
-  const isToday = date === todayIso();
+  /* Largeur d'une barre, avec un intervalle constant. */
+
+  const barGeometry = useMemo(() => {
+    const count = Math.max(rows.length, 1);
+    const usable = W - PAD_L - PAD_R;
+    const slot = usable / count;
+
+    return {
+      slot,
+      width: Math.max(slot * 0.62, 2),
+    };
+  }, [rows.length]);
 
   return (
     <main className="page solar-page">
@@ -426,26 +591,51 @@ export default function SolarDayPage() {
           ‹ Accueil
         </Link>
 
-        <h1>{labelDate(date)}</h1>
+        <h1>{labelFor(scope, current)}</h1>
 
-        <div className="solar-nav">
+        <div className="solar-controls">
 
-          <button
-            type="button"
-            onClick={() => setDate(shiftDate(date, -1))}
-            aria-label="Jour précédent"
-          >
-            ‹
-          </button>
+          <div className="solar-scopes">
+            {(['day', 'month', 'year'] as Scope[]).map(
+              (value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={
+                    scope === value ? 'is-active' : ''
+                  }
+                  onClick={() => setScope(value)}
+                >
+                  {value === 'day'
+                    ? 'Jour'
+                    : value === 'month'
+                      ? 'Mois'
+                      : 'Année'}
+                </button>
+              )
+            )}
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setDate(shiftDate(date, 1))}
-            disabled={isToday}
-            aria-label="Jour suivant"
-          >
-            ›
-          </button>
+          <div className="solar-nav">
+
+            <button
+              type="button"
+              onClick={() => step(-1)}
+              aria-label="Précédent"
+            >
+              ‹
+            </button>
+
+            <button
+              type="button"
+              onClick={() => step(1)}
+              disabled={atPresent}
+              aria-label="Suivant"
+            >
+              ›
+            </button>
+
+          </div>
 
         </div>
 
@@ -458,95 +648,234 @@ export default function SolarDayPage() {
           className="solar-chart"
           viewBox={`0 0 ${W} ${H}`}
           role="img"
-          aria-label="Production et consommation de la journée"
-          onPointerDown={(e) => readAt(e.clientX)}
-          onPointerMove={(e) => {
-            if (e.buttons > 0 || e.pointerType === 'touch') {
-              readAt(e.clientX);
-            }
-          }}
+          aria-label="Production et consommation"
+          onPointerDown={
+            scope === 'day'
+              ? (e) => readAt(e.clientX)
+              : undefined
+          }
+          onPointerMove={
+            scope === 'day'
+              ? (e) => {
+                  if (
+                    e.buttons > 0 ||
+                    e.pointerType === 'touch'
+                  ) {
+                    readAt(e.clientX);
+                  }
+                }
+              : undefined
+          }
           onPointerLeave={() => setCursor(null)}
           onPointerUp={() => setCursor(null)}
         >
 
-          {/* Graduations : traits pleins d'un demi-pixel.
-              Des pointillés se liraient comme un seuil. */}
+          {/* Graduations : traits pleins d'un demi-pixel. Des
+              pointillés se liraient comme un seuil. */}
 
-          {gridLines.map((kw) => (
-            <g key={kw}>
-              <line
-                className="solar-grid-line"
-                x1={PAD_L}
-                x2={W - PAD_R}
-                y1={y(kw * 1000)}
-                y2={y(kw * 1000)}
-              />
-              <text
-                className="solar-axis-text"
-                x={PAD_L - 8}
-                y={y(kw * 1000) + 3.5}
-                textAnchor="end"
-              >
-                {kw}
-              </text>
-            </g>
-          ))}
+          {gridValues.map((value) => {
+            const yy =
+              scope === 'day'
+                ? yDay(value * 1000)
+                : yBar(value * 1000);
 
-          {[0, 6, 12, 18, 24].map((hour) => (
-            <text
-              key={hour}
-              className="solar-axis-text"
-              x={x(hour * 60)}
-              y={H - PAD_B + 16}
-              textAnchor={
-                hour === 0
-                  ? 'start'
-                  : hour === 24
-                    ? 'end'
-                    : 'middle'
-              }
-            >
-              {String(hour).padStart(2, '0')}h
-            </text>
-          ))}
+            return (
+              <g key={value}>
+                <line
+                  className="solar-grid-line"
+                  x1={PAD_L}
+                  x2={W - PAD_R}
+                  y1={yy}
+                  y2={yy}
+                />
+                <text
+                  className="solar-axis-text"
+                  x={PAD_L - 6}
+                  y={yy + 3.5}
+                  textAnchor="end"
+                >
+                  {value}
+                </text>
+              </g>
+            );
+          })}
 
-          {segments.production.map((segment, index) => (
-            <path
-              key={'p' + index}
-              className="solar-area-production"
-              d={areaPath(segment)}
-            />
-          ))}
+          {scope === 'day' ? (
+            <>
+              {[0, 6, 12, 18, 24].map((hour) => (
+                <text
+                  key={hour}
+                  className="solar-axis-text"
+                  x={x(hour * 60)}
+                  y={H - PAD_B + 16}
+                  textAnchor={
+                    hour === 0
+                      ? 'start'
+                      : hour === 24
+                        ? 'end'
+                        : 'middle'
+                  }
+                >
+                  {String(hour).padStart(2, '0')}h
+                </text>
+              ))}
 
-          {segments.selfUse.map((segment, index) => (
-            <path
-              key={'s' + index}
-              className="solar-area-self"
-              d={areaPath(segment)}
-            />
-          ))}
+              {segments.production.map((segment, index) => (
+                <path
+                  key={'p' + index}
+                  className="solar-area-production"
+                  d={areaPath(segment)}
+                />
+              ))}
 
-          {segments.consumption.map((segment, index) => (
-            <path
-              key={'c' + index}
-              className="solar-line-consumption"
-              d={linePath(segment)}
-            />
-          ))}
+              {segments.selfUse.map((segment, index) => (
+                <path
+                  key={'s' + index}
+                  className="solar-area-self"
+                  d={areaPath(segment)}
+                />
+              ))}
 
-          {cursorPoint && (
-            <line
-              className="solar-cursor"
-              x1={x(cursorPoint.minute)}
-              x2={x(cursorPoint.minute)}
-              y1={PAD_T}
-              y2={H - PAD_B}
-            />
+              {segments.consumption.map((segment, index) => (
+                <path
+                  key={'c' + index}
+                  className="solar-line-consumption"
+                  d={linePath(segment)}
+                />
+              ))}
+
+              {cursorPoint && (
+                <line
+                  className="solar-cursor"
+                  x1={x(cursorPoint.minute)}
+                  x2={x(cursorPoint.minute)}
+                  y1={PAD_T}
+                  y2={H - PAD_B}
+                />
+              )}
+            </>
+          ) : (
+            <>
+              {rows.map((row, index) => {
+                const cx =
+                  PAD_L +
+                  barGeometry.slot * (index + 0.5);
+
+                const left = cx - barGeometry.width / 2;
+                const base = H - PAD_B;
+
+                const self =
+                  row.totals?.selfConsumedWh ?? 0;
+                const exported =
+                  row.totals?.exportWh ?? 0;
+                const used =
+                  row.totals?.consumptionWh ?? null;
+
+                const selfTop = yBar(self);
+                const prodTop = yBar(self + exported);
+
+                /* Un intervalle de 2 unités sépare les deux
+                   segments empilés : un trait de contour les
+                   alourdirait, un contact direct les
+                   fondrait l'un dans l'autre. */
+                const gap = self > 0 && exported > 0 ? 2 : 0;
+
+                return (
+                  <g
+                    key={row.key}
+                    className={
+                      picked === row.key
+                        ? 'solar-bar is-picked'
+                        : 'solar-bar'
+                    }
+                    onPointerDown={() =>
+                      setPicked(
+                        picked === row.key ? null : row.key
+                      )
+                    }
+                  >
+
+                    {/* Zone tactile large : viser une barre de
+                        cinq pixels au doigt est impossible. */}
+                    <rect
+                      className="solar-bar-hit"
+                      x={cx - barGeometry.slot / 2}
+                      y={PAD_T}
+                      width={barGeometry.slot}
+                      height={base - PAD_T}
+                    />
+
+                    {exported > 0 && (
+                      <rect
+                        className="solar-bar-export"
+                        x={left}
+                        y={prodTop}
+                        width={barGeometry.width}
+                        height={Math.max(
+                          selfTop - prodTop - gap,
+                          0.5
+                        )}
+                        rx={1.5}
+                      />
+                    )}
+
+                    {self > 0 && (
+                      <rect
+                        className="solar-bar-self"
+                        x={left}
+                        y={selfTop}
+                        width={barGeometry.width}
+                        height={Math.max(
+                          base - selfTop,
+                          0.5
+                        )}
+                        rx={1.5}
+                      />
+                    )}
+
+                    {used !== null && used > 0 && (
+                      <line
+                        className="solar-bar-consumption"
+                        x1={left - 1}
+                        x2={left + barGeometry.width + 1}
+                        y1={yBar(used)}
+                        y2={yBar(used)}
+                      />
+                    )}
+
+                  </g>
+                );
+              })}
+
+              {rows.map((row, index) => {
+                const show =
+                  scope === 'year' ||
+                  index === 0 ||
+                  (index + 1) % 5 === 0;
+
+                if (!show) return null;
+
+                return (
+                  <text
+                    key={'l' + row.key}
+                    className="solar-axis-text"
+                    x={
+                      PAD_L +
+                      barGeometry.slot * (index + 0.5)
+                    }
+                    y={H - PAD_B + 16}
+                    textAnchor="middle"
+                  >
+                    {row.label}
+                  </text>
+                );
+              })}
+            </>
           )}
 
         </svg>
 
-        {cursorPoint && (
+        {scope === 'day' && cursorPoint && (
           <div className="solar-readout">
 
             <strong>
@@ -564,30 +893,71 @@ export default function SolarDayPage() {
           </div>
         )}
 
+        {scope !== 'day' && pickedRow && (
+          <div className="solar-readout">
+
+            <strong>{pickedRow.label}</strong>
+
+            <span>
+              {formatKwh(pickedRow.totals?.productionWh)}{' '}
+              produits
+            </span>
+
+            <span>
+              {formatKwh(pickedRow.totals?.consumptionWh)}{' '}
+              consommés
+            </span>
+
+            <button
+              type="button"
+              className="solar-drill"
+              onClick={() => drillInto(pickedRow.key)}
+            >
+              Voir le détail ›
+            </button>
+
+          </div>
+        )}
+
         {loading && (
           <p className="solar-empty">Chargement…</p>
         )}
 
-        {!loading && points.length === 0 && (
-          <p className="solar-empty">
-            Aucun relevé pour cette journée.
-          </p>
-        )}
+        {!loading &&
+          scope === 'day' &&
+          points.length === 0 && (
+            <p className="solar-empty">
+              Aucun relevé pour cette journée.
+            </p>
+          )}
+
+        {!loading &&
+          scope !== 'day' &&
+          rows.length === 0 && (
+            <p className="solar-empty">
+              Aucun relevé sur cette période.
+            </p>
+          )}
 
       </section>
 
-      {/* ---------------------------------------------
-          LÉGENDE — elle porte aussi les totaux, ce qui
-          rend chaque série lisible sans dépendre de sa
-          couleur seule.
-          --------------------------------------------- */}
+      {/* Légende : elle porte les totaux, ce qui rend chaque
+          série lisible sans dépendre de sa couleur seule. */}
 
       <section className="solar-legend">
 
         <div className="solar-legend-row">
           <span className="solar-swatch is-production" />
-          <span className="solar-legend-label">Production</span>
-          <strong>{formatKwh(totals?.productionWh ?? null)}</strong>
+          <span className="solar-legend-label">
+            {scope === 'day' ? 'Production' : 'Injectée'}
+          </span>
+          <strong>
+            {formatKwh(
+              scope === 'day'
+                ? aggregate?.productionWh
+                : aggregate?.exportWh
+            )}
+          </strong>
         </div>
 
         <div className="solar-legend-row">
@@ -596,7 +966,7 @@ export default function SolarDayPage() {
             Autoconsommée
           </span>
           <strong>
-            {formatKwh(totals?.selfConsumedWh ?? null)}
+            {formatKwh(aggregate?.selfConsumedWh)}
           </strong>
         </div>
 
@@ -606,29 +976,30 @@ export default function SolarDayPage() {
             Consommation
           </span>
           <strong>
-            {formatKwh(totals?.consumptionWh ?? null)}
+            {formatKwh(aggregate?.consumptionWh)}
           </strong>
         </div>
 
         <div className="solar-legend-split">
 
           <div>
-            <small>Soutiré au réseau</small>
-            <strong>{formatKwh(totals?.importWh ?? null)}</strong>
+            <small>Production totale</small>
+            <strong>
+              {formatKwh(aggregate?.productionWh)}
+            </strong>
           </div>
 
           <div>
-            <small>Injecté sur le réseau</small>
-            <strong>{formatKwh(totals?.exportWh ?? null)}</strong>
+            <small>Soutiré au réseau</small>
+            <strong>{formatKwh(aggregate?.importWh)}</strong>
           </div>
 
         </div>
 
-        {totals?.estimated && (
+        {aggregate?.estimated && (
           <p className="solar-estimated">
-            Totaux reconstitués depuis les courbes : les
-            compteurs du Smart Meter n&apos;ont pas couvert
-            toute la journée.
+            Certains totaux ont été reconstitués depuis les
+            courbes, faute de compteur sur toute la période.
           </p>
         )}
 
@@ -651,28 +1022,87 @@ export default function SolarDayPage() {
 
             <thead>
               <tr>
-                <th>Heure</th>
+                <th>
+                  {scope === 'day'
+                    ? 'Heure'
+                    : scope === 'month'
+                      ? 'Jour'
+                      : 'Mois'}
+                </th>
                 <th>Production</th>
                 <th>Consommation</th>
               </tr>
             </thead>
 
             <tbody>
-              {hourly.map((row) => (
-                <tr key={row.hour}>
-                  <td>
-                    {String(row.hour).padStart(2, '0')}h
-                  </td>
-                  <td>{formatKw(row.production)}</td>
-                  <td>{formatKw(row.consumption)}</td>
-                </tr>
-              ))}
+              {scope === 'day'
+                ? Array.from({ length: 24 }).map(
+                    (_, hour) => {
+                      const inHour = points.filter(
+                        (point) =>
+                          point.minute >= hour * 60 &&
+                          point.minute < (hour + 1) * 60
+                      );
+
+                      const mean = (
+                        pick: (p: Point) => number | null
+                      ) => {
+                        const values = inHour
+                          .map(pick)
+                          .filter(
+                            (v): v is number => v !== null
+                          );
+
+                        if (values.length === 0) return null;
+
+                        return (
+                          values.reduce((a, b) => a + b, 0) /
+                          values.length
+                        );
+                      };
+
+                      return (
+                        <tr key={hour}>
+                          <td>
+                            {String(hour).padStart(2, '0')}h
+                          </td>
+                          <td>
+                            {formatKw(
+                              mean((p) => p.production)
+                            )}
+                          </td>
+                          <td>
+                            {formatKw(
+                              mean((p) => p.consumption)
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )
+                : rows.map((row) => (
+                    <tr key={row.key}>
+                      <td>{row.label}</td>
+                      <td>
+                        {formatKwh(
+                          row.totals?.productionWh
+                        )}
+                      </td>
+                      <td>
+                        {formatKwh(
+                          row.totals?.consumptionWh
+                        )}
+                      </td>
+                    </tr>
+                  ))}
             </tbody>
 
           </table>
 
           <p className="solar-table-note">
-            Moyennes horaires, en kW.
+            {scope === 'day'
+              ? 'Moyennes horaires, en kW.'
+              : 'Totaux par période.'}
           </p>
 
         </div>
