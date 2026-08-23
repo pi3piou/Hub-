@@ -1,8 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import {
+  usePathname,
+  useRouter,
+} from 'next/navigation';
 import { useEffect, useState } from 'react';
+
+import { loadSources } from '@/lib/techfeed/prefs';
 
 /*
  * =============================================================
@@ -56,9 +61,21 @@ function hidesMenu(pathname: string) {
 
 const THEME_KEY = 'anime_theme';
 
+type Source = {
+  id: string;
+  name: string;
+  label?: string;
+  color?: string;
+  favorite?: boolean;
+};
+
 export default function HubMenu() {
   const pathname = usePathname();
+  const router = useRouter();
+
   const [open, setOpen] = useState(false);
+  const [newsOpen, setNewsOpen] = useState(false);
+  const [sources, setSources] = useState<Source[]>([]);
 
   const [theme, setTheme] = useState<'dark' | 'light'>(
     'dark'
@@ -71,6 +88,24 @@ export default function HubMenu() {
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
+
+  /*
+   * Les sources sont relues à chaque ouverture du panneau, et
+   * pas une fois pour toutes au montage : le menu vit dans la
+   * mise en page globale, il n'est jamais démonté. Sans cette
+   * relecture, une source ajoutée depuis les réglages
+   * n'apparaîtrait qu'après un rechargement complet.
+   */
+
+  useEffect(() => {
+    if (!open) return;
+
+    try {
+      setSources(loadSources());
+    } catch {
+      setSources([]);
+    }
+  }, [open]);
 
   /* Échap pour fermer, et on bloque le défilement de la page
      derrière le panneau tant qu'il est ouvert. */
@@ -172,6 +207,146 @@ export default function HubMenu() {
               section.href === '/'
                 ? pathname === '/'
                 : pathname.startsWith(section.href);
+
+            /*
+             * News se déplie pour donner accès aux sources.
+             * C'est la contrepartie du bouton retiré en haut à
+             * droite de la page News : sans lui, il n'existait
+             * plus aucun chemin vers la gestion des flux.
+             */
+
+            if (section.href === '/tech') {
+              return (
+                <div
+                  key={section.href}
+                  className="hub-menu-group"
+                >
+
+                  <div
+                    className={
+                      active
+                        ? 'hub-menu-row is-active'
+                        : 'hub-menu-row'
+                    }
+                  >
+
+                    <Link
+                      href={section.href}
+                      className="hub-menu-row-main"
+                    >
+
+                      <span className="hub-menu-row-icon">
+                        {section.icon}
+                      </span>
+
+                      <span className="hub-menu-row-text">
+
+                        <strong>{section.label}</strong>
+
+                        <small>{section.hint}</small>
+
+                      </span>
+
+                    </Link>
+
+                    <button
+                      type="button"
+                      className={
+                        newsOpen
+                          ? 'hub-menu-expand is-open'
+                          : 'hub-menu-expand'
+                      }
+                      onClick={() =>
+                        setNewsOpen(!newsOpen)
+                      }
+                      aria-label={
+                        newsOpen
+                          ? 'Replier les sources'
+                          : 'Déplier les sources'
+                      }
+                    >
+                      ›
+                    </button>
+
+                  </div>
+
+                  {newsOpen && (
+                    <div className="hub-menu-sub">
+
+                      <button
+                        type="button"
+                        className="hub-menu-sub-row"
+                        onClick={() => {
+                          router.push('/tech');
+                          setOpen(false);
+                        }}
+                      >
+                        <span className="hub-menu-dot is-all" />
+                        Tous les articles
+                      </button>
+
+                      {sources.map((source) => (
+                        <button
+                          key={source.id}
+                          type="button"
+                          className="hub-menu-sub-row"
+                          onClick={() => {
+                            router.push(
+                              '/tech?source=' +
+                                encodeURIComponent(
+                                  source.id
+                                )
+                            );
+                            setOpen(false);
+                          }}
+                        >
+                          <span
+                            className="hub-menu-dot"
+                            style={{
+                              background:
+                                source.color || undefined,
+                            }}
+                          />
+                          {source.label || source.name}
+                        </button>
+                      ))}
+
+                      <button
+                        type="button"
+                        className="hub-menu-sub-row is-settings"
+                        onClick={() => {
+                          /*
+                           * Le tiroir des réglages vit dans la
+                           * page News, hors de l'arbre React de
+                           * ce menu. Un évènement du navigateur
+                           * est le lien le plus simple entre
+                           * les deux — pas d'état partagé à
+                           * maintenir, et si la page News n'est
+                           * pas montée, l'évènement se perd
+                           * sans rien casser.
+                           */
+                          router.push('/tech');
+                          setOpen(false);
+
+                          window.setTimeout(() => {
+                            window.dispatchEvent(
+                              new CustomEvent(
+                                'techfeed:open-drawer'
+                              )
+                            );
+                          }, 260);
+                        }}
+                      >
+                        <span className="hub-menu-dot is-settings" />
+                        Gérer les sources
+                      </button>
+
+                    </div>
+                  )}
+
+                </div>
+              );
+            }
 
             return (
               <Link
