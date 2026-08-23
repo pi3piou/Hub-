@@ -2,35 +2,43 @@
 
 /*
  * =============================================================
- * FLUX SOLAIRE — les trois cercles et les billes animées
+ * FLUX SOLAIRE — trois nœuds, des billes qui remontent
  *
- * Soleil, maison, réseau. Les billes circulent le long des
- * traits et changent de couleur au fil de leur trajet : orange
- * du côté du soleil, bleu du côté de la maison et du réseau.
+ * Les icônes sont DESSINÉES ici, en SVG. La version
+ * précédente utilisait trois caractères de police (☀ ⌂ ⌁) :
+ * on héritait alors du dessin de la police du système, sans
+ * aucun contrôle sur l'épaisseur, le cadrage ou le style — et
+ * ça se voyait, les trois n'appartenaient visiblement pas à
+ * la même famille.
  *
- * Le trajet est une simple translation horizontale plutôt
- * qu'un `offset-path` sur une courbe SVG. Les liaisons sont
- * droites, donc la courbe n'apporterait rien, et le
- * `translateX` est composé par le GPU sur toutes les versions
- * de Safari — y compris les plus anciennes, où offset-path est
- * absent ou partiel.
+ * Les billes descendent du nœud de départ, longent le bas, et
+ * REMONTENT dans le nœud d'arrivée. Ce détour par le bas rend
+ * le sens du courant lisible d'un coup d'œil, là où un trait
+ * droit entre deux cercles ne dit rien de la direction.
  *
- * La VITESSE porte l'information : plus il passe de puissance,
- * plus les billes filent. Multiplier leur nombre serait
- * illisible sur un trait de quarante pixels.
+ * Tout est dans un seul SVG à viewBox fixe : le dessin
+ * s'adapte à la largeur sans qu'aucune coordonnée n'ait à
+ * être recalculée en JavaScript.
  * =============================================================
  */
 
+const VW = 320;
+const VH = 138;
+
+const NODE_R = 27;
+const NODE_Y = 40;
+
+const SUN_X = 42;
+const HOUSE_X = 160;
+const GRID_X = 278;
+
+/* Hauteur du couloir où circulent les billes. */
+const LANE_Y = 108;
+
 const BEADS = [0, 1, 2, 3];
 
-/* Bornes de vitesse, en secondes par traversée. Une bille qui
-   met plus de 4 s semble immobile, une qui met moins de 0,7 s
-   devient un trait. */
-
 const SLOWEST = 4;
-const FASTEST = 0.7;
-
-/* Puissance à partir de laquelle les billes vont à fond. */
+const FASTEST = 0.8;
 const FULL_SPEED_W = 4000;
 
 function duration(watts: number) {
@@ -53,55 +61,93 @@ function formatWatts(value: number | null) {
   return watts + ' W';
 }
 
+/* Trajet en U : on descend, on longe, on remonte. */
+
+function lanePath(fromX: number, toX: number) {
+  return (
+    `M${fromX} ${NODE_Y + NODE_R}` +
+    ` V${LANE_Y}` +
+    ` H${toX}` +
+    ` V${NODE_Y + NODE_R}`
+  );
+}
+
 type Props = {
   production: number | null;
   consumption: number | null;
   grid: number | null;
 };
 
-function Track({
+function Beads({
+  id,
   watts,
-  reversed,
-  label,
 }: {
+  id: string;
   watts: number;
-  reversed: boolean;
-  label: string;
 }) {
   /*
-   * En dessous de 20 W on ne fait rien circuler. Un onduleur
-   * au repos affiche rarement zéro pile, et des billes qui
-   * rampent pour 3 W donneraient l'impression d'un flux réel.
+   * En dessous de 20 W, rien ne circule. Un onduleur au repos
+   * n'affiche jamais zéro pile, et des billes rampant pour
+   * 3 W laisseraient croire à un flux réel.
    */
 
-  const active = Math.abs(watts) >= 20;
+  if (Math.abs(watts) < 20) return null;
 
   const seconds = duration(watts);
 
   return (
-    <div
-      className={
-        'flow-track' +
-        (active ? ' is-active' : '') +
-        (reversed ? ' is-reversed' : '')
-      }
-      aria-label={label}
-    >
-      <span className="flow-line" />
+    <>
+      {BEADS.map((index) => (
+        <circle
+          key={index}
+          className="flow-bead"
+          r={3.5}
+          style={{
+            animationDuration: seconds + 's',
+            animationDelay:
+              -(seconds / BEADS.length) * index + 's',
+          }}
+        >
+          {/*
+            `begin` négatif décale la PHASE : la bille démarre
+            comme si l'animation tournait déjà depuis ce
+            temps-là. C'est ce qui les répartit le long du
+            trajet dès la première image, au lieu de les faire
+            apparaître les unes après les autres.
+          */}
+          <animateMotion
+            dur={seconds + 's'}
+            begin={
+              -(seconds / BEADS.length) * index + 's'
+            }
+            repeatCount="indefinite"
+            rotate="0"
+          >
+            <mpath href={'#' + id} />
+          </animateMotion>
 
-      {active &&
-        BEADS.map((index) => (
-          <span
-            key={index}
-            className="flow-bead"
-            style={{
-              animationDuration: seconds + 's',
-              animationDelay:
-                (seconds / BEADS.length) * index + 's',
-            }}
+          {/*
+            La COULEUR est animée en CSS, pas ici. SMIL
+            n'interpole pas les variables CSS : il aurait fallu
+            écrire les teintes en dur et perdre le thème clair.
+            Le CSS, lui, les résout — d'où ce partage des
+            rôles, le mouvement à SMIL, la couleur au CSS, avec
+            la même durée et le même décalage de phase.
+          */}
+
+          <animate
+            attributeName="opacity"
+            values="0;1;1;0"
+            keyTimes="0;0.14;0.86;1"
+            dur={seconds + 's'}
+            begin={
+              -(seconds / BEADS.length) * index + 's'
+            }
+            repeatCount="indefinite"
           />
-        ))}
-    </div>
+        </circle>
+      ))}
+    </>
   );
 }
 
@@ -114,75 +160,167 @@ export default function SolarFlow({
   const load = consumption ?? 0;
   const net = grid ?? 0;
 
-  /*
-   * Ce que la maison prend directement au soleil : la plus
-   * petite des deux valeurs. On ne peut pas autoconsommer plus
-   * qu'on ne produit, ni plus qu'on ne consomme.
-   */
+  /* Ce que la maison prend directement au soleil : on ne peut
+     autoconsommer ni plus qu'on ne produit, ni plus qu'on ne
+     consomme. */
 
   const selfUse = Math.min(pv, load);
 
-  /* `net` positif = soutirage, négatif = injection. Le trait
-     de droite change donc de sens selon le signe. */
+  /* `net` positif = soutirage. Le trajet de droite change donc
+     de sens selon le signe. */
 
   const importing = net > 0;
 
   return (
     <div className="flow">
 
-      <div className="flow-node">
+      <svg
+        className="flow-svg"
+        viewBox={`0 0 ${VW} ${VH}`}
+        role="img"
+        aria-label="Circulation de l'énergie entre le soleil, la maison et le réseau"
+      >
 
-        <span className="flow-icon is-sun">☀</span>
+        <defs>
+          <path
+            id="flow-sun-house"
+            d={lanePath(SUN_X, HOUSE_X)}
+          />
+          <path
+            id="flow-house-grid"
+            d={lanePath(HOUSE_X, GRID_X)}
+          />
+          <path
+            id="flow-grid-house"
+            d={lanePath(GRID_X, HOUSE_X)}
+          />
+        </defs>
 
-        <strong>{formatWatts(production)}</strong>
+        {/* --- les couloirs, en trait fin --- */}
 
-        <small>Production</small>
+        <path
+          className="flow-lane"
+          d={lanePath(SUN_X, HOUSE_X)}
+        />
 
-      </div>
+        <path
+          className="flow-lane"
+          d={lanePath(HOUSE_X, GRID_X)}
+        />
 
-      <Track
-        watts={selfUse}
-        reversed={false}
-        label="Du soleil vers la maison"
-      />
+        {/* --- SOLEIL --- */}
 
-      <div className="flow-node">
+        <g transform={`translate(${SUN_X} ${NODE_Y})`}>
 
-        <span className="flow-icon is-house">⌂</span>
+          <circle
+            className="flow-ring is-sun"
+            r={NODE_R}
+          />
 
-        <strong>{formatWatts(consumption)}</strong>
+          <circle className="flow-glyph is-sun" r={7} />
 
-        <small>Maison</small>
-
-      </div>
-
-      <Track
-        watts={net}
-        reversed={importing}
-        label={
-          importing
-            ? 'Du réseau vers la maison'
-            : 'De la maison vers le réseau'
-        }
-      />
-
-      <div className="flow-node">
-
-        <span className="flow-icon is-grid">⌁</span>
-
-        <strong>
-          {formatWatts(
-            grid === null ? null : Math.abs(grid)
+          {[0, 45, 90, 135, 180, 225, 270, 315].map(
+            (angle) => (
+              <line
+                key={angle}
+                className="flow-glyph-line is-sun"
+                x1={0}
+                y1={-11}
+                x2={0}
+                y2={-15}
+                transform={`rotate(${angle})`}
+              />
+            )
           )}
-        </strong>
 
-        <small>
-          {grid === null
-            ? 'Réseau'
-            : importing
-              ? 'Soutiré'
-              : 'Injecté'}
-        </small>
+        </g>
+
+        {/* --- MAISON --- */}
+
+        <g transform={`translate(${HOUSE_X} ${NODE_Y})`}>
+
+          <circle
+            className="flow-ring is-house"
+            r={NODE_R}
+          />
+
+          {/* Toit et corps en un seul tracé continu : deux
+              formes séparées se désalignaient d'un demi-pixel
+              selon la mise à l'échelle. */}
+          <path
+            className="flow-glyph-line is-house"
+            d="M-11 -1 L0 -10 L11 -1 M-8 -1 L-8 11 L8 11 L8 -1"
+          />
+
+          <path
+            className="flow-glyph-line is-house"
+            d="M-2.5 11 L-2.5 3.5 L2.5 3.5 L2.5 11"
+          />
+
+        </g>
+
+        {/* --- RÉSEAU : un pylône, pas un éclair --- */}
+
+        <g transform={`translate(${GRID_X} ${NODE_Y})`}>
+
+          <circle
+            className="flow-ring is-grid"
+            r={NODE_R}
+          />
+
+          <path
+            className="flow-glyph-line is-grid"
+            d="M-9 12 L-3.5 -11 L3.5 -11 L9 12 M-6.6 -2 L6.6 -2 M-7.8 5 L7.8 5 M-3.5 -11 L3.5 -11"
+          />
+
+          <path
+            className="flow-glyph-line is-grid"
+            d="M-12 -8 L-3.9 -8 M12 -8 L3.9 -8"
+          />
+
+        </g>
+
+        {/* --- les billes --- */}
+
+        <Beads id="flow-sun-house" watts={selfUse} />
+
+        <Beads
+          id={
+            importing
+              ? 'flow-grid-house'
+              : 'flow-house-grid'
+          }
+          watts={net}
+        />
+
+      </svg>
+
+      <div className="flow-values">
+
+        <div className="flow-value">
+          <strong>{formatWatts(production)}</strong>
+          <small>Production</small>
+        </div>
+
+        <div className="flow-value">
+          <strong>{formatWatts(consumption)}</strong>
+          <small>Maison</small>
+        </div>
+
+        <div className="flow-value">
+          <strong>
+            {formatWatts(
+              grid === null ? null : Math.abs(grid)
+            )}
+          </strong>
+          <small>
+            {grid === null
+              ? 'Réseau'
+              : importing
+                ? 'Soutiré'
+                : 'Injecté'}
+          </small>
+        </div>
 
       </div>
 
