@@ -37,9 +37,22 @@ const LANE_Y = 108;
 
 const BEADS = [0, 1, 2, 3];
 
-const SLOWEST = 4;
-const FASTEST = 0.8;
-const FULL_SPEED_W = 4000;
+/*
+ * Vitesse des billes, en secondes par traversée complète.
+ *
+ * Le trajet fait le tour par le bas : il est bien plus long
+ * qu'il n'en a l'air, presque deux cents unités. Une traversée
+ * en une seconde donnait donc des billes filantes, illisibles.
+ *
+ * Le palier de pleine vitesse est calé à 6 kW pour qu'une
+ * production ordinaire tombe au MILIEU de la plage : si le
+ * palier était au niveau habituel, tout se passerait à fond
+ * toute la journée et la vitesse ne dirait plus rien.
+ */
+
+const SLOWEST = 9;
+const FASTEST = 3;
+const FULL_SPEED_W = 6000;
 
 function duration(watts: number) {
   const ratio = Math.min(Math.abs(watts) / FULL_SPEED_W, 1);
