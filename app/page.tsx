@@ -578,46 +578,6 @@ export default function HubHome() {
 
       </section>
 
-      {/* ---------------------------------------------
-          RACCOURCIS VERS LES DEUX APPLICATIONS
-          --------------------------------------------- */}
-
-      <section className="hub-section">
-
-        <div className="hub-shortcuts">
-
-          <Link href="/tech" className="hub-shortcut">
-
-            <span className="hub-shortcut-icon">◈</span>
-
-            <span className="hub-shortcut-text">
-
-              <strong>News</strong>
-
-              <small>Actualité tech</small>
-
-            </span>
-
-          </Link>
-
-          <Link href="/anime" className="hub-shortcut">
-
-            <span className="hub-shortcut-icon">▶</span>
-
-            <span className="hub-shortcut-text">
-
-              <strong>Anime Stream</strong>
-
-              <small>Séries et planning</small>
-
-            </span>
-
-          </Link>
-
-        </div>
-
-      </section>
-
     </main>
   );
 }
