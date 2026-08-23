@@ -35,13 +35,25 @@ const DAY_MINUTES = 24 * 60;
 const STEP_KW = 2;
 const MIN_TOP_KW = 10;
 
-/* Géométrie du tracé, en unités du viewBox. */
-const W = 720;
+/*
+ * Géométrie du tracé, en unités du viewBox.
+ *
+ * La largeur est volontairement proche de la largeur réelle
+ * d'affichage. Le SVG s'étire pour remplir la carte : avec un
+ * viewBox deux fois plus large que la place disponible, tout
+ * était divisé par deux à l'écran — les libellés d'axe
+ * tombaient à cinq pixels de haut, illisibles. À 360, l'unité
+ * du dessin vaut à peu près le pixel.
+ *
+ * La hauteur double la place occupée par le graphique.
+ */
+
+const W = 360;
 const H = 300;
-const PAD_L = 40;
-const PAD_R = 10;
-const PAD_T = 12;
-const PAD_B = 26;
+const PAD_L = 30;
+const PAD_R = 8;
+const PAD_T = 14;
+const PAD_B = 28;
 
 type Point = {
   minute: number;
