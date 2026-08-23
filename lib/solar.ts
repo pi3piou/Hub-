@@ -701,3 +701,254 @@ export async function loadTotals(
     estimated: true,
   };
 }
+
+/*
+ * =============================================================
+ * AGRÉGATION — LA PYRAMIDE JOUR / MOIS / ANNÉE
+ *
+ * Relire une année en repartant des relevés de 5 minutes
+ * demanderait plus de mille commandes Redis par ouverture de
+ * page. On empile donc trois niveaux, chacun calculé depuis
+ * celui du dessous et mis en cache :
+ *
+ *   288 relevés  ->  1 total de jour  ->  1 total de mois
+ *
+ * Ce qui rend le cache sûr, c'est qu'une journée révolue ne
+ * change PLUS jamais : ses compteurs sont figés. On ne met
+ * donc en cache que le passé, et la journée en cours est
+ * recalculée à chaque fois.
+ * =============================================================
+ */
+
+const KEY_DAY_TOTALS = 'solar:totals';
+const KEY_MONTH_TOTALS = 'solar:months';
+
+/*
+ * Nombre maximum de mois manquants reconstitués par requête.
+ *
+ * Sans cette borne, une première ouverture de la vue annuelle
+ * sur un historique déjà rempli relirait 365 journées d'un
+ * coup : la fonction Vercel dépasserait son temps imparti et
+ * la page ne s'afficherait jamais. Avec la borne, elle
+ * s'affiche partiellement et se complète d'elle-même.
+ */
+
+const MAX_MONTHS_PER_REQUEST = 3;
+
+function todayLocal() {
+  return localSlot(new Date()).date;
+}
+
+function monthOf(date: string) {
+  return date.slice(0, 7);
+}
+
+function daysInMonth(month: string) {
+  const [year, mon] = month.split('-').map(Number);
+
+  /* Le jour 0 du mois suivant, c'est le dernier du mois
+     courant — la façon la plus sûre de gérer février. */
+  const count = new Date(
+    Date.UTC(year, mon, 0)
+  ).getUTCDate();
+
+  const days: string[] = [];
+
+  for (let day = 1; day <= count; day++) {
+    days.push(
+      month + '-' + String(day).padStart(2, '0')
+    );
+  }
+
+  return days;
+}
+
+function emptyTotals(): DayTotals {
+  return {
+    productionWh: null,
+    importWh: null,
+    exportWh: null,
+    consumptionWh: null,
+    selfConsumedWh: null,
+    estimated: false,
+  };
+}
+
+function addTotals(a: DayTotals, b: DayTotals): DayTotals {
+  const sum = (
+    x: number | null,
+    y: number | null
+  ): number | null => {
+    if (x === null && y === null) return null;
+    return (x ?? 0) + (y ?? 0);
+  };
+
+  return {
+    productionWh: sum(a.productionWh, b.productionWh),
+    importWh: sum(a.importWh, b.importWh),
+    exportWh: sum(a.exportWh, b.exportWh),
+    consumptionWh: sum(a.consumptionWh, b.consumptionWh),
+    selfConsumedWh: sum(a.selfConsumedWh, b.selfConsumedWh),
+    estimated: a.estimated || b.estimated,
+  };
+}
+
+/*
+ * Totaux d'une journée, depuis le cache si elle est révolue.
+ */
+
+export async function ensureDayTotals(
+  date: string
+): Promise<DayTotals> {
+  const complete = date < todayLocal();
+
+  if (complete) {
+    const cached = await command([
+      'HGET',
+      KEY_DAY_TOTALS,
+      date,
+    ]);
+
+    if (typeof cached === 'string') {
+      try {
+        return JSON.parse(cached) as DayTotals;
+      } catch {
+        /* Cache illisible : on recalcule plutôt que de
+           propager une valeur douteuse. */
+      }
+    }
+  }
+
+  const points = await loadDay(date);
+  const totals = await loadTotals(date, points);
+
+  if (complete) {
+    await command([
+      'HSET',
+      KEY_DAY_TOTALS,
+      date,
+      JSON.stringify(totals),
+    ]);
+  }
+
+  return totals;
+}
+
+export async function loadMonth(month: string) {
+  const days = daysInMonth(month);
+  const today = todayLocal();
+
+  const rows: Array<{
+    key: string;
+    label: string;
+    totals: DayTotals;
+  }> = [];
+
+  for (const date of days) {
+    /* Inutile d'interroger l'avenir. */
+    if (date > today) continue;
+
+    rows.push({
+      key: date,
+      label: String(Number(date.slice(8, 10))),
+      totals: await ensureDayTotals(date),
+    });
+  }
+
+  return rows;
+}
+
+async function ensureMonthTotals(
+  month: string,
+  allowCompute: boolean
+): Promise<DayTotals | null> {
+  const complete = month < monthOf(todayLocal());
+
+  if (complete) {
+    const cached = await command([
+      'HGET',
+      KEY_MONTH_TOTALS,
+      month,
+    ]);
+
+    if (typeof cached === 'string') {
+      try {
+        return JSON.parse(cached) as DayTotals;
+      } catch {
+        // on recalcule
+      }
+    }
+  }
+
+  if (!allowCompute) return null;
+
+  const rows = await loadMonth(month);
+
+  let totals = emptyTotals();
+
+  for (const row of rows) {
+    totals = addTotals(totals, row.totals);
+  }
+
+  if (complete) {
+    await command([
+      'HSET',
+      KEY_MONTH_TOTALS,
+      month,
+      JSON.stringify(totals),
+    ]);
+  }
+
+  return totals;
+}
+
+export async function loadYear(year: string) {
+  const today = todayLocal();
+  const currentMonth = monthOf(today);
+
+  const rows: Array<{
+    key: string;
+    label: string;
+    totals: DayTotals | null;
+  }> = [];
+
+  const labels = [
+    'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+    'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc',
+  ];
+
+  let computed = 0;
+
+  for (let index = 0; index < 12; index++) {
+    const month =
+      year + '-' + String(index + 1).padStart(2, '0');
+
+    if (month > currentMonth) continue;
+
+    /* Le mois en cours doit toujours être recalculé, il
+       change encore. Les mois manquants sont reconstitués
+       dans la limite du budget. */
+    const mustCompute = month === currentMonth;
+
+    const allowed =
+      mustCompute || computed < MAX_MONTHS_PER_REQUEST;
+
+    const totals = await ensureMonthTotals(month, allowed);
+
+    if (totals !== null && !mustCompute) {
+      computed += 1;
+    }
+
+    rows.push({
+      key: month,
+      label: labels[index],
+      totals,
+    });
+  }
+
+  const pending = rows.filter(
+    (row) => row.totals === null
+  ).length;
+
+  return { rows, pending };
+}
