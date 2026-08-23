@@ -26,11 +26,37 @@ export interface Player {
   urls: string[];
 }
 
+/*
+ * Une « partie » d'un anime sur Anime-Sama n'est pas toujours
+ * une saison : il y a aussi les films et les hors-séries. Les
+ * trois se lisent exactement pareil (un episodes.js, une liste
+ * de lecteurs), seule l'adresse change — d'où ce champ `path`,
+ * qui porte le segment réel du site au lieu de le reconstruire
+ * à partir d'un numéro.
+ */
+
+export type SeasonKind = 'season' | 'film' | 'special';
+
 export interface SeasonEntry {
   number: number;
   label: string;
   langs: string[];
+  path: string;
+  kind: SeasonKind;
 }
+
+/*
+ * Les films et les hors-séries n'ont pas de numéro de saison,
+ * mais TOUT le reste de l'application les identifie par un
+ * nombre : la progression enregistrée, la reprise de lecture,
+ * les clés de stockage. Plutôt que de tout convertir en
+ * chaînes — un chantier qui toucherait le stockage déjà écrit
+ * chez l'utilisateur — on leur attribue des numéros hors
+ * d'atteinte des vraies saisons, qui sont bornées à 100.
+ */
+
+export const FILM_ID_BASE = 900;
+export const SPECIAL_ID_BASE = 1000;
 
 export interface AnimeInfo {
   name: string;
@@ -157,15 +183,27 @@ export async function fetchText(
   }
 }
 
+/*
+ * Accepte soit un numéro de saison (comportement historique,
+ * « saison3 »), soit directement le segment du site pour les
+ * parties qui n'en sont pas une (« film », « oav »…).
+ */
+
+export function partSegment(part: string | number) {
+  return typeof part === 'number'
+    ? `saison${part}`
+    : part;
+}
+
 export async function fetchEpisodes(
   slug: string,
-  season: number,
+  part: string | number,
   lang: string
 ) {
   const url =
     `${BASE_URL}/catalogue/` +
     `${encodeURIComponent(slug)}/` +
-    `saison${season}/` +
+    `${encodeURIComponent(partSegment(part))}/` +
     `${lang}/episodes.js`;
 
   return fetchText(url);
@@ -620,11 +658,118 @@ function belongsToOtherAnime(
   return referencedSlug !== normalizedSlug;
 }
 
+/*
+ * Segments de langue. On les reconnaît pour pouvoir isoler le
+ * segment de CONTENU, qui est toujours celui juste avant.
+ */
+
+function isLangSegment(segment: string) {
+  return /^(vostfr|vf|va|vj|vkr|vcn|vqc)\d*$/i.test(
+    segment
+  );
+}
+
+/*
+ * Les scans du manga apparaissent parfois dans la même liste
+ * de panneaux. Ils n'ont pas de episodes.js et ne se lisent
+ * pas dans un lecteur vidéo : les inclure ajouterait une
+ * ligne qui échouerait systématiquement.
+ */
+
+const NOT_VIDEO_SEGMENT =
+  /^(scan|scans|manga|lecture|nouveaux)\d*$/i;
+
+const SEASON_SEGMENT = /^saison[\s_-]*(\d+)$/i;
+
+const FILM_SEGMENT =
+  /^(film|films|movie|movies)[\s_-]*\d*$/i;
+
+/*
+ * Découpe un chemin de panneau en (segment de contenu, langue).
+ *
+ * Les chemins prennent plusieurs formes selon les fiches :
+ * "saison1/vostfr", "film/vf", ou la version longue
+ * "catalogue/mon-anime/oav/vostfr". Chercher le segment de
+ * langue et prendre celui d'avant les couvre toutes, là où
+ * une position fixe n'en couvrirait qu'une.
+ */
+
+function readPathParts(
+  path: string,
+  normalizedSlug: string
+) {
+  const segments = path
+    .split(/[/\\]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (!segments.length) return null;
+
+  const langIndex = segments.findIndex(isLangSegment);
+
+  /* Un chemin qui COMMENCE par la langue n'a pas de segment
+     de contenu à offrir. */
+  if (langIndex === 0) return null;
+
+  const contentIndex =
+    langIndex > 0 ? langIndex - 1 : segments.length - 1;
+
+  const segment = (
+    segments[contentIndex] || ''
+  ).toLowerCase();
+
+  if (!segment) return null;
+
+  /* Reste du chemin long quand la langue manque : ni le mot
+     "catalogue" ni le slug ne sont des parties. */
+  if (
+    segment === 'catalogue' ||
+    (normalizedSlug && segment === normalizedSlug)
+  ) {
+    return null;
+  }
+
+  const langSegment =
+    langIndex >= 0 ? segments[langIndex] : '';
+
+  return {
+    segment,
+    lang: /^vf/i.test(langSegment) ? 'vf' : 'vostfr',
+  };
+}
+
+function defaultLabel(
+  kind: SeasonKind,
+  number: number
+) {
+  if (kind === 'season') return `Saison ${number}`;
+  if (kind === 'film') return 'Film';
+
+  return 'Épisodes spéciaux';
+}
+
+interface RawPart {
+  segment: string;
+  label: string;
+  langs: string[];
+  kind: SeasonKind;
+  number: number;
+  order: number;
+}
+
 export function parseSeasons(
   html: string,
   slug?: string
 ): SeasonEntry[] {
-  const found = new Map<number, SeasonEntry>();
+  /*
+   * La clé est le SEGMENT, pas le numéro : c'est lui qui
+   * identifie vraiment une partie. Un même film listé en VF
+   * puis en VOSTFR doit fusionner en une seule ligne à deux
+   * langues, et un numéro ne le permettrait pas puisque les
+   * films n'en ont pas.
+   */
+
+  const found = new Map<string, RawPart>();
 
   const normalizedSlug = slug
     ? slug.trim().toLowerCase()
@@ -632,6 +777,8 @@ export function parseSeasons(
 
   const regex =
     /panneauAnime\(\s*["'`]([^"'`]*)["'`]\s*,\s*["'`]([^"'`]*)["'`]\s*\)/gi;
+
+  let order = 0;
 
   for (const match of html.matchAll(regex)) {
     const label = match[1].trim();
@@ -650,52 +797,103 @@ export function parseSeasons(
       continue;
     }
 
-    /*
-     * "saison" doit être un vrai segment/mot du chemin,
-     * pas une sous-chaîne (ex. évite qu'un chemin du type
-     * "occasion2/vf" ou "saisonnier/vf" soit confondu avec
-     * une vraie saison).
-     */
-    const seasonMatch = path.match(
-      /(?:^|[/_-])saison[\s_-]*(\d+)(?:$|[/_-])/i
-    );
+    const parts = readPathParts(path, normalizedSlug);
 
-    if (!seasonMatch) continue;
+    if (!parts) continue;
 
-    const number = Number(seasonMatch[1]);
-
-    if (
-      !Number.isInteger(number) ||
-      number < 1 ||
-      number > 100
-    ) {
+    if (NOT_VIDEO_SEGMENT.test(parts.segment)) {
       continue;
     }
 
-    const lang = /\bvf\b/i.test(path)
-      ? 'vf'
-      : 'vostfr';
-
-    const existing = found.get(number);
+    const existing = found.get(parts.segment);
 
     if (existing) {
-      if (!existing.langs.includes(lang)) {
-        existing.langs.push(lang);
+      if (!existing.langs.includes(parts.lang)) {
+        existing.langs.push(parts.lang);
       }
-    } else {
-      found.set(number, {
-        number,
-        label: label || `Saison ${number}`,
-        langs: [lang],
-      });
+
+      continue;
     }
+
+    const seasonMatch =
+      parts.segment.match(SEASON_SEGMENT);
+
+    let kind: SeasonKind = 'special';
+    let number = 0;
+
+    if (seasonMatch) {
+      const value = Number(seasonMatch[1]);
+
+      if (
+        !Number.isInteger(value) ||
+        value < 1 ||
+        value > 100
+      ) {
+        continue;
+      }
+
+      kind = 'season';
+      number = value;
+    } else if (FILM_SEGMENT.test(parts.segment)) {
+      kind = 'film';
+    }
+
+    found.set(parts.segment, {
+      segment: parts.segment,
+      label: label || defaultLabel(kind, number),
+      langs: [parts.lang],
+      kind,
+      number,
+      order: order += 1,
+    });
   }
 
   if (found.size) {
-    return Array.from(found.values()).sort(
-      (a, b) => a.number - b.number
-    );
+    const raw = Array.from(found.values());
+
+    const build = (item: RawPart, number: number) => ({
+      number,
+      label: item.label,
+      langs: item.langs,
+      path: item.segment,
+      kind: item.kind,
+    });
+
+    /*
+     * Les saisons se rangent par numéro, les films et les
+     * hors-séries dans l'ordre où la fiche les présente :
+     * c'est celui que l'auteur de la page a choisi, et il
+     * vaut mieux que n'importe quel tri alphabétique.
+     */
+
+    const seasons = raw
+      .filter((item) => item.kind === 'season')
+      .sort((a, b) => a.number - b.number)
+      .map((item) => build(item, item.number));
+
+    const films = raw
+      .filter((item) => item.kind === 'film')
+      .sort((a, b) => a.order - b.order)
+      .map((item, index) =>
+        build(item, FILM_ID_BASE + index)
+      );
+
+    const specials = raw
+      .filter((item) => item.kind === 'special')
+      .sort((a, b) => a.order - b.order)
+      .map((item, index) =>
+        build(item, SPECIAL_ID_BASE + index)
+      );
+
+    return [...seasons, ...films, ...specials];
   }
+
+  /*
+   * Aucun panneau exploitable : on retombe sur la recherche
+   * brute de « saisonN » dans la page. Ce repli ne cherche
+   * pas les films — sans panneau, rien ne dit sous quel
+   * segment ils vivraient.
+   */
 
   const fallback = new Set<number>();
 
@@ -719,6 +917,8 @@ export function parseSeasons(
       number,
       label: `Saison ${number}`,
       langs: [],
+      path: `saison${number}`,
+      kind: 'season' as SeasonKind,
     }));
 }
 
