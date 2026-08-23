@@ -5124,18 +5124,19 @@ main:has(.reader-page) { overflow-x: clip; }
  * fondre l'orange dans le jaune.
  */
 
-.solar-bar-self {
-  fill: var(--solar-self);
-}
+/*
+ * Deux barres par période : production et consommation, côte
+ * à côte. Le mois et l'année comparent deux quantités, alors
+ * que la journée décompose la production — d'où deux formes
+ * de tracé différentes pour deux questions différentes.
+ */
 
-.solar-bar-export {
+.solar-bar-production {
   fill: var(--solar-production);
 }
 
 .solar-bar-consumption {
-  stroke: var(--solar-consumption);
-  stroke-width: 2;
-  stroke-linecap: round;
+  fill: var(--solar-consumption);
 }
 
 /* Zone tactile invisible, bien plus large que la barre :
