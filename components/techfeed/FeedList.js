@@ -127,6 +127,26 @@ export default function FeedList() {
       setInitialLoad(false);
     }
 
+    /*
+     * Le menu lateral peut demander une source precise via
+     * l'URL (/tech?source=...). On la lit ici plutot que par
+     * useSearchParams : ce composant est deja monte cote
+     * client, et useSearchParams imposerait une frontiere
+     * Suspense a toute la page pour un seul parametre.
+     */
+
+    try {
+      const asked = new URLSearchParams(
+        window.location.search
+      ).get('source');
+
+      if (asked && list.some((s) => s.id === asked)) {
+        setActiveTab(asked);
+      }
+    } catch (e) {
+      // URL illisible : on reste sur "Tous"
+    }
+
     ready.current = true;
     fetchAllSources(list, true);
   }, []);
