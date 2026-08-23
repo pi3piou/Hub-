@@ -81,7 +81,6 @@ export default function FeedList() {
   const [readLinks, setReadLinks] = useState([]);
   const [appName, setAppName] = useState('TechFeed');
   const [tabMode, setTabMode] = useState('name');
-  const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -402,6 +401,22 @@ export default function FeedList() {
   const pullZoneRef = useRef(null);
   const pullDistanceRef = useRef(0);
 
+  /*
+   * Le geste de traction est écrit DIRECTEMENT dans le DOM, via
+   * ces trois références.
+   *
+   * Avant, chaque pixel parcouru appelait setPullDistance, donc
+   * relançait un rendu React de la liste entière — jusqu'à 300
+   * cartes reconstruites par pixel de doigt. Le geste était
+   * mathématiquement correct mais arrivait à l'écran avec du
+   * retard, d'où cette sensation de caoutchouc qui ne suit pas
+   * la main. React n'apprend le résultat qu'au relâchement.
+   */
+
+  const indicatorRef = useRef(null);
+  const spinnerRef = useRef(null);
+  const feedRef = useRef(null);
+
   useEffect(() => {
     const zone = pullZoneRef.current;
 
@@ -409,7 +424,35 @@ export default function FeedList() {
 
     const setPull = (value) => {
       pullDistanceRef.current = value;
-      setPullDistance(value);
+
+      const indicator = indicatorRef.current;
+      const spinner = spinnerRef.current;
+      const feed = feedRef.current;
+
+      if (indicator) {
+        indicator.style.height = Math.max(value, 0) + 'px';
+        indicator.style.opacity = String(
+          Math.min(value / 18, 1)
+        );
+      }
+
+      if (spinner) {
+        spinner.style.transform =
+          'rotate(' + value * 4 + 'deg)';
+
+        /* Le trait s'éclaircit une fois le seuil franchi :
+           on sait qu'on peut lâcher sans avoir à deviner. */
+        if (value >= PULL_THRESHOLD) {
+          spinner.classList.add('is-armed');
+        } else {
+          spinner.classList.remove('is-armed');
+        }
+      }
+
+      if (feed) {
+        feed.style.transform =
+          'translateY(' + value * 0.3 + 'px)';
+      }
     };
 
     function onStart(e) {
@@ -658,33 +701,18 @@ export default function FeedList() {
       )}
 
       <div
+        ref={indicatorRef}
         className={'pull-indicator' + (refreshing ? ' spinning' : '')}
-        style={{
-          height: refreshing
-            ? 44
-            : Math.max(pullDistance, 0),
-          opacity: refreshing
-            ? 1
-            : Math.min(pullDistance / 18, 1),
-        }}
+        style={
+          refreshing
+            ? { height: 44, opacity: 1 }
+            : { height: 0, opacity: 0 }
+        }
       >
-        <span
-          className={
-            !refreshing && pullDistance >= PULL_THRESHOLD
-              ? 'pull-spinner is-armed'
-              : 'pull-spinner'
-          }
-          style={
-            refreshing
-              ? undefined
-              : {
-                  transform: `rotate(${pullDistance * 4}deg)`,
-                }
-          }
-        />
+        <span ref={spinnerRef} className="pull-spinner" />
       </div>
 
-      <div className="feed" style={{ transform: `translateY(${pullDistance * 0.3}px)` }}>
+      <div className="feed" ref={feedRef}>
         {initialLoad && visibleArticles.length === 0 && (
           <>
             <div className="skeleton-card" />
