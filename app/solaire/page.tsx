@@ -571,15 +571,21 @@ export default function SolarPage() {
 
   /* Largeur d'une barre, avec un intervalle constant. */
 
+  /*
+   * Deux barres par période, côte à côte : production et
+   * consommation. Un intervalle de 2 unités les sépare — la
+   * règle de tracé veut un espace de fond entre deux barres
+   * voisines plutôt qu'un contour, qui alourdirait le dessin.
+   */
+
   const barGeometry = useMemo(() => {
     const count = Math.max(rows.length, 1);
-    const usable = W - PAD_L - PAD_R;
-    const slot = usable / count;
+    const slot = (W - PAD_L - PAD_R) / count;
 
-    return {
-      slot,
-      width: Math.max(slot * 0.62, 2),
-    };
+    const group = slot * 0.78;
+    const width = Math.max((group - 2) / 2, 1.5);
+
+    return { slot, group, width };
   }, [rows.length]);
 
   return (
@@ -758,27 +764,16 @@ export default function SolarPage() {
             <>
               {rows.map((row, index) => {
                 const cx =
-                  PAD_L +
-                  barGeometry.slot * (index + 0.5);
+                  PAD_L + barGeometry.slot * (index + 0.5);
 
-                const left = cx - barGeometry.width / 2;
                 const base = H - PAD_B;
 
-                const self =
-                  row.totals?.selfConsumedWh ?? 0;
-                const exported =
-                  row.totals?.exportWh ?? 0;
+                const produced =
+                  row.totals?.productionWh ?? 0;
                 const used =
-                  row.totals?.consumptionWh ?? null;
+                  row.totals?.consumptionWh ?? 0;
 
-                const selfTop = yBar(self);
-                const prodTop = yBar(self + exported);
-
-                /* Un intervalle de 2 unités sépare les deux
-                   segments empilés : un trait de contour les
-                   alourdirait, un contact direct les
-                   fondrait l'un dans l'autre. */
-                const gap = self > 0 && exported > 0 ? 2 : 0;
+                const halfGap = 1;
 
                 return (
                   <g
@@ -796,7 +791,7 @@ export default function SolarPage() {
                   >
 
                     {/* Zone tactile large : viser une barre de
-                        cinq pixels au doigt est impossible. */}
+                        trois unités au doigt est impossible. */}
                     <rect
                       className="solar-bar-hit"
                       x={cx - barGeometry.slot / 2}
@@ -805,41 +800,35 @@ export default function SolarPage() {
                       height={base - PAD_T}
                     />
 
-                    {exported > 0 && (
+                    {produced > 0 && (
                       <rect
-                        className="solar-bar-export"
-                        x={left}
-                        y={prodTop}
+                        className="solar-bar-production"
+                        x={
+                          cx -
+                          halfGap -
+                          barGeometry.width
+                        }
+                        y={yBar(produced)}
                         width={barGeometry.width}
                         height={Math.max(
-                          selfTop - prodTop - gap,
+                          base - yBar(produced),
                           0.5
                         )}
                         rx={1.5}
                       />
                     )}
 
-                    {self > 0 && (
+                    {used > 0 && (
                       <rect
-                        className="solar-bar-self"
-                        x={left}
-                        y={selfTop}
-                        width={barGeometry.width}
-                        height={Math.max(
-                          base - selfTop,
-                          0.5
-                        )}
-                        rx={1.5}
-                      />
-                    )}
-
-                    {used !== null && used > 0 && (
-                      <line
                         className="solar-bar-consumption"
-                        x1={left - 1}
-                        x2={left + barGeometry.width + 1}
-                        y1={yBar(used)}
-                        y2={yBar(used)}
+                        x={cx + halfGap}
+                        y={yBar(used)}
+                        width={barGeometry.width}
+                        height={Math.max(
+                          base - yBar(used),
+                          0.5
+                        )}
+                        rx={1.5}
                       />
                     )}
 
@@ -949,26 +938,32 @@ export default function SolarPage() {
         <div className="solar-legend-row">
           <span className="solar-swatch is-production" />
           <span className="solar-legend-label">
-            {scope === 'day' ? 'Production' : 'Injectée'}
+            Production
           </span>
           <strong>
-            {formatKwh(
-              scope === 'day'
-                ? aggregate?.productionWh
-                : aggregate?.exportWh
-            )}
+            {formatKwh(aggregate?.productionWh)}
           </strong>
         </div>
 
-        <div className="solar-legend-row">
-          <span className="solar-swatch is-self" />
-          <span className="solar-legend-label">
-            Autoconsommée
-          </span>
-          <strong>
-            {formatKwh(aggregate?.selfConsumedWh)}
-          </strong>
-        </div>
+        {/* L'autoconsommation n'apparaît en légende que sur la
+            journée : c'est là qu'elle est DESSINÉE, en aire
+            orange sous la courbe. Aux autres échelles les
+            barres ne montrent que production et consommation,
+            et une pastille de couleur sans forme
+            correspondante sur le graphique induirait en
+            erreur. Le chiffre reste juste en dessous. */}
+
+        {scope === 'day' && (
+          <div className="solar-legend-row">
+            <span className="solar-swatch is-self" />
+            <span className="solar-legend-label">
+              Autoconsommée
+            </span>
+            <strong>
+              {formatKwh(aggregate?.selfConsumedWh)}
+            </strong>
+          </div>
+        )}
 
         <div className="solar-legend-row">
           <span className="solar-swatch is-consumption" />
@@ -982,16 +977,23 @@ export default function SolarPage() {
 
         <div className="solar-legend-split">
 
+          {scope !== 'day' && (
+            <div>
+              <small>Autoconsommée</small>
+              <strong>
+                {formatKwh(aggregate?.selfConsumedWh)}
+              </strong>
+            </div>
+          )}
+
           <div>
-            <small>Production totale</small>
-            <strong>
-              {formatKwh(aggregate?.productionWh)}
-            </strong>
+            <small>Soutiré</small>
+            <strong>{formatKwh(aggregate?.importWh)}</strong>
           </div>
 
           <div>
-            <small>Soutiré au réseau</small>
-            <strong>{formatKwh(aggregate?.importWh)}</strong>
+            <small>Injecté</small>
+            <strong>{formatKwh(aggregate?.exportWh)}</strong>
           </div>
 
         </div>
