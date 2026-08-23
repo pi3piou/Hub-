@@ -5,6 +5,7 @@ import {
   fetchCatalogue,
   getCatalogueUrl,
   parseSeasons,
+  SeasonEntry,
 } from '@/lib/anime';
 
 /*
@@ -131,13 +132,15 @@ export async function GET(request: Request) {
 
     const entries = parseSeasons(html, slug);
 
-    const seasonEntries = entries.length
+    const seasonEntries: SeasonEntry[] = entries.length
       ? entries
       : [
           {
             number: 1,
             label: 'Saison 1',
             langs: [],
+            path: 'saison1',
+            kind: 'season',
           },
         ];
 
@@ -149,14 +152,27 @@ export async function GET(request: Request) {
       )
     );
 
+    /*
+     * `seasons` ne contient que les VRAIES saisons, et pas
+     * les films ni les hors-séries. Plusieurs écrans s'en
+     * servent pour écrire « 3 saisons » ou pour deviner la
+     * saison suivante d'une série : y glisser les films
+     * fausserait ces deux calculs. Les autres parties
+     * restent accessibles par `seasonEntries`.
+     */
+
+    const realSeasons = seasonEntries.filter(
+      (item) => item.kind === 'season'
+    );
+
     return NextResponse.json(
       {
         ...info,
         seasonEntries,
-        seasons: seasonEntries.map(
+        seasons: realSeasons.map(
           (item) => item.number
         ),
-        totalSeasons: seasonEntries.length,
+        totalSeasons: realSeasons.length,
         langs,
       },
       {
