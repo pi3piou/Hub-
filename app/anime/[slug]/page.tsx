@@ -23,6 +23,7 @@ import {
   loadEpisodes,
   loadTMDB,
   prefetchEpisodes,
+  SeasonEntry,
 } from '@/lib/animeCache';
 
 import {
@@ -513,8 +514,68 @@ function AnimeInfoPageContent({
           number,
           label: `Saison ${number}`,
           langs: [] as string[],
+          path: `saison${number}`,
+          kind: 'season' as const,
         }));
   }, [info]);
+
+  /*
+   * =======================================================
+   * TROIS FAMILLES DE PARTIES
+   *
+   * Anime-Sama range dans la même liste les saisons, les
+   * films et les hors-séries. Les afficher à plat mettrait
+   * « Film 2 » juste après « Saison 3 » sans rien dire de
+   * leur nature — or c'est exactement la distinction qu'on
+   * vient chercher dans ce menu. Une famille vide disparaît
+   * plutôt que d'afficher un titre sans rien dessous.
+   *
+   * Les fiches mises en cache par la version précédente
+   * n'ont pas de `kind` : on les traite comme des saisons,
+   * ce qu'elles étaient forcément à l'époque.
+   * =======================================================
+   */
+
+  const seasonGroups = useMemo(() => {
+    const kindOf = (entry: SeasonEntry) =>
+      entry.kind || 'season';
+
+    const groups = [
+      {
+        key: 'season',
+        title: 'Saisons',
+        items: seasonEntries.filter(
+          (entry) => kindOf(entry) === 'season'
+        ),
+      },
+      {
+        key: 'film',
+        title: 'Films',
+        items: seasonEntries.filter(
+          (entry) => kindOf(entry) === 'film'
+        ),
+      },
+      {
+        key: 'special',
+        title: 'Épisodes spéciaux',
+        items: seasonEntries.filter(
+          (entry) => kindOf(entry) === 'special'
+        ),
+      },
+    ];
+
+    return groups.filter(
+      (group) => group.items.length > 0
+    );
+  }, [seasonEntries]);
+
+  const countOf = (key: string) =>
+    seasonGroups.find((group) => group.key === key)
+      ?.items.length || 0;
+
+  const seasonCount = countOf('season');
+  const filmCount = countOf('film');
+  const specialCount = countOf('special');
 
   const firstSeason =
     seasonEntries[0]?.number || 1;
@@ -674,14 +735,14 @@ function AnimeInfoPageContent({
 
       if (!total) {
         window.alert(
-          'Nombre d’épisodes introuvable pour cette saison.'
+          'Nombre d’épisodes introuvable pour cette partie.'
         );
 
         return;
       }
 
       const confirmed = window.confirm(
-        `Marquer les ${total} épisodes de cette saison comme vus ?`
+        `Marquer les ${total} épisodes de cette partie comme vus ?`
       );
 
       if (!confirmed) return;
@@ -1239,6 +1300,29 @@ function AnimeInfoPageContent({
 
   const title = info?.name || getAnimeName(slug);
 
+  /*
+   * « S900 É1 » ne veut rien dire pour personne : 900 est un
+   * numéro fabriqué pour les films. Quand la reprise pointe
+   * sur autre chose qu'une saison, on affiche le libellé du
+   * site plutôt que ce numéro interne.
+   */
+
+  const continueLabel = useMemo(() => {
+    if (!continueItem) return '';
+
+    const entry = seasonEntries.find(
+      (item) => item.number === continueItem.season
+    );
+
+    const episode = `É${continueItem.episode + 1}`;
+
+    if (entry?.kind && entry.kind !== 'season') {
+      return `${entry.label} · ${episode}`;
+    }
+
+    return `S${continueItem.season} ${episode}`;
+  }, [continueItem, seasonEntries]);
+
   const synopsis = info?.synopsis || '';
 
   const isLongSynopsis =
@@ -1429,12 +1513,25 @@ function AnimeInfoPageContent({
               </span>
             )}
 
-            <span>
-              {seasonEntries.length}{' '}
-              {seasonEntries.length > 1
-                ? 'saisons'
-                : 'saison'}
-            </span>
+            {seasonCount > 0 && (
+              <span>
+                {seasonCount}{' '}
+                {seasonCount > 1
+                  ? 'saisons'
+                  : 'saison'}
+              </span>
+            )}
+
+            {filmCount > 0 && (
+              <span>
+                {filmCount}{' '}
+                {filmCount > 1 ? 'films' : 'film'}
+              </span>
+            )}
+
+            {specialCount > 0 && (
+              <span>Épisodes spéciaux</span>
+            )}
 
             {totals.episodes > 0 && (
               <span>
@@ -1466,9 +1563,7 @@ function AnimeInfoPageContent({
         }
       >
         {continueItem
-          ? `▶ Continuer · S${
-              continueItem.season
-            } É${continueItem.episode + 1}`
+          ? `▶ Continuer · ${continueLabel}`
           : '▶ Commencer'}
       </button>
 
@@ -1560,83 +1655,106 @@ function AnimeInfoPageContent({
             }`}
           >
 
-            {seasonEntries.map((entry) => {
+            {seasonGroups.map((group) => (
+              <div
+                key={group.key}
+                className="season-menu-group"
+              >
 
-              const item = progress.get(
-                entry.number
-              );
+                {/* Le titre de famille n'apparaît que s'il
+                    y a plus d'une famille : sur une série
+                    sans film ni hors-série, écrire
+                    « Saisons » au-dessus d'une liste de
+                    saisons n'apprendrait rien. */}
 
-              const watchedCount =
-                item?.watched || 0;
-
-              const totalCount = item?.total || 0;
-
-              const isDone =
-                totalCount > 0 &&
-                watchedCount >= totalCount;
-
-              const isMarking =
-                markingSeason === entry.number;
-
-              const isActive =
-                activeSeason === entry.number;
-
-              return (
-                <button
-                  key={entry.number}
-                  type="button"
-                  className={`season-menu-row ${
-                    isActive ? 'is-active' : ''
-                  }`}
-                  onMouseEnter={() =>
-                    prefetchEpisodes(
-                      slug,
-                      entry.number
-                    )
-                  }
-                  onPointerDown={() =>
-                    startPress(entry.number)
-                  }
-                  onPointerUp={cancelPress}
-                  onPointerLeave={cancelPress}
-                  onPointerCancel={cancelPress}
-                  onContextMenu={(event) =>
-                    event.preventDefault()
-                  }
-                  onClick={() =>
-                    selectSeason(entry.number)
-                  }
-                >
-
-                  <span className="season-menu-row-label">
-
-                    <strong>{entry.label}</strong>
-
-                    <span>
-                      {totalCount > 0
-                        ? `${watchedCount} / ${totalCount} épisodes`
-                        : 'Non commencée'}
-                    </span>
-
+                {seasonGroups.length > 1 && (
+                  <span className="season-menu-group-title">
+                    {group.title}
                   </span>
+                )}
 
-                  <span className="season-menu-row-icons">
+                {group.items.map((entry) => {
 
-                    {isMarking ? (
-                      <span className="loader" />
-                    ) : (
-                      isDone && (
-                        <span className="season-done">
-                          ✓
+                  const item = progress.get(
+                    entry.number
+                  );
+
+                  const watchedCount =
+                    item?.watched || 0;
+
+                  const totalCount = item?.total || 0;
+
+                  const isDone =
+                    totalCount > 0 &&
+                    watchedCount >= totalCount;
+
+                  const isMarking =
+                    markingSeason === entry.number;
+
+                  const isActive =
+                    activeSeason === entry.number;
+
+                  return (
+                    <button
+                      key={entry.number}
+                      type="button"
+                      className={`season-menu-row ${
+                        isActive ? 'is-active' : ''
+                      }`}
+                      onMouseEnter={() =>
+                        prefetchEpisodes(
+                          slug,
+                          entry.number
+                        )
+                      }
+                      onPointerDown={() =>
+                        startPress(entry.number)
+                      }
+                      onPointerUp={cancelPress}
+                      onPointerLeave={cancelPress}
+                      onPointerCancel={cancelPress}
+                      onContextMenu={(event) =>
+                        event.preventDefault()
+                      }
+                      onClick={() =>
+                        selectSeason(entry.number)
+                      }
+                    >
+
+                      <span className="season-menu-row-label">
+
+                        <strong>{entry.label}</strong>
+
+                        <span>
+                          {totalCount > 0
+                            ? `${watchedCount} / ${totalCount} épisodes`
+                            : group.key === 'season'
+                              ? 'Non commencée'
+                              : 'Non commencé'}
                         </span>
-                      )
-                    )}
 
-                  </span>
+                      </span>
 
-                </button>
-              );
-            })}
+                      <span className="season-menu-row-icons">
+
+                        {isMarking ? (
+                          <span className="loader" />
+                        ) : (
+                          isDone && (
+                            <span className="season-done">
+                              ✓
+                            </span>
+                          )
+                        )}
+
+                      </span>
+
+                    </button>
+                  );
+                })}
+
+              </div>
+            ))}
 
           </div>
 
