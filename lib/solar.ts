@@ -834,6 +834,76 @@ export async function ensureDayTotals(
   return totals;
 }
 
+/*
+ * =============================================================
+ * IMPORT DE L'HISTORIQUE
+ *
+ * L'onduleur garde des années d'archives, mais il n'est
+ * joignable que depuis le réseau de la maison : l'application
+ * déployée ne pourra jamais aller les chercher elle-même. On
+ * les injecte donc une fois pour toutes, directement au niveau
+ * des totaux journaliers.
+ *
+ * Écrire à CE niveau-là, et pas au niveau des relevés de 5
+ * minutes, est délibéré : l'archive journalière de l'onduleur
+ * donne exactement les mêmes grandeurs que celles qu'on
+ * calculerait, en un millième du volume. Les journées ainsi
+ * importées n'auront pas de courbe détaillée — seulement leurs
+ * totaux — ce qui est précisément ce dont les vues mois et
+ * année ont besoin.
+ * =============================================================
+ */
+
+export async function importDayTotals(
+  date: string,
+  totals: DayTotals,
+  overwrite: boolean
+): Promise<'ecrit' | 'existant'> {
+  /*
+   * Par défaut on n'écrase rien. Un total déjà en cache a été
+   * calculé à partir des relevés réels de la journée ; le
+   * remplacer à l'aveugle par une valeur importée ferait
+   * perdre l'information la plus fine sans prévenir.
+   */
+
+  if (!overwrite) {
+    const existing = await command([
+      'HGET',
+      KEY_DAY_TOTALS,
+      date,
+    ]);
+
+    if (typeof existing === 'string' && existing) {
+      return 'existant';
+    }
+  }
+
+  await command([
+    'HSET',
+    KEY_DAY_TOTALS,
+    date,
+    JSON.stringify(totals),
+  ]);
+
+  return 'ecrit';
+}
+
+/*
+ * Les totaux mensuels sont un cache du niveau du dessous. Après
+ * un import, ceux des mois touchés sont périmés : s'ils restent
+ * en place, la vue annuelle continuera d'afficher les anciennes
+ * valeurs — souvent zéro — alors que les journées, elles, sont
+ * bien là. Les effacer suffit, ils se recalculent tout seuls.
+ */
+
+export async function forgetMonthTotals(
+  months: string[]
+) {
+  if (!months.length) return;
+
+  await command(['HDEL', KEY_MONTH_TOTALS, ...months]);
+}
+
 export async function loadMonth(month: string) {
   const days = daysInMonth(month);
   const today = todayLocal();
