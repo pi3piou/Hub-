@@ -2957,12 +2957,26 @@ a {
   padding: 8px 2px 0;
 }
 
+/*
+ * Deux lignes, pas une.
+ *
+ * Un episode s'appelle "Episode 12" et tenait largement sur
+ * une ligne. Un film s'appelle "Episode d'Alabasta : Les
+ * Pirates et la Princesse du Desert" et se faisait couper au
+ * quart. La hauteur est figee a deux lignes meme quand le
+ * texte est court, sinon les cartes du rail n'auraient plus
+ * la meme hauteur selon la longueur du titre.
+ */
+
 .ep-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
+  min-height: 2.6em;
   font-size: 13px;
   font-weight: 650;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
 .ep-card-sub {
