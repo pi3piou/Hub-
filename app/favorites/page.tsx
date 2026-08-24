@@ -14,6 +14,7 @@ import {
   loadAniList,
   loadAnimeInfo,
   loadTMDB,
+  partLabel,
 } from '@/lib/animeCache';
 
 import {
@@ -46,6 +47,10 @@ interface HistoryItem {
   episode: number;
   lang: 'vostfr' | 'vf';
   updatedAt: number;
+
+  /* Absent des reprises enregistrées avant l'arrivée des
+     films : on retombe alors sur une famille générique. */
+  partLabel?: string;
 }
 
 interface LibraryItem {
@@ -687,7 +692,10 @@ export default function LibraryPage() {
                     <strong>{item.name}</strong>
 
                     <span>
-                      Saison {item.season}
+                      {partLabel(
+                        item.season,
+                        item.partLabel
+                      )}
                       {' • '}
                       Épisode {item.episode + 1}
                     </span>
