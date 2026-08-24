@@ -953,6 +953,50 @@ export function parseSeasons(
 }
 
 /* =========================================================
+   TITRES DES FILMS ET DES HORS-SÉRIES
+   ========================================================= */
+
+/*
+ * Anime-Sama nomme chaque entree d'une partie par un appel
+ * `newSPF("...")` dans la page, un par entree et dans l'ordre
+ * du lecteur. Les saisons, elles, n'en ont pas : leurs
+ * episodes sont simplement numerotes.
+ *
+ * C'est le seul endroit ou ces noms existent. Le fichier
+ * episodes.js, lui, ne contient que des adresses de lecteurs
+ * dans des tableaux anonymes — d'ou la lecture separee de la
+ * page.
+ */
+
+export function parsePartTitles(html: string): string[] {
+  const titles: string[] = [];
+
+  /*
+   * Le guillemet ouvrant est capture puis exige a la
+   * fermeture. Sans ca, un titre comme "L'Aventure de l'Ile"
+   * se ferait couper a la premiere apostrophe. La partie
+   * `\\.` laisse aussi passer un guillemet echappe a
+   * l'interieur du texte.
+   */
+
+  const regex =
+    /newSPF?\s*\(\s*(["'`])((?:\\.|(?!\1)[\s\S])*)\1\s*\)/g;
+
+  for (const match of html.matchAll(regex)) {
+    const unescaped = match[2].replace(
+      /\\(["'`\\])/g,
+      '$1'
+    );
+
+    const title = cleanText(unescaped);
+
+    if (title) titles.push(title);
+  }
+
+  return titles;
+}
+
+/* =========================================================
    LECTEURS
    ========================================================= */
 
