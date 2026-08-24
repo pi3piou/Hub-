@@ -87,6 +87,54 @@ export default function FeedList() {
   const [navX, setNavX] = useState(0);
   const [navAnimating, setNavAnimating] = useState(false);
 
+  /*
+   * Le bandeau du haut n'est plus la en permanence.
+   *
+   * Il flottait sans fond au-dessus du contenu, si bien que le
+   * titre de l'article et le nom de la source se superposaient
+   * en une bouillie illisible. Plutot que de lui coller un fond
+   * opaque qui mangerait une bande d'ecran a demeure, on le
+   * fait apparaitre seulement quand il sert :
+   *
+   *   - dans la liste, le nom de l'app n'a d'interet qu'en haut
+   *     de page. Il s'efface des qu'on defile.
+   *   - dans un article, c'est l'inverse : il ne prend le
+   *     relais qu'une fois le vrai titre sorti de l'ecran.
+   *
+   * Meme mecanisme que la fiche d'anime, avec un seuil de
+   * retour plus bas que celui d'aller pour eviter le
+   * clignotement quand on s'arrete pile dessus.
+   */
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    let ticking = false;
+
+    const update = () => {
+      ticking = false;
+
+      const y =
+        window.scrollY || document.documentElement.scrollTop || 0;
+
+      setScrolled((prev) => {
+        if (y > 64 && !prev) return true;
+        if (y < 28 && prev) return false;
+        return prev;
+      });
+    };
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(update);
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    update();
+
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
   const pullStartY = useRef(null);
@@ -670,7 +718,13 @@ export default function FeedList() {
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
-        <h1 className="app-title">{selected.source}</h1>
+        <h1
+          className={
+            'app-title is-reader' + (scrolled ? ' is-visible' : '')
+          }
+        >
+          {selected.source}
+        </h1>
 
         <div
           className={'reader-page' + (dragging ? ' dragging' : '') + (navAnimating ? ' nav-anim' : '')}
@@ -712,7 +766,13 @@ export default function FeedList() {
         onOpenSource={openSource}
         onPrefsChange={handlePrefsChange}
       />
-      <h1 className="app-title">{appName}</h1>
+      <h1
+        className={
+          'app-title' + (scrolled ? '' : ' is-visible')
+        }
+      >
+        {appName}
+      </h1>
 
       {pending.length > 0 && (
         <button className="new-articles-pill" onClick={showPending}>
