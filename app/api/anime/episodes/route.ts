@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import {
   fetchCatalogue,
   fetchEpisodes,
+  fetchPartPage,
   FILM_ID_BASE,
   getDefaultPlayerIndex,
   parsePlayers,
@@ -83,6 +84,66 @@ export async function GET(request: Request) {
       }
 
       part = entry.path;
+    }
+
+    /*
+     * Sonde de reconnaissance : &debug=noms
+     *
+     * Elle renvoie le contenu des balises <script> de la page
+     * de la partie, la ou vivent les titres des films. Elle
+     * existe parce que deviner la forme d'un balisage qu'on
+     * n'a pas sous les yeux revient a ecrire un analyseur au
+     * hasard — et un analyseur qui se trompe en silence rend
+     * simplement des titres vides.
+     */
+
+    if (searchParams.get('debug') === 'noms') {
+      const page = await fetchPartPage(slug, part, lang);
+
+      if (!page) {
+        return NextResponse.json(
+          { error: 'page introuvable', part, lang },
+          { status: 404 }
+        );
+      }
+
+      const scripts = Array.from(
+        page.matchAll(
+          /<script[^>]*>([\s\S]*?)<\/script>/gi
+        )
+      )
+        .map((match) => match[1].trim())
+        .filter(Boolean);
+
+      /* Les lignes qui ont une chance de nommer quelque chose :
+         un appel de fonction avec une chaine de caracteres. */
+
+      const interessantes = scripts
+        .join('\n')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(
+          (line) =>
+            /\w+\s*\(\s*["'`][^"'`]/.test(line) &&
+            !/^\/\//.test(line)
+        )
+        .slice(0, 120);
+
+      return NextResponse.json(
+        {
+          part,
+          lang,
+          taillePage: page.length,
+          nombreDeScripts: scripts.length,
+          lignesAvecTexte: interessantes,
+        },
+        {
+          headers: {
+            'Content-Type':
+              'application/json; charset=utf-8',
+          },
+        }
+      );
     }
 
     const [requestedText, otherText] =
