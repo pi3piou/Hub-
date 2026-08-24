@@ -7,6 +7,28 @@ import ProfileGate from '@/components/ProfileGate';
 export const metadata: Metadata = {
   title: 'Hub',
   description: 'Accueil, actualité tech et anime',
+
+  /*
+   * Le manifeste et l'icône d'écran d'accueil ne sont pas
+   * de la décoration : sur iPhone, les notifications web
+   * n'existent que pour une application installée, et iOS
+   * ne propose l'installation que si ces deux-là sont là.
+   */
+  manifest: '/manifest.json',
+
+  appleWebApp: {
+    capable: true,
+    title: 'Hub',
+    statusBarStyle: 'black-translucent',
+  },
+
+  icons: {
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192' },
+      { url: '/icon-512.png', sizes: '512x512' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 /*
