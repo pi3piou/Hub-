@@ -35,7 +35,18 @@ const REFRESH_MIN_INTERVAL = 60 * 1000;
  * contenu stocke ici.
  */
 
-const LIST_KEY = 'techfeed-list-cache-v2';
+/*
+ * Le numero de version de cette cle n'est pas decoratif : le
+ * changer JETTE la liste enregistree sur l'appareil.
+ *
+ * Passage en v3 parce que les articles mis en cache avant la
+ * correction de l'extracteur portaient le logo du site en
+ * guise de vignette. La fusion ci-dessous ne remplacait
+ * jamais un article deja connu, donc ces mauvaises vignettes
+ * survivaient indefiniment, meme une fois le flux relu
+ * correctement.
+ */
+const LIST_KEY = 'techfeed-list-cache-v3';
 const LIST_MAX = 300;
 
 function loadListCache() {
@@ -202,12 +213,53 @@ export default function FeedList() {
   useEffect(() => { articlesRef.current = articles; }, [articles]);
   useEffect(() => { pendingRef.current = pending; }, [pending]);
 
+  /*
+   * La fusion n'ajoutait que les nouveautes et laissait les
+   * articles connus strictement intacts. C'est ce qui a fige
+   * les mauvaises vignettes : le flux servait pourtant la
+   * bonne adresse a chaque relecture, elle etait simplement
+   * ignoree puisque le lien, lui, etait deja connu.
+   *
+   * Desormais la vignette d'un article deja present est mise a
+   * jour quand le flux en propose une differente. Le tri et
+   * l'enregistrement ne sont refaits que si quelque chose a
+   * reellement change — sans cette condition, chaque
+   * rafraichissement redessinerait les trois cents cartes pour
+   * rien.
+   */
+
   function mergeArticles(prev, incoming) {
+    const byLink = new Map(
+      incoming.filter((a) => a.link).map((a) => [a.link, a])
+    );
+
+    let touched = false;
+
+    const updated = prev.map((a) => {
+      const fresh = byLink.get(a.link);
+
+      if (!fresh || !fresh.thumbnail) return a;
+      if (fresh.thumbnail === a.thumbnail) return a;
+
+      touched = true;
+
+      return { ...a, thumbnail: fresh.thumbnail };
+    });
+
     const known = new Set(prev.map((a) => a.link));
-    const fresh = incoming.filter((a) => a.link && !known.has(a.link));
-    if (fresh.length === 0) return prev;
-    const merged = [...fresh, ...prev].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const added = incoming.filter(
+      (a) => a.link && !known.has(a.link)
+    );
+
+    if (!touched && added.length === 0) return prev;
+
+    const merged = [...added, ...updated].sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
+
     saveListCache(merged);
+
     return merged;
   }
 
