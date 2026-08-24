@@ -928,30 +928,38 @@ export async function loadMonth(month: string) {
   return rows;
 }
 
-async function ensureMonthTotals(
-  month: string,
-  allowCompute: boolean
+/*
+ * Lecture SEULE du cache mensuel. Séparée du calcul, et ce
+ * n'est pas de la coquetterie : c'est la distinction qui
+ * permet plus bas de ne facturer au budget que le travail
+ * réellement effectué.
+ */
+
+async function readMonthTotals(
+  month: string
 ): Promise<DayTotals | null> {
-  const complete = month < monthOf(todayLocal());
+  if (month >= monthOf(todayLocal())) return null;
 
-  if (complete) {
-    const cached = await command([
-      'HGET',
-      KEY_MONTH_TOTALS,
-      month,
-    ]);
+  const cached = await command([
+    'HGET',
+    KEY_MONTH_TOTALS,
+    month,
+  ]);
 
-    if (typeof cached === 'string') {
-      try {
-        return JSON.parse(cached) as DayTotals;
-      } catch {
-        // on recalcule
-      }
-    }
+  if (typeof cached !== 'string') return null;
+
+  try {
+    return JSON.parse(cached) as DayTotals;
+  } catch {
+    /* Cache illisible : on laisse le calcul reprendre la
+       main plutôt que de propager une valeur douteuse. */
+    return null;
   }
+}
 
-  if (!allowCompute) return null;
-
+async function computeMonthTotals(
+  month: string
+): Promise<DayTotals> {
   const rows = await loadMonth(month);
 
   let totals = emptyTotals();
@@ -960,7 +968,10 @@ async function ensureMonthTotals(
     totals = addTotals(totals, row.totals);
   }
 
-  if (complete) {
+  /* Seul un mois révolu est mis en cache : le mois en cours
+     changera encore d'ici ce soir. */
+
+  if (month < monthOf(todayLocal())) {
     await command([
       'HSET',
       KEY_MONTH_TOTALS,
@@ -996,17 +1007,34 @@ export async function loadYear(year: string) {
     if (month > currentMonth) continue;
 
     /* Le mois en cours doit toujours être recalculé, il
-       change encore. Les mois manquants sont reconstitués
-       dans la limite du budget. */
+       change encore. */
     const mustCompute = month === currentMonth;
 
-    const allowed =
-      mustCompute || computed < MAX_MONTHS_PER_REQUEST;
+    /*
+     * Le cache d'abord, et il ne coûte RIEN au budget.
+     *
+     * C'est ici que se cachait le bogue des mois manquants.
+     * L'ancienne version incrémentait le compteur pour tout
+     * mois obtenu, cache compris. Une fois les trois premiers
+     * mois en cache, ils consommaient à eux seuls la totalité
+     * du budget à chaque requête, et le quatrième n'était
+     * jamais atteint : la page se relançait indéfiniment sur
+     * un trou qu'elle ne pouvait plus combler.
+     */
 
-    const totals = await ensureMonthTotals(month, allowed);
+    let totals = mustCompute
+      ? null
+      : await readMonthTotals(month);
 
-    if (totals !== null && !mustCompute) {
-      computed += 1;
+    if (totals === null) {
+      const allowed =
+        mustCompute || computed < MAX_MONTHS_PER_REQUEST;
+
+      if (allowed) {
+        totals = await computeMonthTotals(month);
+
+        if (!mustCompute) computed += 1;
+      }
     }
 
     rows.push({
