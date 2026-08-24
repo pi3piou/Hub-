@@ -4264,17 +4264,52 @@ main:has(.reader-page) { overflow-x: clip; }
   margin: 0;
 }
 
+/*
+ * Bandeau du haut — present seulement quand il sert.
+ *
+ * L'ombre blanche qui trainait ici etait une fausse bonne
+ * idee : censee detacher le titre du fond, elle debordait de
+ * huit pixels et delavait le texte de l'article qui passait
+ * dessous. C'est elle qui donnait cet aspect gris fantome.
+ *
+ * Les marges laterales degagent les deux boutons ronds en
+ * position fixe, pour qu'un titre long ne finisse pas sous
+ * l'un d'eux.
+ */
+
 .app-title {
   position: fixed;
   top: calc(10px + env(safe-area-inset-top));
   left: 0; right: 0;
   z-index: 95;
+  padding: 0 62px;
+  overflow: hidden;
   text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 19px;
   font-weight: 700;
   margin: 0;
   pointer-events: none;
-  text-shadow: 0 1px 8px var(--bg-shadow, rgba(255,255,255,.5));
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity var(--ease),
+    transform var(--ease);
+}
+
+.app-title.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Dans un article, il remplace un titre parti vers le haut :
+   plus petit, il se lit comme une legende et non comme un
+   second titre en concurrence avec le premier. */
+
+.app-title.is-reader {
+  font-size: 15px;
+  font-weight: 750;
 }
 
 .float-btn, .menu-btn {
@@ -5447,6 +5482,69 @@ main:has(.reader-page) { overflow-x: clip; }
 /* Sauf ce qui n'est pas de la prose : une justification sur
    une légende courte ou un lien isolé écarterait deux mots aux
    deux bouts de la ligne. */
+
+/*
+ * =========================================================
+ * DOMPTER LE CONTENU IMPORTE
+ *
+ * Le corps de l'article n'est pas ecrit par nous : c'est du
+ * HTML recupere sur le site d'origine et injecte tel quel. Il
+ * suffit d'UN element trop large la-dedans — un tableau, un
+ * tweet integre, une image aux dimensions forcees — pour que
+ * le document entier devienne plus large que l'ecran.
+ *
+ * Le symptome est deroutant : la page se met a glisser
+ * lateralement et le texte se retrouve coupe a gauche, tandis
+ * que les boutons en position fixe, eux, ne bougent pas. On
+ * cherche alors le decalage dans notre mise en page, alors
+ * qu'il vient d'une image publiee trois jours plus tot.
+ *
+ * D'ou ces deux niveaux : tout est contraint a la largeur
+ * disponible, et ce qui ne PEUT pas retrecir — un tableau de
+ * comparaison, un bloc de code — recoit son propre defilement
+ * horizontal, dans sa boite. On garde l'acces au contenu
+ * large sans que la page entiere parte de travers.
+ * =========================================================
+ */
+
+.reader-full > * {
+  max-width: 100%;
+}
+
+.reader-full img,
+.reader-full video,
+.reader-full iframe,
+.reader-full embed,
+.reader-full object,
+.reader-full svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.reader-full table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.reader-full pre {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/*
+ * Filet de securite au niveau du document. Si malgre tout un
+ * element s'echappe, la page refuse de glisser de cote plutot
+ * que d'afficher du texte coupe. Le defilement vertical, lui,
+ * n'est pas touche.
+ */
+
+html,
+body {
+  overflow-x: clip;
+}
 
 .reader-full figcaption,
 .reader-full blockquote cite,
