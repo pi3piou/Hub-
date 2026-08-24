@@ -1,0 +1,5774 @@
+/* =========================================================
+   VARIABLES
+   ========================================================= */
+
+/*
+ * =========================================================
+ * THÈME — noir quasi pur façon Apple TV+, un seul accent
+ * neutre (blanc/gris) au lieu d'une couleur vive. Le thème
+ * clair ci-dessous réutilise exactement les mêmes noms de
+ * variable : rien d'autre dans le fichier n'a besoin de
+ * connaître le thème actif.
+ * =========================================================
+ */
+
+:root {
+  /* Fond */
+  --bg: #000000;
+
+  /*
+   * Verre : translucide et clair sur fond sombre, pas
+   * "verre teinté noir". C'est ce qui donne l'effet
+   * Liquid Glass plutôt que l'ancien flou sombre opaque.
+   */
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-strong: rgba(255, 255, 255, 0.09);
+  --surface-solid: #161618;
+  --surface-input: rgba(255, 255, 255, 0.045);
+  --surface-hover: rgba(255, 255, 255, 0.1);
+
+  /*
+   * Verre "carte de saison" : un cran plus opaque que
+   * --surface pour rester lisible sans image derrière,
+   * avec un reflet du haut plus marqué (esprit iOS 26).
+   */
+  --surface-glass: rgba(255, 255, 255, 0.065);
+  --surface-glass-hover: rgba(255, 255, 255, 0.1);
+
+  /* Bordures et reflets */
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --glass-highlight: rgba(255, 255, 255, 0.5);
+  --glass-highlight-soft: rgba(255, 255, 255, 0.2);
+
+  /* Flou, avec saturation pour la vivacité du verre */
+  --blur-sm: 24px;
+  --blur-md: 34px;
+  --blur-lg: 46px;
+  --blur-xl: 56px;
+
+  /* Texte */
+  --text: #f5f5f7;
+  --text-muted: #98989f;
+  --text-dim: #6c6c72;
+
+  /*
+   * Accent monochrome, façon Apple TV+ : un blanc cassé
+   * pour les boutons pleins et les états actifs, jamais de
+   * teinte vive. `--accent-ink` est le texte à utiliser
+   * PAR-DESSUS un fond `--accent` (sombre sur clair).
+   */
+  --accent: #f2f2f4;
+  --accent-ink: #0a0a0b;
+  --accent-light: #ffffff;
+  --accent-tint: rgba(255, 255, 255, 0.12);
+  --accent-border: rgba(255, 255, 255, 0.32);
+
+  /* Barre de navigation flottante. Tout son verre passe par
+     ces variables pour qu'elle puisse s'inverser proprement
+     en thème clair (icônes noires sur verre clair) au lieu
+     de rester un bloc sombre plaqué sur une page blanche. */
+  --nav-surface: rgba(20, 20, 24, 0.07);
+  --nav-surface-pressed: rgba(26, 26, 30, 0.12);
+  --nav-text: rgba(255, 255, 255, 0.56);
+  --nav-text-active: #ffffff;
+  --nav-pill: rgba(255, 255, 255, 0.14);
+  --nav-pill-strong: rgba(255, 255, 255, 0.26);
+  --nav-hairline: rgba(255, 255, 255, 0.09);
+  --nav-hairline-strong: rgba(255, 255, 255, 0.14);
+  --nav-sheen: rgba(255, 255, 255, 0.22);
+  --nav-sheen-strong: rgba(255, 255, 255, 0.6);
+
+  /* Ombre portée du menu latéral. Sur fond noir elle peut
+     être franche ; sur fond clair la même valeur virerait au
+     gris sale, d'où la variable. */
+  --menu-shadow: 12px 0 40px rgba(0, 0, 0, 0.45);
+
+  /* Rayons — plus généreux, esprit continu */
+  --radius-sm: 14px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 30px;
+  --radius-pill: 999px;
+
+  /* Gabarit */
+  --page-max: 560px;
+  --page-pad: 16px;
+
+  /* Transitions */
+  --ease: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /*
+   * Ressort iOS : léger dépassement puis retour, utilisé
+   * pour les taps et l'arrivée de la feuille d'épisodes —
+   * c'est ce petit rebond qui donne l'impression "liquide".
+   */
+  --ease-spring: 0.46s cubic-bezier(0.32, 1.4, 0.34, 1);
+}
+
+/*
+ * Thème clair — activé en posant data-theme="light" sur
+ * <html> (bouton dans la barre de navigation). Mêmes noms
+ * de variable, valeurs inversées : verre sombre sur fond
+ * clair au lieu de verre clair sur fond sombre.
+ */
+:root[data-theme="light"] {
+  --bg: #f2f2f4;
+
+  --surface: rgba(0, 0, 0, 0.03);
+  --surface-strong: rgba(0, 0, 0, 0.05);
+  --surface-solid: #e4e4e8;
+  --surface-input: rgba(0, 0, 0, 0.04);
+  --surface-hover: rgba(0, 0, 0, 0.06);
+
+  --surface-glass: rgba(0, 0, 0, 0.035);
+  --surface-glass-hover: rgba(0, 0, 0, 0.06);
+
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --glass-highlight: rgba(255, 255, 255, 0.7);
+  --glass-highlight-soft: rgba(255, 255, 255, 0.4);
+
+  --text: #0b0b0c;
+  --text-muted: #55555c;
+  --text-dim: #86868d;
+
+  --accent: #0b0b0c;
+  --accent-ink: #ffffff;
+  --accent-light: #000000;
+  --accent-tint: rgba(0, 0, 0, 0.08);
+  --accent-border: rgba(0, 0, 0, 0.24);
+
+  /* Barre de navigation en thème clair : verre blanc et
+     icônes NOIRES. Le verre reste très peu teinté pour
+     qu'on continue de voir la page défiler derrière. */
+  --nav-surface: rgba(255, 255, 255, 0.22);
+  --nav-surface-pressed: rgba(255, 255, 255, 0.34);
+  --nav-text: rgba(0, 0, 0, 0.45);
+  --nav-text-active: #000000;
+  --nav-pill: rgba(255, 255, 255, 0.5);
+  --nav-pill-strong: rgba(255, 255, 255, 0.72);
+  --nav-hairline: rgba(0, 0, 0, 0.08);
+  --nav-hairline-strong: rgba(0, 0, 0, 0.14);
+  --nav-sheen: rgba(255, 255, 255, 0.65);
+  --nav-sheen-strong: rgba(255, 255, 255, 0.9);
+
+  --menu-shadow: 12px 0 34px rgba(0, 0, 0, 0.14);
+}
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "SF Pro Text",
+    Inter,
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* =========================================================
+   PAGE
+   ========================================================= */
+
+.page {
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 22px var(--page-pad) 120px;
+}
+
+/* =========================================================
+   EN-TÊTES
+   ========================================================= */
+
+.hero {
+  padding: 25px 4px 24px;
+}
+
+/*
+ * L'en-tête d'Anime Stream, centré et dégagé.
+ *
+ * Le bouton du menu est en position fixe dans le coin
+ * haut-gauche, sur 42 pixels. Le titre, lui, commençait à 4
+ * pixels du bord : le bouton lui passait dessus et on ne
+ * lisait plus que « E STREAM ». Ce n'était pas une question
+ * de taille, mais de place.
+ *
+ * D'où les deux corrections ensemble : la marge latérale
+ * réserve la largeur du bouton DES DEUX CÔTÉS, pour que le
+ * centrage reste vrai, et la hauteur minimale aligne le
+ * titre sur le bouton plutôt que de le laisser flotter
+ * au-dessus.
+ */
+
+.hero-mini {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 4px 0 14px;
+}
+
+.hero-mini .eyebrow {
+  margin: 0;
+  padding: 0 56px;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  text-align: center;
+}
+
+.simple-header {
+  padding: 20px 4px 25px;
+}
+
+.eyebrow,
+.section-eyebrow {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--accent-light);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.hero h1,
+.simple-header h1 {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.hero p {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* =========================================================
+   RECHERCHE — chrome flottant, verre le plus prononcé
+   ========================================================= */
+
+.search-section {
+  position: relative;
+  z-index: 20;
+  margin-bottom: 22px;
+}
+
+/*
+ * Même langage de verre que la barre d'onglets : un trait
+ * cheveu de 0.5px, presque pas de teinte, un flou faible pour
+ * qu'on voie au travers, et un seul reflet d'un demi-pixel en
+ * haut. Pas de double ombre ni de liseré épais — c'est ce qui
+ * donnait un objet lourd et "verni" au lieu d'un morceau de
+ * verre posé sur la page.
+ */
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 54px;
+  padding: 0 18px;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen),
+    0 8px 24px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
+  transition:
+    border-color var(--ease),
+    background var(--ease);
+}
+
+.search-box:focus-within {
+  border-color: var(--nav-hairline-strong);
+  background: var(--surface-glass-hover);
+}
+
+.search-icon {
+  color: var(--text-dim);
+  font-size: 25px;
+  line-height: 1;
+}
+
+.search-box input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+}
+
+.search-box input::placeholder {
+  color: var(--text-dim);
+}
+
+.clear-button {
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-strong);
+  color: var(--text-muted);
+  line-height: 20px;
+}
+
+/*
+ * La liste des résultats est le prolongement du même morceau
+ * de verre. Elle garde un flou plus marqué que la barre de
+ * recherche, volontairement : ici du texte se superpose au
+ * contenu de la page, et à 6px de flou les lignes deviennent
+ * illisibles sur une affiche chargée.
+ */
+
+.search-results {
+  position: absolute;
+  top: 64px;
+  right: 0;
+  left: 0;
+  max-height: 370px;
+  overflow: auto;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-strong);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen),
+    0 14px 40px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+}
+
+.search-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.search-result:last-child {
+  border-bottom: 0;
+}
+
+.search-result:hover {
+  background: var(--surface-hover);
+}
+
+.search-result-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-result-info strong {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.search-result-info span {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.search-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 80px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.arrow {
+  color: var(--text-dim);
+  font-size: 22px;
+}
+
+/* =========================================================
+   AFFICHES — format paysage 16/9 (source Anime-Sama)
+   ========================================================= */
+
+.anime-cover,
+.favorite-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-solid);
+}
+
+.search-cover,
+.continue-cover {
+  position: relative;
+  flex: 0 0 96px;
+  width: 96px;
+  height: 54px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--surface-solid);
+}
+
+.history-cover {
+  flex: 0 0 84px;
+  width: 84px;
+  height: 47px;
+  overflow: hidden;
+  border-radius: 11px;
+  background: var(--surface-solid);
+}
+
+.anime-cover img,
+.favorite-cover img,
+.search-cover img,
+.continue-cover img,
+.history-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* =========================================================
+   SECTIONS ET GRILLES
+   ========================================================= */
+
+.section {
+  margin-top: 34px;
+}
+
+.section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 13px;
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 19px;
+  letter-spacing: -0.025em;
+}
+
+.see-all {
+  color: var(--accent-light);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.anime-grid,
+.favorite-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.anime-card,
+.favorite-card {
+  min-width: 0;
+}
+
+.anime-card span {
+  display: block;
+  padding: 8px 3px 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.favorite-info {
+  padding: 8px 2px;
+}
+
+.favorite-info strong {
+  display: block;
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.count-badge,
+.episode-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-tint);
+  color: var(--accent-light);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* =========================================================
+   BOUTONS — capsules pleines avec reflet
+   ========================================================= */
+
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 20px;
+  padding: 0 19px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 750;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 26px rgba(0, 0, 0, 0.4);
+}
+
+.remove-button {
+  margin-top: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.remove-button:hover {
+  color: #f27676;
+}
+
+/* =========================================================
+   ÉTAT VIDE
+   ========================================================= */
+
+.empty-card {
+  padding: 34px 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight-soft);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  text-align: center;
+}
+
+.empty-icon {
+  margin-bottom: 10px;
+  color: var(--accent-light);
+  font-size: 30px;
+}
+
+.empty-card h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.empty-card p {
+  max-width: 280px;
+  margin: 0 auto;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* =========================================================
+   NAVIGATION — pilule flottante
+   ========================================================= */
+
+.bottom-nav {
+  position: fixed;
+  right: 0;
+  bottom: 26px;
+  left: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  padding: 0 10px;
+  pointer-events: none;
+}
+
+/*
+ * La barre prend toute la largeur utile de l'écran, comme
+ * la vraie barre d'onglets d'Apple. Verre FIN : contour
+ * cheveu (0.5px quasi transparent), un seul reflet léger en
+ * haut, aucune ombre creusée à l'intérieur — c'est cette
+ * ombre interne qui alourdissait la barre et lui donnait
+ * cet aspect "épais et terne". Pas de brightness() non plus,
+ * qui blanchissait le verre au lieu de le laisser lire le
+ * fond.
+ */
+
+.bottom-nav-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: auto;
+  max-width: 100%;
+  padding: 5px;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--nav-surface);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen),
+    0 10px 30px rgba(0, 0, 0, 0.28);
+  /* Flou volontairement TRÈS faible : c'est du verre qu'on
+     traverse du regard, pas du dépoli. On doit reconnaître
+     l'image qui passe derrière, pas seulement ses couleurs.
+     La saturation fait le reste du travail. */
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
+  /* La bulle doit pouvoir sortir de la barre quand elle
+     grossit sous le doigt : surtout pas d'overflow caché. */
+  overflow: visible;
+  transition:
+    transform var(--ease-spring),
+    background var(--ease),
+    border-color var(--ease);
+  pointer-events: auto;
+}
+
+/*
+ * La barre elle-même répond au toucher : elle se gonfle très
+ * légèrement et son verre s'éclaircit tant qu'un doigt la
+ * tient, puis retombe en ressort. C'est ce petit sursaut qui
+ * fait qu'elle a l'air vivante au lieu d'être un décor fixe.
+ */
+
+.bottom-nav-inner.is-pressed {
+  transform: scale(1.07);
+  border-color: var(--nav-hairline-strong);
+  background: var(--nav-surface-pressed);
+}
+
+/*
+ * La piste des 3 onglets : c'est ELLE qui capte le doigt et
+ * sert de repère de coordonnées à la pastille, pour ne pas
+ * empiéter sur le bouton de thème séparé à droite.
+ * `touch-action: none` est indispensable — sans lui iOS
+ * confisque le geste pour faire défiler la page et les
+ * pointermove s'arrêtent net au bout de quelques pixels.
+ */
+
+.nav-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  overflow: visible;
+  touch-action: none;
+}
+
+/*
+ * Repère glissant façon Liquid Glass : une petite bulle de
+ * verre qui vit vraiment — elle se colle sous le doigt et le
+ * suit sans latence pendant l'appui (.is-dragging coupe la
+ * transition sur `left`), grossit légèrement pour se
+ * sentir "tenue", puis retombe en ressort (`--ease-spring`)
+ * sur l'onglet relâché.
+ */
+
+/*
+ * ATTENTION : `transform` appartient entièrement au JS
+ * (Navbar.tsx l'écrit à chaque frame). Aucune transition CSS
+ * ne doit porter dessus, sinon les deux se battent et on
+ * retrouve le déplacement saccadé. Seules la couleur et
+ * l'ombre sont animées ici.
+ */
+
+/*
+ * ATTENTION à la hauteur : la pastille est positionnée dans
+ * `.nav-track` (hauteur des onglets), pas dans la barre, qui
+ * est plus haute de son padding. Lui donner un inset ici la
+ * rendait si courte qu'elle ne pouvait plus dépasser de la
+ * barre en grossissant. Elle épouse donc toute la hauteur de
+ * la piste — le retrait visuel au repos vient déjà du padding
+ * de la barre.
+ */
+
+.nav-pill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  transform-origin: center center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--nav-pill);
+  box-shadow: inset 0 0.5px 0 var(--nav-sheen);
+  will-change: transform;
+  transition:
+    background var(--ease),
+    box-shadow var(--ease),
+    opacity var(--ease);
+}
+
+/*
+ * Tenue par le doigt, la bulle déborde de la barre : elle
+ * doit donc se détacher comme un objet soulevé — verre plus
+ * dense, reflet plus net, et une vraie ombre portée en
+ * dessous pour qu'elle flotte au-dessus de la barre.
+ */
+
+.nav-pill.is-dragging {
+  background: var(--nav-pill-strong);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen-strong),
+    0 8px 22px rgba(0, 0, 0, 0.3);
+}
+
+.nav-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 80px;
+  padding: 8px 4px 7px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--nav-text);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  /* Sans ça, un appui long sur un onglet déclenche l'aperçu
+     de lien d'iOS (la page s'ouvre en popover) au beau
+     milieu du balayage. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition:
+    background var(--ease),
+    color var(--ease),
+    transform var(--ease-spring);
+}
+
+.nav-item:active {
+  transform: scale(0.92);
+}
+
+.nav-item.active {
+  background: transparent;
+  color: var(--nav-text-active);
+}
+
+/*
+ * L'onglet s'allume au passage du doigt pendant le balayage,
+ * avant même d'avoir relâché — c'est ce qui donne la
+ * sensation que la barre répond au toucher.
+ */
+
+.nav-item.is-hover {
+  color: var(--nav-text-active);
+}
+
+.nav-item.is-hover .nav-icon {
+  transform: scale(1.12);
+}
+
+.nav-theme-button {
+  flex: 0 0 auto;
+  width: 68px;
+}
+
+.nav-icon {
+  font-size: 26px;
+  line-height: 28px;
+  transition: transform var(--ease-spring);
+}
+
+.nav-label {
+  max-width: 60px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* =========================================================
+   CONTINUER LA LECTURE
+   ========================================================= */
+
+.continue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.continue-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  color: inherit;
+  transition:
+    transform var(--ease),
+    background var(--ease);
+}
+
+.continue-card:hover {
+  transform: translateY(-2px);
+  background: var(--surface-strong);
+}
+
+.continue-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.continue-info strong {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.continue-info span {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.continue-info small {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.continue-progress {
+  width: 100%;
+  height: 3px;
+  margin-top: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.continue-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-light);
+  transition: width 0.35s ease;
+}
+
+.continue-card .arrow {
+  flex: 0 0 auto;
+  font-size: 25px;
+  opacity: 0.35;
+}
+
+/* =========================================================
+   HISTORIQUE
+   ========================================================= */
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-card {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  transition:
+    background var(--ease),
+    transform var(--ease);
+}
+
+.history-card:hover {
+  transform: translateY(-1px);
+  background: var(--surface-strong);
+}
+
+.history-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  padding: 10px;
+  color: inherit;
+}
+
+.history-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.history-info strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.history-info span {
+  font-size: 12px;
+  opacity: 0.62;
+}
+
+.history-info small {
+  font-size: 11px;
+  opacity: 0.42;
+}
+
+.history-delete {
+  flex: 0 0 42px;
+  align-self: stretch;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 24px;
+  opacity: 0.3;
+  transition:
+    opacity var(--ease),
+    background var(--ease);
+}
+
+.history-delete:hover {
+  background: rgba(255, 255, 255, 0.06);
+  opacity: 0.8;
+}
+
+.clear-history {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: inherit;
+  font-size: 12px;
+  opacity: 0.75;
+  transition:
+    opacity var(--ease),
+    background var(--ease);
+}
+
+.clear-history:hover {
+  background: var(--surface-strong);
+  opacity: 1;
+}
+
+/* =========================================================
+   PAGE ANIME — EN-TÊTE
+   ========================================================= */
+
+.anime-page {
+  padding-top: 12px;
+}
+
+.anime-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.back-button,
+.favorite-button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
+  box-shadow: inset 0 1px 0 var(--glass-highlight-soft);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  color: var(--text-muted);
+}
+
+.back-button {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.favorite-button {
+  font-size: 19px;
+}
+
+.favorite-button.is-favorite {
+  border-color: rgba(255, 212, 92, 0.28);
+  background: rgba(255, 212, 92, 0.1);
+  color: #ffd45c;
+}
+
+.anime-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.anime-title span {
+  color: var(--accent-light);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.anime-title h1 {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 18px;
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* =========================================================
+   LECTEUR — pleine largeur sur mobile
+   ========================================================= */
+
+.player-container {
+  position: relative;
+  width: calc(100% + var(--page-pad) * 2);
+  margin-inline: calc(var(--page-pad) * -1);
+  margin-top: 16px;
+  aspect-ratio: 16 / 9;
+  max-height: 70vh;
+  overflow: hidden;
+  border-block: 1px solid var(--border-strong);
+  background: #000;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+.video-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.player-empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  width: 100%;
+  height: 100%;
+  color: #5c5c64;
+}
+
+.player-empty span {
+  font-size: 25px;
+}
+
+.player-empty p {
+  margin: 0;
+  font-size: 11px;
+}
+
+/* =========================================================
+   PROGRESSION
+   ========================================================= */
+
+.anime-progress {
+  margin: 18px 0 24px;
+}
+
+.progress-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.progress-title > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-title strong {
+  font-size: 14px;
+}
+
+.progress-track {
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.progress-value {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-light);
+  transition: width 0.35s ease;
+}
+
+.global-progress {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+.global-progress strong {
+  font-weight: 600;
+}
+
+/* Ancien sélecteur de saison sur la page lecteur */
+
+.season-progress-list {
+  display: flex;
+  gap: 8px;
+  margin-top: 17px;
+  padding-bottom: 3px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.season-progress-list::-webkit-scrollbar {
+  display: none;
+}
+
+.season-progress {
+  flex: 0 0 auto;
+  min-width: 108px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: inherit;
+  opacity: 0.6;
+  transition:
+    opacity var(--ease),
+    background var(--ease),
+    border-color var(--ease);
+}
+
+.season-progress.active {
+  border-color: var(--accent-border);
+  background: var(--accent-tint);
+  opacity: 1;
+}
+
+.season-progress:hover {
+  opacity: 1;
+}
+
+.season-progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  font-size: 11px;
+}
+
+.season-progress-top strong {
+  font-weight: 650;
+}
+
+/*
+ * Barre fine réutilisée par le sélecteur de saison
+ * ci-dessus ET par les cartes de saison de la fiche.
+ */
+.season-progress-track {
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.season-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-light);
+  transition: width 0.3s ease;
+}
+
+/* =========================================================
+   CONTRÔLES
+   ========================================================= */
+
+.episode-controls {
+  margin-top: 14px;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight-soft);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+}
+
+.control-row {
+  display: flex;
+  gap: 8px;
+}
+
+.segmented {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.segmented button {
+  flex: 1;
+  min-height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  transition: background var(--ease), color var(--ease);
+}
+
+.segmented button.selected {
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.control-row select {
+  min-width: 108px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  outline: 0;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.players {
+  margin-top: 13px;
+}
+
+.players > span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.player-list {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.player-list button {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.player-list button.player-selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* =========================================================
+   ÉPISODES
+   ========================================================= */
+
+.episodes-section {
+  margin-top: 27px;
+}
+
+.episode-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  max-height: 300px;
+  padding-right: 2px;
+  overflow-y: auto;
+}
+
+.episode {
+  position: relative;
+  min-height: 44px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 750;
+  transition:
+    opacity var(--ease),
+    transform var(--ease),
+    background var(--ease);
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.episode:hover {
+  transform: translateY(-1px);
+  opacity: 1;
+}
+
+.episode.watched {
+  opacity: 0.6;
+}
+
+.episode.watched::after {
+  content: "✓";
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.episode.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  opacity: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.episode.active.watched::after {
+  background: #fff;
+  color: var(--accent);
+}
+
+.episode-hint {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.mark-button {
+  padding: 7px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--accent-light);
+  font-size: 10px;
+  font-weight: 700;
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  transition: border-color var(--ease);
+}
+
+.mark-button:hover {
+  border-color: var(--accent-border);
+}
+
+/* =========================================================
+   ÉTATS
+   ========================================================= */
+
+.loading-page {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  min-height: 70vh;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.loader {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent-light);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loader.large {
+  width: 25px;
+  height: 25px;
+}
+
+.loading-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 2px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error-page {
+  display: grid;
+  place-items: center;
+  min-height: 80vh;
+}
+
+.error-card {
+  width: 100%;
+  padding: 30px 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: rgba(24, 24, 29, 0.7);
+  box-shadow: inset 0 1px 0 var(--glass-highlight-soft);
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
+  text-align: center;
+}
+
+.error-icon {
+  display: grid;
+  place-items: center;
+  width: 45px;
+  height: 45px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: rgba(239, 91, 91, 0.14);
+  color: #ef7777;
+  font-weight: 900;
+}
+
+.error-card h1,
+.error-card h2 {
+  margin: 0 0 7px;
+  font-size: 16px;
+}
+
+.error-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* =========================================================
+   RESPONSIVE — un seul jeu de points de rupture
+   ========================================================= */
+
+@media (min-width: 700px) {
+  :root {
+    --page-max: 720px;
+    --page-pad: 22px;
+  }
+
+  .page {
+    padding-top: 40px;
+  }
+
+  .bottom-nav {
+    bottom: 34px;
+  }
+
+  .floating-filter {
+    bottom: 112px;
+  }
+
+  .anime-grid,
+  .favorite-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  /* Le lecteur reprend sa carte arrondie */
+  .player-container {
+    width: 100%;
+    margin-inline: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-xl);
+  }
+
+  .episode-grid {
+    grid-template-columns: repeat(8, 1fr);
+    max-height: 260px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .anime-grid,
+  .favorite-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* =========================================================
+   FICHE ANIME
+   ========================================================= */
+
+/*
+ * =========================================================
+ * AFFICHE PLEIN ÉCRAN — façon fiche Apple TV+ : l'image
+ * déborde de tout le cadre de la page (marges négatives),
+ * le titre est écrit PAR-DESSUS via un dégradé, et deux
+ * boutons ronds en verre (retour, favori) restent fixes à
+ * l'écran quel que soit le défilement. `.hero-banner-frame`
+ * est l'élément que le scroll anime : étirement élastique
+ * quand on tire vers le bas en haut de page, léger
+ * rétrécissement en parallaxe quand on défile vers le bas.
+ * =========================================================
+ */
+
+.hero-float-buttons {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top, 14px));
+  left: 0;
+  right: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 var(--page-pad);
+  pointer-events: none;
+}
+
+.hero-round-button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  background: rgba(28, 28, 32, 0.55);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  backdrop-filter: blur(var(--blur-md)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
+  pointer-events: auto;
+  transition: transform var(--ease-spring), background var(--ease);
+}
+
+.hero-round-button:active {
+  transform: scale(0.88);
+}
+
+.hero-round-button.is-favorite {
+  color: #ffd45c;
+}
+
+.hero-compact-title {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top, 14px));
+  left: 62px;
+  right: 62px;
+  z-index: 59;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 38px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity var(--ease), transform var(--ease);
+  pointer-events: none;
+}
+
+.hero-compact-title.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hero-banner {
+  position: relative;
+  overflow: hidden;
+  height: 42vh;
+  min-height: 300px;
+  max-height: 430px;
+  margin: -12px calc(-1 * var(--page-pad)) 18px;
+  background: var(--bg);
+}
+
+.hero-banner-frame {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.hero-banner-img,
+.hero-banner-img-empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-color: var(--surface-solid);
+}
+
+/*
+ * Le voile descend plus tôt vers le fond de page qu'avant :
+ * le titre ayant grossi, il occupe une bande plus haute de
+ * l'affiche, et cette bande doit être calme pour qu'il s'y
+ * détache. Le dégradé finit toujours sur var(--bg), donc il
+ * suit le thème sans qu'aucune couleur ne soit écrite ici.
+ */
+
+.hero-banner-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.05) 0%,
+    rgba(0, 0, 0, 0.2) 42%,
+    var(--bg) 92%
+  );
+  pointer-events: none;
+}
+
+/*
+ * Titre centré. Aligné à gauche, il partait se perdre dans
+ * un coin de l'affiche ; au centre, il tombe là où le regard
+ * arrive et là où le voile est le plus dense.
+ */
+
+.hero-banner-content {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 0 var(--page-pad) 18px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.hero-banner-content h1 {
+  margin: 0 0 6px;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.5),
+    0 0 28px rgba(0, 0, 0, 0.4);
+}
+
+.alt-titles p {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  line-height: 1.5;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+}
+
+.alt-titles p.is-open {
+  -webkit-line-clamp: unset;
+}
+
+.alt-titles .text-button {
+  pointer-events: auto;
+}
+
+.meta-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  pointer-events: auto;
+}
+
+.meta-pills span {
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-pill);
+  background: rgba(20, 20, 24, 0.45);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  color: #e6e6ea;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.meta-pills span.is-status {
+  border-color: var(--accent-border);
+  background: var(--accent-tint);
+  color: var(--accent-light);
+}
+
+.hero-action {
+  display: flex;
+  width: 100%;
+  margin: 0 0 16px;
+  min-height: 48px;
+  font-size: 13px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+/* Genres */
+
+.genre-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.genre-badges span {
+  padding: 6px 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-pill);
+  background: var(--accent-tint);
+  color: var(--accent-light);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+/* Synopsis */
+
+.anime-synopsis {
+  padding: 17px;
+  margin-bottom: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight-soft);
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
+}
+
+.anime-synopsis p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.anime-synopsis p.is-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.text-button {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-light);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/*
+ * =========================================================
+ * SÉLECTEUR DE SAISON — petit bouton "Saison X ›" qui ouvre
+ * un menu déroulant en verre juste en dessous, façon Apple
+ * TV+, au lieu d'une grande feuille modale.
+ * =========================================================
+ */
+
+.season-picker {
+  position: relative;
+}
+
+.season-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.season-picker-trigger .season-chevron {
+  color: var(--text-dim);
+  font-size: 14px;
+  transition: transform var(--ease-spring);
+}
+
+.season-picker.is-open
+  .season-picker-trigger
+  .season-chevron {
+  transform: rotate(90deg);
+}
+
+.season-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  width: min(280px, 84vw);
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-strong);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 20px 46px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(var(--blur-lg)) saturate(190%);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(190%);
+  transform-origin: top left;
+  transform: scale(0.92);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--ease-spring),
+    transform var(--ease-spring);
+}
+
+.season-menu.is-open {
+  transform: scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/*
+ * Trois familles dans le même menu : saisons, films,
+ * épisodes spéciaux. Le titre de famille est collé à la
+ * liste qui le SUIT et séparé de celle qui précède —
+ * sinon rien ne dirait auquel des deux blocs il se
+ * rattache.
+ */
+
+.season-menu-group + .season-menu-group {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.season-menu-group-title {
+  display: block;
+  padding: 2px 11px 6px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.season-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 11px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background var(--ease);
+}
+
+.season-menu-row + .season-menu-row {
+  margin-top: 2px;
+}
+
+.season-menu-row:active {
+  background: var(--surface-hover);
+}
+
+.season-menu-row.is-active {
+  background: var(--accent-tint);
+}
+
+.season-menu-row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.season-menu-row-label strong {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.season-menu-row-label span {
+  color: var(--text-dim);
+  font-size: 10.5px;
+}
+
+.season-menu-row-icons {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.season-done {
+  display: grid;
+  place-items: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 10px;
+}
+
+/* Squelettes */
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.045),
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.045)
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-hero {
+  position: relative;
+  height: 42vh;
+  min-height: 300px;
+  max-height: 430px;
+  margin: -12px calc(-1 * var(--page-pad)) 18px;
+  border-radius: 0;
+}
+
+.skeleton-line {
+  height: 14px;
+  margin-bottom: 8px;
+}
+
+.skeleton-line.short {
+  width: 55%;
+}
+
+.skeleton-block {
+  height: 120px;
+  margin-top: 16px;
+}
+
+/* Tablette et desktop */
+
+@media (min-width: 700px) {
+  .hero-banner,
+  .skeleton-hero {
+    max-height: 480px;
+  }
+
+  .hero-banner-content h1 {
+    font-size: 44px;
+  }
+
+  .hero-action {
+    width: auto;
+    min-width: 260px;
+  }
+}
+
+/* =========================================================
+   PLANNING
+   ========================================================= */
+
+/*
+ * Filtre flottant du planning — même morceau de verre que la
+ * barre d'onglets et la barre de recherche, posé juste
+ * au-dessus de la navigation pour rester atteignable sans
+ * remonter en haut de la liste.
+ *
+ * `bottom` doit dégager la barre d'onglets : 26px de marge
+ * basse + ~66px de hauteur de barre + 12px de respiration.
+ * Si tu changes la hauteur des onglets, cette valeur et le
+ * padding bas de `.page.has-floating-filter` sont à revoir
+ * ensemble, sinon le filtre chevauche la barre ou masque la
+ * dernière ligne de la liste.
+ */
+
+.floating-filter {
+  position: fixed;
+  right: 0;
+  bottom: 104px;
+  left: 0;
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  padding: 0 10px;
+  pointer-events: none;
+}
+
+.page.has-floating-filter {
+  padding-bottom: 176px;
+}
+
+.filter-chip {
+  padding: 10px 18px;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--nav-surface);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen),
+    0 8px 24px rgba(0, 0, 0, 0.28);
+  color: var(--nav-text-active);
+  font-size: 12px;
+  font-weight: 650;
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
+  transition:
+    transform var(--ease-spring),
+    border-color var(--ease),
+    background var(--ease);
+  pointer-events: auto;
+}
+
+.filter-chip:active {
+  transform: scale(0.95);
+}
+
+.filter-chip.is-active {
+  border-color: var(--nav-hairline-strong);
+  background: var(--nav-pill-strong);
+}
+
+.planning-day {
+  margin-bottom: 26px;
+}
+
+.planning-day.is-past {
+  opacity: 0.45;
+}
+
+.planning-day-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 11px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.planning-day-title h2 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  text-transform: capitalize;
+}
+
+.planning-day-title span {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.planning-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planning-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: inherit;
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  transition:
+    transform var(--ease),
+    border-color var(--ease);
+}
+
+.planning-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+}
+
+.planning-card.is-followed {
+  border-left: 2px solid var(--accent);
+  background: var(--accent-tint);
+}
+
+.planning-cover {
+  flex: 0 0 78px;
+  width: 78px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 11px;
+  background: var(--surface-solid);
+}
+
+.planning-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.planning-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.planning-info strong {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.planning-info span {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+
+.planning-time {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.planning-time strong {
+  display: block;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.planning-time small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@media (min-width: 700px) {
+  .planning-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+/* =========================================================
+   BIBLIOTHÈQUE
+   ========================================================= */
+
+.library-filters {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 18px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.library-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.library-filters .filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+.library-filters .filter-chip span {
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.09);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.library-filters .filter-chip.is-active span {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-bottom: 30px;
+}
+
+.library-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: inherit;
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  transition:
+    transform var(--ease),
+    border-color var(--ease);
+}
+
+.library-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+}
+
+.library-cover {
+  flex: 0 0 84px;
+  width: 84px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--surface-solid);
+}
+
+.library-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.library-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.library-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.library-top strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.library-status {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+}
+
+.library-status.is-watching {
+  background: var(--accent-tint);
+  color: var(--accent-light);
+}
+
+.library-status.is-todo {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+
+.library-status.is-upToDate {
+  background: rgba(96, 168, 224, 0.14);
+  color: #7bc0e8;
+}
+
+.library-status.is-done {
+  background: rgba(96, 208, 140, 0.14);
+  color: #7bdba0;
+}
+
+.library-meta {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.library-track {
+  height: 3px;
+  margin-top: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.library-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-light);
+  transition: width 0.35s ease;
+}
+
+.library-next {
+  display: block;
+  margin-top: 6px;
+  color: var(--accent-light);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+@media (min-width: 900px) {
+  .library-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+/* =========================================================
+   ACCUEIL — HERO, STATS, DÉCOUVERTE
+   ========================================================= */
+
+.home-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  margin-bottom: 18px;
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 20px 55px rgba(0, 0, 0, 0.3);
+}
+
+.home-hero-visual {
+  position: relative;
+  min-height: 220px;
+  display: flex;
+  align-items: flex-end;
+  background-color: var(--surface-solid);
+  background-size: cover;
+  background-position: center;
+}
+
+.home-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(3, 3, 4, 0.1) 0%,
+    rgba(3, 3, 4, 0.55) 55%,
+    rgba(3, 3, 4, 0.92) 100%
+  );
+  backdrop-filter: saturate(160%);
+  -webkit-backdrop-filter: saturate(160%);
+}
+
+/*
+ * Cette carte est TOUJOURS une image sombrée par un voile,
+ * dans les deux thèmes. Son texte ne doit donc pas suivre le
+ * thème : en clair, `--text` vaut presque du noir et
+ * `--accent-light` du noir franc, si bien que « REPRENDRE »
+ * et le titre de la série disparaissaient purement et
+ * simplement dans le voile.
+ *
+ * Le paragraphe en dessous, lui, portait déjà une couleur
+ * écrite en dur — c'est pour ça que lui seul restait lisible,
+ * et c'est ce qui a mis la puce à l'oreille.
+ */
+
+.home-hero-content {
+  position: relative;
+  width: 100%;
+  padding: 22px 20px;
+  color: #f5f5f7;
+}
+
+.home-hero-content .section-eyebrow {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.home-hero-content h2 {
+  margin: 6px 0 4px;
+  color: #ffffff;
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+
+.home-hero-content p {
+  margin: 0 0 14px;
+  color: #dcdce2;
+  font-size: 12px;
+}
+
+.hero-cta {
+  display: inline-flex;
+  width: auto;
+  min-height: 46px;
+  margin: 0;
+  padding: 0 22px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+.home-hero-empty {
+  padding: 34px 22px;
+  background: var(--surface);
+  backdrop-filter: blur(var(--blur-md)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
+}
+
+.home-hero-empty .eyebrow {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.home-hero-empty h1 {
+  margin: 0 0 8px;
+  font-size: 26px;
+  letter-spacing: -0.03em;
+}
+
+.home-hero-empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.home-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.home-stat {
+  padding: 14px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight-soft);
+  text-align: center;
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+}
+
+.home-stat strong {
+  display: block;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+}
+
+.home-stat span {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.discovery-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.discovery-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.discovery-card {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 220px;
+  color: inherit;
+}
+
+.discovery-cover {
+  width: 220px;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-solid);
+}
+
+.discovery-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.discovery-card strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.discovery-card span {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+@media (min-width: 700px) {
+  .home-hero-visual {
+    min-height: 280px;
+  }
+
+  .home-hero-content h2 {
+    font-size: 30px;
+  }
+
+  .home-hero-content p {
+    font-size: 14px;
+  }
+
+  .home-stat strong {
+    font-size: 24px;
+  }
+}
+
+@media (min-width: 1400px) {
+  :root {
+    --page-max: 960px;
+  }
+
+  .home-hero-visual {
+    min-height: 360px;
+  }
+
+  .home-hero-content h2 {
+    font-size: 38px;
+  }
+}
+
+/* =========================================================
+   PROFIL
+   ========================================================= */
+
+.profile-card {
+  margin-top: 28px;
+  padding: 17px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight-soft);
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
+}
+
+.profile-card .section-header {
+  margin-bottom: 14px;
+}
+
+.profile-setup p,
+.profile-linked p {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.profile-create {
+  width: 100%;
+  margin-top: 0;
+}
+
+.profile-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.profile-divider::before,
+.profile-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.profile-join {
+  display: flex;
+  gap: 8px;
+}
+
+.profile-join input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.profile-join-button {
+  flex: 0 0 auto;
+  height: 44px;
+  padding: 0 17px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.profile-join-button:disabled {
+  opacity: 0.5;
+}
+
+.profile-preview {
+  display: block;
+  margin: -8px 0 12px;
+  color: var(--accent-light);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.profile-suggest {
+  display: block;
+  margin: 0 auto;
+}
+
+.profile-code-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.profile-code {
+  flex: 1;
+  padding: 13px;
+  border: 1px dashed var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--accent-tint);
+  color: var(--accent-light);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: center;
+  word-break: break-all;
+}
+
+.profile-copy {
+  flex: 0 0 auto;
+  padding: 11px 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.profile-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.profile-action {
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.profile-action:disabled {
+  opacity: 0.5;
+}
+
+.profile-unlink {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.profile-unlink:hover {
+  color: #f27676;
+}
+
+.profile-status {
+  margin: 12px 0 0;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.profile-status.is-working {
+  color: var(--text-muted);
+}
+
+.profile-status.is-success {
+  color: #7bdba0;
+}
+
+.profile-status.is-error {
+  color: #f27676;
+}
+
+/* =========================================================
+   SAISON ACTIVE — barre VOSTFR/VF, lecteur intégré et rail
+   d'épisodes horizontal, façon fiche Apple TV+
+   ========================================================= */
+
+.season-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 14px 0 12px;
+}
+
+/* Lecteur intégré au-dessus du rail d'épisodes */
+
+.season-player {
+  margin-bottom: 14px;
+}
+
+.season-player-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/*
+ * Rail d'épisodes horizontal : vignette 16:9, titre et
+ * statut dessous, scroll-snap comme les rangées de cartes
+ * d'Apple TV+ — jamais de liste verticale pleine largeur.
+ */
+
+/* Précédent / Suivant, sous le lecteur : deux boutons en
+   verre qui changent directement l'épisode affiché. */
+
+.player-episode-nav {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.player-episode-nav-button {
+  flex: 1 1 0;
+  padding: 11px 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 700;
+  backdrop-filter: blur(var(--blur-md)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(180%);
+  transition:
+    transform var(--ease-spring),
+    background var(--ease),
+    opacity var(--ease);
+}
+
+.player-episode-nav-button:active {
+  transform: scale(0.96);
+  background: var(--surface-glass-hover);
+}
+
+.player-episode-nav-button:disabled {
+  opacity: 0.35;
+}
+
+.ep-rail {
+  display: flex;
+  gap: 10px;
+  margin: 0 calc(-1 * var(--page-pad));
+  padding: 2px var(--page-pad) 6px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ep-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.ep-card {
+  flex: 0 0 auto;
+  width: 208px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  scroll-snap-align: start;
+  transition: transform var(--ease-spring);
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.ep-card:active {
+  transform: scale(0.96);
+}
+
+.ep-card-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-solid);
+  background-size: cover;
+  background-position: center;
+  transition: border-color var(--ease);
+}
+
+.ep-card.is-active .ep-card-thumb {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 2px var(--accent-border);
+}
+
+.ep-card-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.ep-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 2px 0;
+}
+
+/*
+ * Deux lignes, pas une.
+ *
+ * Un episode s'appelle "Episode 12" et tenait largement sur
+ * une ligne. Un film s'appelle "Episode d'Alabasta : Les
+ * Pirates et la Princesse du Desert" et se faisait couper au
+ * quart. La hauteur est figee a deux lignes meme quand le
+ * texte est court, sinon les cartes du rail n'auraient plus
+ * la meme hauteur selon la longueur du titre.
+ */
+
+.ep-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.6em;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.ep-card-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.ep-card.is-active .ep-card-sub {
+  color: var(--accent-light);
+}
+
+
+/* =========================================================
+   HUB — MENU LATÉRAL
+   ========================================================= */
+
+/*
+ * Le bouton du menu reprend exactement le verre de la barre
+ * d'onglets : trait cheveu, flou faible, reflet d'un
+ * demi-pixel. Il est fixe pour rester atteignable quel que
+ * soit le défilement.
+ */
+
+.hub-menu-button {
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top));
+  left: 14px;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--nav-surface);
+  color: var(--nav-text-active);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen),
+    0 8px 24px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
+  transition: transform var(--ease-spring);
+}
+
+.hub-menu-button:active {
+  transform: scale(0.92);
+}
+
+.hub-menu-button-icon {
+  font-size: 17px;
+  line-height: 1;
+}
+
+/*
+ * Le voile derrière le panneau. `visibility` en plus de
+ * l'opacité : sans elle il resterait cliquable une fois
+ * transparent et intercepterait tous les taps de la page.
+ */
+
+.hub-menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  visibility: hidden;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  transition:
+    opacity var(--ease),
+    visibility var(--ease);
+}
+
+.hub-menu-scrim.is-open {
+  visibility: visible;
+  opacity: 1;
+}
+
+/*
+ * Le panneau est SORTI de l'écran par une translation, mais
+ * une translation ne déplace pas son ombre portée hors de
+ * l'écran pour autant : avec 40 pixels de flou, elle continuait
+ * de baver sur le bord gauche de la page. Invisible en thème
+ * sombre — du noir sur du noir — et parfaitement visible en
+ * thème clair, sous la forme d'une bande grise verticale.
+ *
+ * `visibility` règle les deux d'un coup, l'ombre et le filet de
+ * bordure. Elle s'anime par palier : elle passe à `visible` dès
+ * le début de l'ouverture et ne repasse à `hidden` qu'à la fin
+ * de la fermeture, donc le panneau reste bien visible pendant
+ * ses deux animations. C'est déjà le procédé employé par le
+ * voile juste au-dessus.
+ */
+
+.hub-menu {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  width: min(300px, 82vw);
+  padding: calc(20px + env(safe-area-inset-top)) 14px
+    20px;
+  border-right: 0.5px solid var(--nav-hairline);
+  background: var(--surface-solid);
+  box-shadow: var(--menu-shadow);
+  visibility: hidden;
+  transform: translateX(-100%);
+  transition:
+    transform var(--ease-spring),
+    visibility var(--ease-spring);
+}
+
+.hub-menu.is-open {
+  visibility: visible;
+  transform: translateX(0);
+}
+
+.hub-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding: 0 6px;
+}
+
+.hub-menu-title {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+.hub-menu-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-strong);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.hub-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hub-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 12px;
+  border: 0.5px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text);
+  transition:
+    background var(--ease),
+    border-color var(--ease),
+    transform var(--ease-spring);
+}
+
+.hub-menu-row:active {
+  transform: scale(0.97);
+}
+
+.hub-menu-row.is-active {
+  border-color: var(--border-strong);
+  background: var(--surface-strong);
+}
+
+.hub-menu-row-icon {
+  flex: 0 0 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  font-size: 16px;
+  line-height: 34px;
+  text-align: center;
+}
+
+.hub-menu-row.is-active .hub-menu-row-icon {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.hub-menu-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hub-menu-row-text strong {
+  font-size: 14px;
+}
+
+.hub-menu-row-text small {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* =========================================================
+   HUB — ACCUEIL
+   ========================================================= */
+
+/*
+ * L'accueil n'a pas de barre d'onglets en bas, mais garde de
+ * la marge basse pour ne pas coller au bord de l'écran.
+ * En haut, la marge dégage le bouton du menu, qui est fixe et
+ * ne pousse donc rien.
+ */
+
+.hub-page {
+  padding-top: calc(72px + env(safe-area-inset-top));
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
+}
+
+.hub-header {
+  margin-bottom: 20px;
+}
+
+.hub-header h1 {
+  margin-top: 4px;
+  font-size: 27px;
+  font-weight: 750;
+  letter-spacing: -0.6px;
+  /* Réserve la hauteur d'une ligne : la date n'est calculée
+     qu'après le montage, sans ça la page sursaute. */
+  min-height: 34px;
+}
+
+.hub-tile {
+  margin-bottom: 14px;
+  padding: 16px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.hub-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.hub-tile-label {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+}
+
+.hub-tile-empty p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.hub-weather {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hub-weather-icon {
+  flex: 0 0 auto;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.hub-weather-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hub-weather-main strong {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.hub-weather-main span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.hub-weather-side {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.hub-section {
+  margin-bottom: 22px;
+}
+
+/* --- Tâches --- */
+
+.todo-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.todo-input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 16px;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass);
+  color: var(--text);
+  font-size: 16px;
+  outline: 0;
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
+  transition:
+    border-color var(--ease),
+    background var(--ease);
+}
+
+.todo-input::placeholder {
+  color: var(--text-dim);
+}
+
+.todo-input:focus {
+  border-color: var(--nav-hairline-strong);
+  background: var(--surface-glass-hover);
+}
+
+.todo-add {
+  flex: 0 0 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 21px;
+  line-height: 1;
+  transition:
+    transform var(--ease-spring),
+    opacity var(--ease);
+}
+
+.todo-add:active {
+  transform: scale(0.9);
+}
+
+.todo-add:disabled {
+  opacity: 0.35;
+}
+
+.todo-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.todo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition: opacity var(--ease);
+}
+
+.todo-row.is-done {
+  opacity: 0.45;
+}
+
+.todo-check {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent-ink);
+  font-size: 12px;
+  line-height: 1;
+  transition:
+    background var(--ease),
+    border-color var(--ease),
+    transform var(--ease-spring);
+}
+
+.todo-check:active {
+  transform: scale(0.85);
+}
+
+.todo-row.is-done .todo-check {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.todo-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.todo-row.is-done .todo-text {
+  text-decoration: line-through;
+}
+
+.todo-remove {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+/* =========================================================
+   ÉCHÉANCES ET RAPPELS
+   ========================================================= */
+
+/* Bouton d'ouverture des réglages d'échéance. */
+
+.todo-when {
+  flex: 0 0 44px;
+  height: 44px;
+  padding: 0;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: 50%;
+  background: var(--surface-glass);
+  color: var(--text-muted);
+  font-size: 17px;
+  line-height: 1;
+  transition:
+    background var(--ease),
+    color var(--ease),
+    transform var(--ease-spring);
+}
+
+.todo-when:active {
+  transform: scale(0.9);
+}
+
+.todo-when.is-active {
+  border-color: transparent;
+  background: var(--accent-tint);
+  color: var(--text);
+}
+
+.todo-due-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.todo-due-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.todo-due-field > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/*
+ * Safari impose sa propre apparence aux champs de date, y
+ * compris un fond blanc qui creuse un trou lumineux dans le
+ * thème sombre. `appearance: none` la désactive ; la
+ * hauteur minimale, elle, empêche le champ de s'effondrer
+ * une fois cette apparence retirée.
+ */
+
+.todo-due-field input {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-input);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  outline: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.todo-offset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.todo-offset {
+  padding: 7px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  transition:
+    background var(--ease),
+    border-color var(--ease),
+    color var(--ease);
+}
+
+.todo-offset.is-active {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* --- Bannière d'activation --- */
+
+.todo-push-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 0.5px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--accent-tint);
+}
+
+.todo-push-banner p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.todo-push-button {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 600;
+  transition: opacity var(--ease);
+}
+
+.todo-push-button:disabled {
+  opacity: 0.5;
+}
+
+.todo-push-message {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* --- Ligne de tâche datée --- */
+
+.todo-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/*
+ * `.todo-text` porte `flex: 1` pour son usage d'origine, où
+ * il était l'enfant direct de la ligne. Dans la colonne
+ * qu'est `.todo-body`, cette même règle l'étirerait en
+ * hauteur et décollerait la date du texte.
+ */
+
+.todo-body .todo-text {
+  flex: 0 0 auto;
+}
+
+.todo-due {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.todo-due em {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-style: normal;
+}
+
+/*
+ * Une échéance dépassée ne se signale que par la couleur —
+ * pas d'icône, pas de gras. La liste en contiendra
+ * fatalement plusieurs, et trois alertes rouges côte à côte
+ * ne veulent plus rien dire.
+ */
+
+.todo-due.is-late {
+  color: #ff6b6b;
+}
+
+.todo-row.is-done .todo-due {
+  text-decoration: line-through;
+}
+
+.todo-ics {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  transition:
+    color var(--ease),
+    transform var(--ease-spring);
+}
+
+.todo-ics:active {
+  transform: scale(0.85);
+  color: var(--text);
+}
+
+/* --- Raccourcis vers les deux applications --- */
+
+.hub-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hub-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  transition: transform var(--ease-spring);
+}
+
+.hub-shortcut:active {
+  transform: scale(0.98);
+}
+
+.hub-shortcut-icon {
+  flex: 0 0 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  font-size: 16px;
+  line-height: 38px;
+  text-align: center;
+}
+
+.hub-shortcut-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hub-shortcut-text strong {
+  font-size: 14px;
+}
+
+.hub-shortcut-text small {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   TECHFEED — PONT DE VARIABLES
+
+   Techfeed avait son propre jeu de variables, avec trois
+   noms identiques a ceux d'Anime Stream mais des valeurs
+   opposees (--border, --text, --accent). Recopier son bloc
+   :root aurait donc repeint toute l'application.
+
+   On ne garde ici que les variables qui lui sont propres, et
+   on les branche sur les jetons d'Anime Stream. Les trois
+   noms communs designent la meme chose des deux cotes (trait,
+   texte, accent) : Techfeed herite donc automatiquement du
+   theme, thème clair compris, sans qu'aucune de ses regles
+   ait a etre reecrite.
+   ========================================================= */
+
+:root {
+  --panel: var(--surface-solid);
+  --text-soft: var(--text-muted);
+  --muted: var(--text-dim);
+  --accent-soft: var(--accent-tint);
+  --card-bg: var(--surface);
+  --card-border: var(--border);
+  --radius: var(--radius-md);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  --page-padding: var(--page-pad);
+  --reader-font-size: 16px;
+
+  /* Couleurs par source, reglables depuis le tiroir */
+  --tint-iphoneaddict: #2f7bf6;
+  --tint-kulturegeek: #f08b2c;
+  --tint-numerama: #8b5cf6;
+}
+
+/* =========================================================
+   TECHFEED — MISE EN PAGE
+
+   L'ancienne feuille stylait l'element `main` directement.
+   Dans le hub, `main` est aussi celui d'Anime Stream et de
+   l'accueil : la regle est donc portee par une classe.
+   ========================================================= */
+
+.tech-page {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: calc(64px + env(safe-area-inset-top))
+    var(--page-pad) 150px;
+  overflow-x: visible;
+}
+
+.tech-page:has(.reader-page) {
+  overflow-x: clip;
+}
+
+/* =========================================================
+   TECHFEED — REGLES REPRISES DU PROJET D'ORIGINE
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+main:has(.reader-page) { overflow-x: clip; }
+
+.app-title {
+  flex: 1;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+  padding: 0;
+}
+
+.icon-btn, .menu-btn {
+  width: 38px; height: 38px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: 0 2px 10px rgba(20,20,15,.10), inset 0 1px 0 rgba(255,255,255,.4);
+  cursor: pointer;
+}
+
+.icon-btn:active { opacity: 0.5; }
+
+.menu-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0 11px;
+}
+
+.menu-btn span {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text);
+}
+
+.menu-btn span:nth-child(2) { width: 70%; }
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: transform 0.2s ease;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--tint) 12%, var(--card-bg));
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border: 1px solid;
+  border-color: color-mix(in srgb, var(--tint) 22%, var(--card-border));
+  border-radius: 20px;
+  padding: 10px;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s ease;
+}
+
+.card:active { transform: scale(0.98); }
+
+.card.read { opacity: 0.72; }
+
+.card-row { display: flex; gap: 12px; align-items: flex-start; }
+
+.card-text { flex: 1; min-width: 0; padding-right: 2px; }
+
+.card-title {
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  margin: 0 0 8px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.meta { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+.card-thumb {
+  display: block;
+  width: 72px; height: 72px;
+  min-width: 72px; max-width: 72px;
+  border-radius: 14px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--border);
+  opacity: 0;
+  transform: translateX(-22px) scale(0.94);
+  transition: opacity 0.42s ease, transform 0.42s cubic-bezier(.22,.9,.28,1);
+}
+
+.card.seen .card-thumb {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+.unread-bar {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 40%;
+  border-radius: 0 4px 4px 0;
+  background: var(--tint);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.card.read .unread-bar {
+  opacity: 0;
+  transform: translateY(-50%) scaleY(0.3);
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 40px 0;
+}
+
+.load-more-btn {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.load-more-btn:disabled { opacity: 0.5; }
+
+.reader-page {
+  transition: transform 0.24s cubic-bezier(.32,.72,0,1), opacity 0.24s ease;
+  will-change: transform;
+}
+
+.reader-page.dragging { transition: none; }
+
+.reader {
+  background: color-mix(in srgb, var(--tint) 7%, var(--card-bg));
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border: 1px solid var(--card-border);
+  border-radius: 0;
+  margin-left: calc(-1 * var(--page-padding));
+  margin-right: calc(-1 * var(--page-padding));
+  padding: 24px var(--page-padding) 32px;
+}
+
+.reader-title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-bottom: 8px;
+}
+
+.reader-body {
+  font-size: var(--reader-font-size);
+  line-height: 1.6;
+  color: var(--text);
+  margin: 16px 0 20px;
+}
+
+.reader-full p, .reader-full li { font-size: var(--reader-font-size); }
+
+.reader-full p { margin-bottom: 14px; }
+
+.reader-full a { color: var(--accent); }
+
+.reader-full h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 22px 0 10px;
+  line-height: 1.35;
+}
+
+.reader-full blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 14px;
+  margin: 16px 0;
+  font-style: italic;
+  color: var(--text-soft);
+}
+
+.reader-full img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--card-border);
+  border-radius: 14px;
+  margin: 18px 0;
+}
+
+.reader-full img[data-loaded='true'] {
+  aspect-ratio: auto;
+  object-fit: contain;
+}
+
+.source-link {
+  font-size: 13.5px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.video-embed iframe {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  border: none;
+}
+
+.tab-bar {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  backdrop-filter: blur(20px) saturate(180%) brightness(1.06);
+  -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(1.06);
+  box-shadow: 0 8px 30px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.28);
+  max-width: calc(100vw - 32px);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  touch-action: none;
+}
+
+.tab-bar::-webkit-scrollbar { display: none; }
+
+[data-theme='dark'] .tab-bar {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.tab-thumb {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.34) 0%,
+    rgba(255,255,255,0.18) 55%,
+    rgba(255,255,255,0.24) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.85),
+    inset 0 -1px 0 rgba(255,255,255,.3),
+    0 3px 12px rgba(0,0,0,.14);
+  backdrop-filter: blur(6px) saturate(200%) brightness(1.12);
+  -webkit-backdrop-filter: blur(6px) saturate(200%) brightness(1.12);
+  transform-origin: center;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    transform 0.42s cubic-bezier(.2,1.25,.35,1),
+    width 0.34s cubic-bezier(.2,1.1,.3,1),
+    opacity 0.15s ease;
+}
+
+.tab-thumb.free {
+  transition: width 0.2s ease, opacity 0.15s ease;
+}
+
+[data-theme='dark'] .tab-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.17) 0%,
+    rgba(255,255,255,0.07) 55%,
+    rgba(255,255,255,0.11) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.4),
+    0 3px 12px rgba(0,0,0,.35);
+}
+
+.tab-btn {
+  position: relative;
+  z-index: 1;
+  border: none;
+  background: transparent;
+  padding: 13px 14px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.tab-btn.active {
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0,0,0,0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.drawer-backdrop.visible { opacity: 1; pointer-events: auto; }
+
+.drawer {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 201;
+  width: min(300px, 82vw);
+  background: var(--card-bg);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border-right: 1px solid var(--card-border);
+  transform: translateX(-102%);
+  transition: transform 0.28s cubic-bezier(.32,.72,0,1);
+  overflow-y: auto;
+}
+
+.drawer.open { transform: translateX(0); }
+
+.drawer-inner {
+  padding: calc(18px + env(safe-area-inset-top)) 18px 24px;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.drawer-title { font-size: 17px; font-weight: 700; flex: 1; }
+
+.drawer-close, .drawer-back {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-soft);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.drawer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 14px 4px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  border-bottom: 1px solid var(--card-border);
+  cursor: pointer;
+}
+
+.drawer-chevron { color: var(--muted); font-size: 18px; }
+
+.setting-group { margin-bottom: 26px; }
+
+.setting-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.tf-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  background: var(--card-border);
+  border-radius: 12px;
+}
+
+.segment {
+  flex: 1 1 auto;
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segment.active { background: var(--accent); color: #fff; }
+
+.setting-preview {
+  margin-top: 12px;
+  font-size: var(--reader-font-size);
+  line-height: 1.6;
+  color: var(--text-soft);
+}
+
+.add-source { display: flex; gap: 7px; margin-bottom: 8px; }
+
+.add-source input {
+  flex: 1;
+  min-width: 0;
+  background: var(--card-border);
+  border: 1px solid transparent;
+  border-radius: 11px;
+  padding: 11px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.add-source input:focus { outline: none; border-color: var(--accent); }
+
+.add-source button {
+  width: 42px;
+  flex: none;
+  border: none;
+  border-radius: 11px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add-source button:disabled { opacity: 0.5; }
+
+.add-error { color: #e0563f; font-size: 12.5px; margin: 2px 0 6px; }
+
+.add-hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0 0 20px; }
+
+.source-row { border-bottom: 1px solid var(--card-border); }
+
+.source-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 2px;
+}
+
+.star {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.star.on { color: #f0b429; }
+
+.source-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+
+.source-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  padding: 2px 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-name:active { opacity: 0.5; }
+
+.source-more {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.source-detail { padding: 4px 2px 16px; }
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 7px;
+}
+
+.swatch {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.swatch.active {
+  border-color: var(--text);
+  transform: scale(1.12);
+}
+
+.color-free-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 14px 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.color-free {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--card-border);
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+}
+
+.color-free input {
+  position: absolute;
+  inset: -6px;
+  width: 200%; height: 200%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.danger-btn {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(224, 86, 63, 0.4);
+  border-radius: 11px;
+  background: transparent;
+  color: #e0563f;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pull-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: opacity 0.2s ease, height 0.25s ease;
+}
+
+.pull-spinner {
+  display: block;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 2.5px solid var(--card-border);
+  border-top-color: var(--accent);
+}
+
+.pull-indicator.spinning .pull-spinner {
+  animation: pull-spin 0.7s linear infinite;
+}
+
+@keyframes pull-spin { to { transform: rotate(360deg); } }
+
+.tf-skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+  background: var(--border);
+  margin-bottom: 10px;
+  animation: pulse 1.3s ease-in-out infinite;
+}
+
+.tf-skeleton-line:nth-child(2) { width: 90%; }
+
+.tf-skeleton-line:nth-child(3) { width: 75%; }
+
+@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+
+.skeleton-card {
+  height: 96px;
+  border-radius: 18px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  margin-bottom: 10px;
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes skel-pulse { 0%,100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+
+.tab-thumb.free {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+[data-theme='dark'] .tab-thumb.free {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.tab-bar, .tab-bar.scrollable {
+  touch-action: none;
+  scroll-behavior: auto;
+}
+
+.tab-bar { touch-action: none; scroll-behavior: auto; }
+
+.tab-thumb.free {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+[data-theme='dark'] .tab-thumb.free {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.tab-bar .tab-btn {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.new-articles-pill {
+  position: fixed;
+  top: calc(66px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+}
+
+/*
+ * Bandeau du haut — present seulement quand il sert.
+ *
+ * L'ombre blanche qui trainait ici etait une fausse bonne
+ * idee : censee detacher le titre du fond, elle debordait de
+ * huit pixels et delavait le texte de l'article qui passait
+ * dessous. C'est elle qui donnait cet aspect gris fantome.
+ *
+ * Les marges laterales degagent les deux boutons ronds en
+ * position fixe, pour qu'un titre long ne finisse pas sous
+ * l'un d'eux.
+ */
+
+.app-title {
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top));
+  left: 0; right: 0;
+  z-index: 95;
+  padding: 0 62px;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 19px;
+  font-weight: 700;
+  margin: 0;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity var(--ease),
+    transform var(--ease);
+}
+
+.app-title.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Dans un article, il remplace un titre parti vers le haut :
+   plus petit, il se lit comme une legende et non comme un
+   second titre en concurrence avec le premier. */
+
+.app-title.is-reader {
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.float-btn, .menu-btn {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 14px;
+  z-index: 120;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  box-shadow: 0 3px 14px rgba(20,20,15,.16), inset 0 1px 0 rgba(255,255,255,.45);
+  cursor: pointer;
+}
+
+.float-btn {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text);
+  padding: 0;
+}
+
+.float-btn:active, .menu-btn:active { transform: scale(0.92); }
+
+.menu-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 4px;
+  padding: 0 11px;
+}
+
+.new-articles-pill { top: calc(58px + env(safe-area-inset-top)); }
+
+.text-input {
+  width: 100%;
+  background: var(--card-border);
+  border: 1px solid transparent;
+  border-radius: 11px;
+  padding: 11px 12px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.text-input:focus { outline: none; border-color: var(--accent); }
+
+.tab-btn.icon-mode { padding: 10px 14px; }
+
+.tab-icon {
+  display: block;
+  width: 22px; height: 22px;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.tab-initial { font-size: 13px; font-weight: 700; }
+
+.float-btn, .menu-btn {
+  width: 46px;
+  height: 46px;
+}
+
+.menu-btn { padding: 0 13px; gap: 5px; }
+
+.menu-btn span { height: 2.5px; }
+
+.app-title { top: calc(13px + env(safe-area-inset-top)); }
+
+.icon-field { margin: 14px 0; }
+
+.icon-field span {
+  display: block;
+  font-size: 13px;
+  color: var(--text-soft);
+  margin-bottom: 6px;
+}
+
+.icon-field input {
+  width: 100%;
+  background: var(--card-border);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.icon-field input:focus { outline: none; border-color: var(--accent); }
+
+.reader-page.nav-anim {
+  transition: transform 0.26s cubic-bezier(.32,.72,0,1);
+}
+
+.reader-page.dragging { transition: none; }
+
+/* =========================================================
+   TECHFEED — REPRISE DU LANGAGE DE VERRE D'ANIME STREAM
+
+   Ces règles arrivent après celles reprises du projet
+   d'origine, et les remplacent donc là où elles divergent.
+   ========================================================= */
+
+/* --- Barre des sources ------------------------------------
+   Même verre que la barre d'onglets d'Anime Stream : trait
+   cheveu, flou faible, un seul reflet. `touch-action: none`
+   est indispensable, sinon iOS confisque le geste pour faire
+   défiler la page et le balayage s'arrête au bout de quelques
+   pixels.
+   --------------------------------------------------------- */
+
+.tab-bar {
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  z-index: 100;
+  display: flex;
+  max-width: calc(100vw - 20px);
+  padding: 5px;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--nav-surface);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen),
+    0 10px 30px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
+  transform: translateX(-50%);
+  transition:
+    background var(--ease),
+    border-color var(--ease);
+  /* La barre ne rogne rien : c'est la piste interieure qui
+     s'en charge, et seulement horizontalement. */
+  overflow: visible;
+}
+
+/*
+ * PISTE DEFILANTE — le point delicat de toute cette barre.
+ *
+ * `overflow-x: auto` ne rogne jamais un seul axe : des que
+ * l'un est rogne, l'autre cesse d'etre `visible`. Poser le
+ * defilement sur la barre elle-meme coupait donc la pastille
+ * au ras du verre, et elle ne pouvait pas deborder en
+ * gonflant sous le doigt.
+ *
+ * D'ou la marge negative verticale compensee par un padding
+ * egal : la boite de rognage descend 14px plus bas et monte
+ * 14px plus haut que le verre, sans decaler les onglets d'un
+ * pixel. La pastille a donc la place de sortir.
+ *
+ * Le masque en degrade remplace le rognage arrondi qu'on
+ * perd : sans lui, un onglet a moitie defile depasserait des
+ * extremites arrondies de la barre.
+ */
+
+.tab-scroll {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  margin: -14px 0;
+  padding: 14px 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+  touch-action: none;
+  -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent 100%
+  );
+}
+
+.tab-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-bar.is-pressed {
+  border-color: var(--nav-hairline-strong);
+  background: var(--nav-surface-pressed);
+}
+
+/*
+ * ATTENTION : `transform` appartient entièrement au JS
+ * (TabBar.js l'écrit à chaque image). Aucune transition CSS
+ * ne doit porter dessus, sinon les deux se battent et le
+ * déplacement redevient saccadé.
+ */
+
+.tab-thumb {
+  position: absolute;
+  /* Alignee sur les onglets : 14px, soit exactement le
+     padding de compensation de la piste. */
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  z-index: 0;
+  transform-origin: center center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--nav-pill);
+  box-shadow: inset 0 0.5px 0 var(--nav-sheen);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  will-change: transform;
+  transition:
+    background var(--ease),
+    box-shadow var(--ease),
+    opacity var(--ease);
+}
+
+.tab-thumb.is-dragging {
+  background: var(--nav-pill-strong);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen-strong),
+    0 8px 22px rgba(0, 0, 0, 0.3);
+}
+
+.tab-btn {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  padding: 11px 15px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--nav-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  transition:
+    color var(--ease),
+    transform var(--ease-spring);
+}
+
+.tab-btn.active,
+.tab-btn.is-hover {
+  color: var(--nav-text-active);
+}
+
+.tab-btn.icon-mode {
+  padding: 9px 13px;
+}
+
+.tab-btn.is-hover .tab-icon,
+.tab-btn.is-hover .tab-initial {
+  transform: scale(1.12);
+}
+
+.tab-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: contain;
+  transition: transform var(--ease-spring);
+}
+
+.tab-initial {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  transition: transform var(--ease-spring);
+}
+
+/* --- Vignettes des articles -------------------------------
+   L'emplacement fait toujours 72px, image ou pas : c'est lui
+   qui empêche la liste de se décaler quand une vignette
+   arrive en différé. Et le fondu se joue UNE fois, au
+   chargement de l'image, plus à chaque passage à l'écran.
+   --------------------------------------------------------- */
+
+.card-thumb-slot {
+  flex: 0 0 72px;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--surface-strong);
+}
+
+.card-thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  max-width: none;
+  border-radius: 0;
+  object-fit: cover;
+  opacity: 0;
+  transform: none;
+  transition: opacity 0.3s ease;
+}
+
+.card-thumb.is-loaded {
+  opacity: 1;
+  transform: none;
+}
+
+/* --- Boutons flottants ------------------------------------
+   Le bouton du tiroir de Techfeed occupait le coin
+   haut-gauche, exactement là où le hub place le sien. On le
+   décale à droite : les deux doivent coexister sur la page
+   News.
+   --------------------------------------------------------- */
+
+.float-btn,
+.menu-btn {
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top));
+  right: 14px;
+  left: auto;
+  z-index: 120;
+  width: 42px;
+  height: 42px;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--nav-surface);
+  color: var(--nav-text-active);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen),
+    0 8px 24px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
+  transition: transform var(--ease-spring);
+}
+
+.float-btn {
+  right: auto;
+  left: 14px;
+}
+
+.menu-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 12px;
+}
+
+.menu-btn span {
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.float-btn:active,
+.menu-btn:active {
+  transform: scale(0.92);
+}
+
+.app-title {
+  color: var(--text);
+  text-shadow: none;
+}
+
+/* Bascule de thème en bas du menu latéral */
+
+.hub-menu-theme {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: auto;
+  padding: 13px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  transition: transform var(--ease-spring);
+}
+
+.hub-menu-theme:active {
+  transform: scale(0.97);
+}
+
+/* =========================================================
+   TECHFEED — CORRECTIF DE SCINTILLEMENT
+
+   Chaque carte de la liste portait un `backdrop-filter`.
+   Multiplie par plusieurs centaines de cartes, iOS n'arrive
+   plus a garder les couches composees en memoire : il les
+   jette et les repeint sans arret, et les images clignotent.
+
+   Le flou n'apportait par ailleurs quasiment rien ici : les
+   cartes reposent sur le fond uni de la page, pas sur une
+   image. On garde la teinte par source, on retire le flou.
+   ========================================================= */
+
+.card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/*
+ * Le fondu d'apparition des vignettes est supprime. Il
+ * dependait d'une classe posee a la main sur le noeud DOM au
+ * chargement de l'image — une manipulation hors de React, qui
+ * ne survit pas forcement au rendu suivant. L'emplacement
+ * reserve suffit a eviter tout decalage, sans animation.
+ */
+
+.card-thumb {
+  opacity: 1;
+  transition: none;
+}
+
+/* =========================================================
+   TECHFEED — BANDEAU "NOUVEAUX ARTICLES" ET TRACTION
+
+   Le bandeau etait en position fixe : il flottait au-dessus
+   de la liste et masquait le premier article, qu'on ne
+   pouvait plus lire ni toucher. Il reprend sa place dans le
+   flux et pousse donc la liste vers le bas.
+   ========================================================= */
+
+.new-articles-pill {
+  position: static;
+  display: block;
+  margin: 0 auto 14px;
+  padding: 9px 18px;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--nav-surface);
+  color: var(--nav-text-active);
+  box-shadow:
+    inset 0 0.5px 0 var(--nav-sheen),
+    0 6px 20px rgba(0, 0, 0, 0.24);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  backdrop-filter: blur(6px) saturate(200%);
+  -webkit-backdrop-filter: blur(6px) saturate(200%);
+  transform: none;
+  transition: transform var(--ease-spring);
+}
+
+.new-articles-pill:active {
+  transform: scale(0.95);
+}
+
+/*
+ * La roue suit le doigt pendant la traction (rotation posee
+ * en ligne par le JS) et change de couleur une fois le seuil
+ * franchi : on sait qu'on peut lacher sans avoir a deviner.
+ */
+
+.pull-spinner {
+  border-color: var(--border);
+  border-top-color: var(--text-dim);
+  transition: border-color var(--ease);
+}
+
+.pull-spinner.is-armed {
+  border-top-color: var(--text);
+}
+
+/*
+ * iOS ne doit pas faire rebondir la page par-dessus notre
+ * propre geste de traction.
+ */
+
+.tech-page {
+  overscroll-behavior-y: contain;
+}
+
+/* =========================================================
+   HUB — TUILE SOLAIRE
+   ========================================================= */
+
+.solar-age {
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/*
+ * Au-dela de dix minutes sans relevé, la fraîcheur passe en
+ * evidence. C'est l'information la plus importante de cette
+ * tuile : un chiffre de production vieux de trois heures,
+ * affiche sans mention, ferait croire que le soleil brille
+ * encore a minuit.
+ */
+
+.solar-age.is-stale {
+  color: var(--text);
+  opacity: 0.9;
+}
+
+
+
+/* =========================================================
+   SOLAIRE — PALETTE
+
+   Ces couleurs ne sont pas choisies à l'œil. Elles viennent
+   du référentiel de visualisation et ont été vérifiées par
+   son script sur les DEUX thèmes : écart suffisant pour un
+   daltonien, contraste suffisant sur le fond.
+
+   Un jaune FRANC et un orange FRANC se séparent très bien :
+   écart de 25,7 en vision daltonienne, 29,9 en vision
+   normale, là où il en faut 8 et 15. C'est l'ambre de la
+   version précédente qui échouait — trop proche de l'orange.
+
+   Une réserve assumée : en thème sombre, le jaune sort de la
+   plage de luminosité recommandée pour une série. Cette règle
+   protège contre une courbe qui écrase les autres ; ici la
+   production EST le sujet, et c'est une grande aire, pas un
+   trait fin. Toutes les vérifications de lisibilité passent
+   avec une large marge. Si le jaune éblouit à l'usage,
+   #b38f00 respecte la plage — au prix d'un jaune moutarde.
+   ========================================================= */
+
+:root {
+  --solar-production: #ffcc00;
+  --solar-self: #e8590c;
+  --solar-consumption: #3987e5;
+}
+
+:root[data-theme="light"] {
+  --solar-production: #e0a800;
+  --solar-self: #e8590c;
+  --solar-consumption: #2a78d6;
+}
+
+/* =========================================================
+   SOLAIRE — FLUX ANIMÉ DE L'ACCUEIL
+   ========================================================= */
+
+.flow-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Le couloir que suivent les billes : un trait fin, une
+   nuance au-dessus du fond, qui ne concurrence jamais les
+   billes elles-mêmes. */
+
+.flow-lane {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.flow-ring {
+  fill: var(--surface-strong);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.flow-ring.is-sun {
+  stroke: var(--solar-production);
+}
+
+.flow-ring.is-house {
+  stroke: var(--solar-consumption);
+}
+
+.flow-glyph.is-sun {
+  fill: var(--solar-production);
+}
+
+/*
+ * Les pictogrammes sont tracés, jamais remplis : une même
+ * épaisseur de trait pour les trois, et un dessin qui reste
+ * net quelle que soit la taille d'écran.
+ */
+
+.flow-glyph-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.flow-glyph-line.is-sun {
+  stroke: var(--solar-production);
+}
+
+.flow-glyph-line.is-house {
+  stroke: var(--solar-consumption);
+}
+
+.flow-glyph-line.is-grid {
+  stroke: var(--text-muted);
+}
+
+/*
+ * La bille : sa POSITION est animée en SMIL (voir
+ * SolarFlow.tsx), sa COULEUR ici. SMIL ne sait pas interpoler
+ * une variable CSS, le CSS ne sait pas suivre un tracé — d'où
+ * ce partage, les deux animations partageant durée et phase.
+ */
+
+.flow-bead {
+  fill: var(--solar-production);
+  animation-name: flow-bead-color;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes flow-bead-color {
+  0% {
+    fill: var(--solar-production);
+  }
+  100% {
+    fill: var(--solar-consumption);
+  }
+}
+
+/*
+ * Mouvement réduit : les billes disparaissent. Un défilement
+ * perpétuel est une gêne réelle pour qui y est sensible, et
+ * l'information reste entière dans les chiffres en dessous.
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-bead {
+    display: none;
+  }
+}
+
+.flow-values {
+  display: flex;
+  margin-top: 2px;
+}
+
+.flow-value {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+
+.flow-value strong {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.flow-value small {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.solar-more {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+/* =========================================================
+   SOLAIRE — PAGE DE LA JOURNÉE
+   ========================================================= */
+
+.solar-page {
+  padding-top: calc(72px + env(safe-area-inset-top));
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
+}
+
+.solar-head {
+  margin-bottom: 18px;
+}
+
+.solar-back {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.solar-head h1 {
+  margin: 6px 0 12px;
+  font-size: 24px;
+  font-weight: 750;
+  letter-spacing: -0.5px;
+}
+
+.solar-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.solar-nav button {
+  width: 42px;
+  height: 34px;
+  padding: 0;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  transition: transform var(--ease-spring);
+}
+
+.solar-nav button:active {
+  transform: scale(0.92);
+}
+
+.solar-nav button:disabled {
+  opacity: 0.35;
+}
+
+.solar-chart-card {
+  position: relative;
+  margin-bottom: 16px;
+  padding: 12px 6px 6px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.solar-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: pan-y;
+}
+
+/* Traits pleins d'un demi-pixel, une nuance au-dessus du
+   fond : la grille se lit sans jamais concurrencer les
+   données. */
+
+.solar-grid-line {
+  stroke: var(--border);
+  stroke-width: 0.5;
+}
+
+.solar-axis-text {
+  fill: var(--text-dim);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.solar-area-production {
+  fill: var(--solar-production);
+}
+
+.solar-area-self {
+  fill: var(--solar-self);
+}
+
+.solar-line-consumption {
+  fill: none;
+  stroke: var(--solar-consumption);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.solar-cursor {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+}
+
+.solar-readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 8px 10px 4px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.solar-readout strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.solar-empty {
+  margin: 0;
+  padding: 10px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+/* --- Légende --- */
+
+.solar-legend {
+  margin-top: 46px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.solar-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+}
+
+.solar-swatch {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.solar-swatch.is-production {
+  background: var(--solar-production);
+}
+
+.solar-swatch.is-self {
+  background: var(--solar-self);
+}
+
+.solar-swatch.is-consumption {
+  background: var(--solar-consumption);
+}
+
+.solar-legend-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.solar-legend-row strong {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.solar-legend-split {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--border);
+}
+
+.solar-legend-split div {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.solar-legend-split small {
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.solar-legend-split strong {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.solar-estimated {
+  margin: 12px 0 0;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* --- Tableau, l'équivalent lisible sans couleur --- */
+
+.solar-table-toggle {
+  width: 100%;
+  padding: 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.solar-table-wrap {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.solar-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.solar-table th {
+  padding: 8px 6px;
+  border-bottom: 0.5px solid var(--border);
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: left;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.solar-table td {
+  padding: 7px 6px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.solar-table-note {
+  margin: 10px 0 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* =========================================================
+   SOLAIRE — SÉLECTEUR D'ÉCHELLE ET BARRES
+   ========================================================= */
+
+.solar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.solar-scopes {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.solar-scopes button {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  transition:
+    background var(--ease),
+    color var(--ease);
+}
+
+.solar-scopes button.is-active {
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+/*
+ * Les barres. Un intervalle de fond sépare les deux segments
+ * empilés plutôt qu'un contour : un trait autour de chaque
+ * segment alourdirait le tracé, et un contact direct ferait
+ * fondre l'orange dans le jaune.
+ */
+
+/*
+ * Deux barres par période : production et consommation, côte
+ * à côte. Le mois et l'année comparent deux quantités, alors
+ * que la journée décompose la production — d'où deux formes
+ * de tracé différentes pour deux questions différentes.
+ */
+
+.solar-bar-production {
+  fill: var(--solar-production);
+}
+
+.solar-bar-consumption {
+  fill: var(--solar-consumption);
+}
+
+/* Zone tactile invisible, bien plus large que la barre :
+   viser cinq pixels au doigt est impossible. */
+
+.solar-bar-hit {
+  fill: transparent;
+}
+
+.solar-bar.is-picked .solar-bar-hit {
+  fill: var(--surface-strong);
+}
+
+.solar-drill {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+/* =========================================================
+   MENU DU HUB — SECTION DÉPLIABLE
+   ========================================================= */
+
+.hub-menu-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * La ligne devient un conteneur : le libellé mène à la
+ * section, le chevron déplie. Deux gestes distincts sur une
+ * même ligne, donc deux zones tactiles séparées — un seul
+ * bouton qui ferait les deux obligerait à choisir lequel des
+ * deux comportements sacrifier.
+ */
+
+.hub-menu-group .hub-menu-row {
+  padding-right: 4px;
+}
+
+.hub-menu-row-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  color: inherit;
+}
+
+.hub-menu-expand {
+  flex: 0 0 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 17px;
+  transition: transform var(--ease-spring);
+}
+
+.hub-menu-expand.is-open {
+  transform: rotate(90deg);
+}
+
+.hub-menu-sub {
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0 6px 22px;
+  padding-left: 12px;
+  border-left: 0.5px solid var(--border);
+}
+
+.hub-menu-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  transition:
+    background var(--ease),
+    color var(--ease);
+}
+
+.hub-menu-sub-row:active {
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.hub-menu-sub-row.is-settings {
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+
+.hub-menu-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.hub-menu-dot.is-all {
+  background: var(--text-muted);
+}
+
+.hub-menu-dot.is-settings {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+}
+
+/*
+ * Le bouton du tiroir des News disparaît : on y accède par le
+ * menu latéral. Il reste dans le document plutôt que d'être
+ * supprimé, parce qu'il demeure le seul chemin utilisable au
+ * clavier vers ce tiroir.
+ */
+
+.menu-btn {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* =========================================================
+   NEWS — TEXTE DES ARTICLES JUSTIFIÉ
+   ========================================================= */
+
+/*
+ * `hyphens: auto` n'est pas décoratif ici, il est
+ * indispensable. Un texte justifié sur une colonne étroite,
+ * sans césure, écarte les mots jusqu'à creuser des rivières
+ * blanches entre eux — le défaut classique de la justification
+ * sur mobile. La césure absorbe l'excédent.
+ */
+
+/*
+ * Justifié SANS césure.
+ *
+ * La césure automatique remplissait les fins de ligne au prix
+ * d'un tiret sur presque chacune d'elles, ce qui hache la
+ * lecture bien plus qu'une ligne un peu aérée. En la coupant,
+ * le navigateur n'a plus qu'un levier pour aligner les deux
+ * marges : écarter les mots. C'est exactement le compromis
+ * demandé — des blancs plus larges plutôt que des tirets.
+ *
+ * `overflow-wrap` reste en filet de sécurité : une adresse web
+ * interminable ne peut pas s'écarter, elle déborderait de la
+ * colonne. Là, et là seulement, elle sera coupée.
+ */
+
+.reader-body,
+.reader-full p,
+.reader-full li {
+  text-align: justify;
+  hyphens: none;
+  -webkit-hyphens: none;
+  overflow-wrap: break-word;
+}
+
+/* Sauf ce qui n'est pas de la prose : une justification sur
+   une légende courte ou un lien isolé écarterait deux mots aux
+   deux bouts de la ligne. */
+
+/*
+ * =========================================================
+ * DOMPTER LE CONTENU IMPORTE
+ *
+ * Le corps de l'article n'est pas ecrit par nous : c'est du
+ * HTML recupere sur le site d'origine et injecte tel quel. Il
+ * suffit d'UN element trop large la-dedans — un tableau, un
+ * tweet integre, une image aux dimensions forcees — pour que
+ * le document entier devienne plus large que l'ecran.
+ *
+ * Le symptome est deroutant : la page se met a glisser
+ * lateralement et le texte se retrouve coupe a gauche, tandis
+ * que les boutons en position fixe, eux, ne bougent pas. On
+ * cherche alors le decalage dans notre mise en page, alors
+ * qu'il vient d'une image publiee trois jours plus tot.
+ *
+ * D'ou ces deux niveaux : tout est contraint a la largeur
+ * disponible, et ce qui ne PEUT pas retrecir — un tableau de
+ * comparaison, un bloc de code — recoit son propre defilement
+ * horizontal, dans sa boite. On garde l'acces au contenu
+ * large sans que la page entiere parte de travers.
+ * =========================================================
+ */
+
+.reader-full > * {
+  max-width: 100%;
+}
+
+.reader-full img,
+.reader-full video,
+.reader-full iframe,
+.reader-full embed,
+.reader-full object,
+.reader-full svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.reader-full table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.reader-full pre {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/*
+ * Filet de securite au niveau du document. Si malgre tout un
+ * element s'echappe, la page refuse de glisser de cote plutot
+ * que d'afficher du texte coupe. Le defilement vertical, lui,
+ * n'est pas touche.
+ */
+
+html,
+body {
+  overflow-x: clip;
+}
+
+.reader-full figcaption,
+.reader-full blockquote cite,
+.source-link {
+  text-align: left;
+  hyphens: manual;
+  -webkit-hyphens: manual;
+}
