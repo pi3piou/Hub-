@@ -45,6 +45,39 @@ export interface EpisodesData {
 export type SeasonKind = 'season' | 'film' | 'special';
 
 /*
+ * =========================================================
+ * NOM D'UNE PARTIE, VU D'AILLEURS
+ *
+ * Les films et les hors-séries portent des numéros fabriqués,
+ * 900 et 1000, parce que toute la progression enregistrée est
+ * indexée par un nombre. Ces numéros sont un détail interne :
+ * ils n'ont aucune raison d'atterrir sous les yeux de qui que
+ * ce soit, et « Saison 900 » n'a jamais voulu rien dire.
+ *
+ * Le libellé exact du site est enregistré avec la reprise de
+ * lecture depuis cette version. Pour tout ce qui a été
+ * enregistré avant, on retombe sur une famille — « Film »,
+ * « Épisode spécial » — ce qui reste juste, seulement moins
+ * précis.
+ * =========================================================
+ */
+
+export const FILM_ID_BASE = 900;
+export const SPECIAL_ID_BASE = 1000;
+
+export function partLabel(
+  season: number,
+  stored?: string
+) {
+  if (stored && stored.trim()) return stored.trim();
+
+  if (season >= SPECIAL_ID_BASE) return 'Épisode spécial';
+  if (season >= FILM_ID_BASE) return 'Film';
+
+  return 'Saison ' + season;
+}
+
+/*
  * `path` et `kind` sont facultatifs : une fiche déjà mise en
  * cache par une version précédente de l'application n'en a
  * pas, et elle doit continuer à s'afficher jusqu'à
