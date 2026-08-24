@@ -213,6 +213,36 @@ export function fetchCatalogue(slug: string) {
   return fetchText(getCatalogueUrl(slug), 3600);
 }
 
+/*
+ * La PAGE d'une partie, pas son episodes.js.
+ *
+ * episodes.js ne contient que des adresses de lecteurs, sous
+ * forme de tableaux anonymes. Tout ce qui NOMME les entrees —
+ * les titres des films, les libelles des hors-series — vit dans
+ * la page HTML qui charge ce fichier.
+ */
+
+export function getPartPageUrl(
+  slug: string,
+  part: string | number,
+  lang: string
+) {
+  return (
+    `${BASE_URL}/catalogue/` +
+    `${encodeURIComponent(slug)}/` +
+    `${encodeURIComponent(partSegment(part))}/` +
+    `${lang}/`
+  );
+}
+
+export function fetchPartPage(
+  slug: string,
+  part: string | number,
+  lang: string
+) {
+  return fetchText(getPartPageUrl(slug, part, lang), 1800);
+}
+
 export function getCatalogueUrl(slug: string) {
   return (
     `${BASE_URL}/catalogue/` +
