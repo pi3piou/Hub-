@@ -941,6 +941,24 @@ function AnimeInfoPageContent({
     return list?.length || data.totalEpisodes || 0;
   }, [data]);
 
+  /*
+   * =======================================================
+   * NOM D'UNE ENTRÉE
+   *
+   * Un film s'appelle « Stampede », pas « Épisode 15 ». Les
+   * saisons n'ont pas de noms et retombent donc sur la
+   * numérotation, qui est la bonne réponse pour elles.
+   * =======================================================
+   */
+
+  const episodeLabel = (index: number) => {
+    const name = data?.episodeNames?.[index];
+
+    return name && name.trim()
+      ? name
+      : `Épisode ${index + 1}`;
+  };
+
   const currentEpisodes = useMemo(() => {
     if (!data?.players?.[playerIndex]) return [];
 
@@ -1830,7 +1848,9 @@ function AnimeInfoPageContent({
               <div className="season-player-head">
 
                 <span className="section-eyebrow">
-                  ÉPISODE {selectedEpisode + 1}
+                  {data?.episodeNames?.[selectedEpisode]
+                    ? episodeLabel(selectedEpisode)
+                    : `ÉPISODE ${selectedEpisode + 1}`}
                 </span>
 
                 <button
@@ -1850,9 +1870,9 @@ function AnimeInfoPageContent({
                   <iframe
                     key={videoUrl}
                     src={videoUrl}
-                    title={`${title} épisode ${
-                      selectedEpisode + 1
-                    }`}
+                    title={`${title} — ${episodeLabel(
+                      selectedEpisode
+                    )}`}
                     allowFullScreen
                     className="video-frame"
                   />
@@ -2012,7 +2032,7 @@ function AnimeInfoPageContent({
                     <span className="ep-card-text">
 
                       <span className="ep-card-title">
-                        Épisode {index + 1}
+                        {episodeLabel(index)}
                       </span>
 
                       <span className="ep-card-sub">
