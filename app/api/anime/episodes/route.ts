@@ -6,6 +6,7 @@ import {
   fetchPartPage,
   FILM_ID_BASE,
   getDefaultPlayerIndex,
+  parsePartTitles,
   parsePlayers,
   parseSeasons,
 } from '@/lib/anime';
@@ -200,10 +201,47 @@ export async function GET(request: Request) {
         ? Boolean(requestedText)
         : Boolean(otherText);
 
+    /*
+     * Les noms des entrees ne sont lus QUE pour les films et
+     * les hors-series. Une saison numerote ses episodes, elle
+     * n'a rien a nommer — aller chercher sa page couterait une
+     * requete de plus a chaque ouverture de fiche pour ne
+     * ramener aucune information.
+     */
+
+    let episodeNames: string[] = [];
+
+    if (season >= FILM_ID_BASE) {
+      const page = await fetchPartPage(
+        slug,
+        part,
+        effectiveLang
+      );
+
+      if (page) {
+        const titles = parsePartTitles(page);
+
+        /*
+         * On n'accepte les noms que s'ils sont au moins aussi
+         * nombreux que les entrees du lecteur. En dessous, le
+         * decalage silencieux guette : le film numero trois
+         * porterait le titre du deuxieme, et rien ne le
+         * signalerait. Mieux vaut alors la numerotation.
+         */
+
+        if (titles.length >= totalEpisodes) {
+          episodeNames = titles.slice(0, totalEpisodes);
+        }
+      }
+    }
+
     return NextResponse.json(
       {
         slug,
         saison: season,
+
+        /* Vide pour une saison, un nom par film sinon. */
+        episodeNames,
 
         /* Langue réellement servie */
         lang: effectiveLang,
