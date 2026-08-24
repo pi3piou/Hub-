@@ -3479,6 +3479,225 @@ a {
   font-size: 12px;
 }
 
+/* =========================================================
+   ÉCHÉANCES ET RAPPELS
+   ========================================================= */
+
+/* Bouton d'ouverture des réglages d'échéance. */
+
+.todo-when {
+  flex: 0 0 44px;
+  height: 44px;
+  padding: 0;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: 50%;
+  background: var(--surface-glass);
+  color: var(--text-muted);
+  font-size: 17px;
+  line-height: 1;
+  transition:
+    background var(--ease),
+    color var(--ease),
+    transform var(--ease-spring);
+}
+
+.todo-when:active {
+  transform: scale(0.9);
+}
+
+.todo-when.is-active {
+  border-color: transparent;
+  background: var(--accent-tint);
+  color: var(--text);
+}
+
+.todo-due-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.todo-due-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.todo-due-field > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/*
+ * Safari impose sa propre apparence aux champs de date, y
+ * compris un fond blanc qui creuse un trou lumineux dans le
+ * thème sombre. `appearance: none` la désactive ; la
+ * hauteur minimale, elle, empêche le champ de s'effondrer
+ * une fois cette apparence retirée.
+ */
+
+.todo-due-field input {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0.5px solid var(--nav-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-input);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  outline: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.todo-offset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.todo-offset {
+  padding: 7px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  transition:
+    background var(--ease),
+    border-color var(--ease),
+    color var(--ease);
+}
+
+.todo-offset.is-active {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* --- Bannière d'activation --- */
+
+.todo-push-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 0.5px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--accent-tint);
+}
+
+.todo-push-banner p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.todo-push-button {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 600;
+  transition: opacity var(--ease);
+}
+
+.todo-push-button:disabled {
+  opacity: 0.5;
+}
+
+.todo-push-message {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* --- Ligne de tâche datée --- */
+
+.todo-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/*
+ * `.todo-text` porte `flex: 1` pour son usage d'origine, où
+ * il était l'enfant direct de la ligne. Dans la colonne
+ * qu'est `.todo-body`, cette même règle l'étirerait en
+ * hauteur et décollerait la date du texte.
+ */
+
+.todo-body .todo-text {
+  flex: 0 0 auto;
+}
+
+.todo-due {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.todo-due em {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-style: normal;
+}
+
+/*
+ * Une échéance dépassée ne se signale que par la couleur —
+ * pas d'icône, pas de gras. La liste en contiendra
+ * fatalement plusieurs, et trois alertes rouges côte à côte
+ * ne veulent plus rien dire.
+ */
+
+.todo-due.is-late {
+  color: #ff6b6b;
+}
+
+.todo-row.is-done .todo-due {
+  text-decoration: line-through;
+}
+
+.todo-ics {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  transition:
+    color var(--ease),
+    transform var(--ease-spring);
+}
+
+.todo-ics:active {
+  transform: scale(0.85);
+  color: var(--text);
+}
+
 /* --- Raccourcis vers les deux applications --- */
 
 .hub-shortcuts {
