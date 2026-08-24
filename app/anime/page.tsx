@@ -7,6 +7,7 @@ import {
   getCachedInfo,
   loadAnimeInfo,
   loadEpisodes,
+  partLabel,
 } from '@/lib/animeCache';
 
 import {
@@ -31,6 +32,7 @@ interface AnimeItem {
 }
 
 interface ContinueItem {
+  partLabel?: string;
   slug: string;
   name: string;
   image?: string;
@@ -558,7 +560,10 @@ export default function Home() {
               <h2>{heroItem.name}</h2>
 
               <p>
-                Saison {heroItem.targetSeason}
+                {partLabel(
+                  heroItem.targetSeason,
+                  heroItem.partLabel
+                )}
                 {' · '}
                 Épisode{' '}
                 {heroItem.targetEpisode + 1}
@@ -697,7 +702,10 @@ export default function Home() {
                     <strong>{item.name}</strong>
 
                     <span>
-                      Saison {item.targetSeason}
+                      {partLabel(
+                        item.targetSeason,
+                        item.partLabel
+                      )}
                       {' • '}
                       Épisode{' '}
                       {item.targetEpisode + 1}
