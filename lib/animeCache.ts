@@ -31,6 +31,14 @@ export interface EpisodesData {
   totalEpisodes: number;
   hasVF: boolean;
   hasVOSTFR: boolean;
+
+  /*
+   * Un nom par entree, dans l'ordre du lecteur. Rempli pour
+   * les films et les hors-series, vide pour les saisons — et
+   * absent des fiches mises en cache par une version
+   * precedente, d'ou le point d'interrogation.
+   */
+  episodeNames?: string[];
 }
 
 
