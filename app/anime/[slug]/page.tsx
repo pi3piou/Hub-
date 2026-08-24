@@ -43,6 +43,7 @@ interface ContinueItem {
   episode: number;
   lang: 'vostfr' | 'vf';
   updatedAt: number;
+  partLabel?: string;
 }
 
 interface FavoriteItem {
@@ -988,6 +989,15 @@ function AnimeInfoPageContent({
         episode: episodeIndex,
         lang,
         updatedAt: Date.now(),
+
+        /*
+         * Le libellé du site voyage avec la reprise. Sans lui,
+         * l'accueil n'aurait que le numéro — et pour un film,
+         * ce numéro est fabriqué : il afficherait « Saison
+         * 900 ». Le stocker ici évite d'avoir à recharger la
+         * fiche entière juste pour nommer une ligne.
+         */
+        partLabel: activeEntry?.label,
       };
 
       localStorage.setItem(
