@@ -79,6 +79,11 @@
   --nav-sheen: rgba(255, 255, 255, 0.22);
   --nav-sheen-strong: rgba(255, 255, 255, 0.6);
 
+  /* Ombre portée du menu latéral. Sur fond noir elle peut
+     être franche ; sur fond clair la même valeur virerait au
+     gris sale, d'où la variable. */
+  --menu-shadow: 12px 0 40px rgba(0, 0, 0, 0.45);
+
   /* Rayons — plus généreux, esprit continu */
   --radius-sm: 14px;
   --radius-md: 18px;
@@ -147,6 +152,8 @@
   --nav-hairline-strong: rgba(0, 0, 0, 0.14);
   --nav-sheen: rgba(255, 255, 255, 0.65);
   --nav-sheen-strong: rgba(255, 255, 255, 0.9);
+
+  --menu-shadow: 12px 0 34px rgba(0, 0, 0, 0.14);
 }
 
 /* =========================================================
@@ -211,8 +218,36 @@ a {
   padding: 25px 4px 24px;
 }
 
+/*
+ * L'en-tête d'Anime Stream, centré et dégagé.
+ *
+ * Le bouton du menu est en position fixe dans le coin
+ * haut-gauche, sur 42 pixels. Le titre, lui, commençait à 4
+ * pixels du bord : le bouton lui passait dessus et on ne
+ * lisait plus que « E STREAM ». Ce n'était pas une question
+ * de taille, mais de place.
+ *
+ * D'où les deux corrections ensemble : la marge latérale
+ * réserve la largeur du bouton DES DEUX CÔTÉS, pour que le
+ * centrage reste vrai, et la hauteur minimale aligne le
+ * titre sur le bouton plutôt que de le laisser flotter
+ * au-dessus.
+ */
+
 .hero-mini {
-  padding: 4px 4px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 4px 0 14px;
+}
+
+.hero-mini .eyebrow {
+  margin: 0;
+  padding: 0 56px;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  text-align: center;
 }
 
 .simple-header {
@@ -2450,17 +2485,37 @@ a {
   -webkit-backdrop-filter: saturate(160%);
 }
 
+/*
+ * Cette carte est TOUJOURS une image sombrée par un voile,
+ * dans les deux thèmes. Son texte ne doit donc pas suivre le
+ * thème : en clair, `--text` vaut presque du noir et
+ * `--accent-light` du noir franc, si bien que « REPRENDRE »
+ * et le titre de la série disparaissaient purement et
+ * simplement dans le voile.
+ *
+ * Le paragraphe en dessous, lui, portait déjà une couleur
+ * écrite en dur — c'est pour ça que lui seul restait lisible,
+ * et c'est ce qui a mis la puce à l'oreille.
+ */
+
 .home-hero-content {
   position: relative;
   width: 100%;
   padding: 22px 20px;
+  color: #f5f5f7;
+}
+
+.home-hero-content .section-eyebrow {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .home-hero-content h2 {
   margin: 6px 0 4px;
+  color: #ffffff;
   font-size: 22px;
   line-height: 1.1;
   letter-spacing: -0.03em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
 }
 
 .home-hero-content p {
@@ -3057,6 +3112,22 @@ a {
   opacity: 1;
 }
 
+/*
+ * Le panneau est SORTI de l'écran par une translation, mais
+ * une translation ne déplace pas son ombre portée hors de
+ * l'écran pour autant : avec 40 pixels de flou, elle continuait
+ * de baver sur le bord gauche de la page. Invisible en thème
+ * sombre — du noir sur du noir — et parfaitement visible en
+ * thème clair, sous la forme d'une bande grise verticale.
+ *
+ * `visibility` règle les deux d'un coup, l'ombre et le filet de
+ * bordure. Elle s'anime par palier : elle passe à `visible` dès
+ * le début de l'ouverture et ne repasse à `hidden` qu'à la fin
+ * de la fermeture, donc le panneau reste bien visible pendant
+ * ses deux animations. C'est déjà le procédé employé par le
+ * voile juste au-dessus.
+ */
+
 .hub-menu {
   position: fixed;
   top: 0;
@@ -3070,12 +3141,16 @@ a {
     20px;
   border-right: 0.5px solid var(--nav-hairline);
   background: var(--surface-solid);
-  box-shadow: 12px 0 40px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--menu-shadow);
+  visibility: hidden;
   transform: translateX(-100%);
-  transition: transform var(--ease-spring);
+  transition:
+    transform var(--ease-spring),
+    visibility var(--ease-spring);
 }
 
 .hub-menu.is-open {
+  visibility: visible;
   transform: translateX(0);
 }
 
@@ -5345,12 +5420,28 @@ main:has(.reader-page) { overflow-x: clip; }
  * sur mobile. La césure absorbe l'excédent.
  */
 
+/*
+ * Justifié SANS césure.
+ *
+ * La césure automatique remplissait les fins de ligne au prix
+ * d'un tiret sur presque chacune d'elles, ce qui hache la
+ * lecture bien plus qu'une ligne un peu aérée. En la coupant,
+ * le navigateur n'a plus qu'un levier pour aligner les deux
+ * marges : écarter les mots. C'est exactement le compromis
+ * demandé — des blancs plus larges plutôt que des tirets.
+ *
+ * `overflow-wrap` reste en filet de sécurité : une adresse web
+ * interminable ne peut pas s'écarter, elle déborderait de la
+ * colonne. Là, et là seulement, elle sera coupée.
+ */
+
 .reader-body,
 .reader-full p,
 .reader-full li {
   text-align: justify;
-  hyphens: auto;
-  -webkit-hyphens: auto;
+  hyphens: none;
+  -webkit-hyphens: none;
+  overflow-wrap: break-word;
 }
 
 /* Sauf ce qui n'est pas de la prose : une justification sur
