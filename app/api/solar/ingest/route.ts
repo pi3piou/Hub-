@@ -6,7 +6,6 @@ import {
   saveMeter,
   savePowerflow,
 } from '@/lib/solar';
-
 import { debugAllowed } from '@/lib/debugGate';
 
 export const runtime = 'nodejs';
@@ -41,13 +40,7 @@ function checkKey(request: Request) {
 
   const { searchParams } = new URL(request.url);
 
-// if (searchParams.get('probe') === '1') {        →
-  if (
-    searchParams.get('probe') === '1' &&
-    debugAllowed(request)
-  ) {
-
-
+  if (searchParams.get('key') === expected) return true;
 
   /*
    * Repli sur l'authentification HTTP classique, au cas où le
@@ -153,7 +146,10 @@ export async function GET(request: Request) {
    * l'onduleur.
    */
 
-  if (searchParams.get('probe') === '1') {
+  if (
+    searchParams.get('probe') === '1' &&
+    debugAllowed(request)
+  ) {
     return Response.json({
       ok: true,
       message: 'route joignable',
