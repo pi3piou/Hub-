@@ -26,10 +26,25 @@ export const dynamic = 'force-dynamic';
  * =========================================================
  */
 
-const ALLOWED_HOSTS: string[] = FEEDS.map(
-  (f: { base: string }) =>
-    new URL(f.base).hostname.replace(/^www\./, '')
-);
+/*
+ * Numerama ne sert pas ses images depuis numerama.com mais
+ * depuis un CDN mutualisé, `lestechnophiles.com` — le domaine
+ * du site d'origine réapparaît dans le CHEMIN de l'URL
+ * (`c0.lestechnophiles.com/www.numerama.com/...`), pas dans
+ * son hôte. Rien dans FEEDS ne pouvait le deviner : la liste
+ * qui en est dérivée doit donc être complétée à la main pour
+ * ce genre de cas.
+ */
+
+const EXTRA_HOSTS = ['lestechnophiles.com'];
+
+const ALLOWED_HOSTS: string[] = [
+  ...FEEDS.map(
+    (f: { base: string }) =>
+      new URL(f.base).hostname.replace(/^www\./, '')
+  ),
+  ...EXTRA_HOSTS,
+];
 
 function hostAllowed(hostname: string): boolean {
   const h = hostname.toLowerCase();
