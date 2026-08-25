@@ -3398,19 +3398,34 @@ a {
   text-transform: uppercase;
 }
 
+/*
+ * La bande défile désormais horizontalement plutôt que de se
+ * répartir sur cinq colonnes fixes : c'est ce qui permet d'y
+ * mettre une heure par créneau, plus détaillée, sans tasser
+ * chaque colonne jusqu'à l'illisible.
+ */
+
 .hub-hours {
   display: flex;
-  justify-content: space-between;
-  gap: 4px;
+  gap: 14px;
+  margin: 0 -2px;
+  padding: 0 2px 2px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.hub-hours::-webkit-scrollbar {
+  display: none;
 }
 
 .hub-hour {
   display: flex;
-  flex: 1 1 0;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  min-width: 0;
+  min-width: 26px;
 }
 
 .hub-hour-time {
@@ -3466,6 +3481,56 @@ a {
   color: var(--text-dim);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================
+   PROCHAINS JOURS — coup d'œil au-delà de demain, sans
+   prévision de production : le modèle n'a jamais été validé
+   à plus d'un jour.
+   ========================================================= */
+
+.hub-days {
+  display: flex;
+  gap: 4px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--border);
+}
+
+.hub-day {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.hub-day-label {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.hub-day-icon {
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.hub-day-temps {
+  display: flex;
+  gap: 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-day-temps strong {
+  font-weight: 600;
+}
+
+.hub-day-temps span {
+  color: var(--text-dim);
 }
 
 /* =========================================================
@@ -3545,6 +3610,23 @@ a {
 
 .hub-forecast.is-belle .hub-forecast-label {
   color: var(--solar-production);
+}
+
+/*
+ * Variante « demain », dans le détail déplié : même lecture
+ * que la prévision du jour, en plus discret — c'est celle
+ * d'aujourd'hui qui reste la ligne principale, visible même
+ * repliée.
+ */
+
+.hub-forecast-secondary {
+  margin-top: 11px;
+  padding-top: 10px;
+  opacity: 0.82;
+}
+
+.hub-forecast-secondary .hub-forecast-text strong {
+  font-size: 13px;
 }
 
 .hub-section {
@@ -3837,6 +3919,25 @@ a {
   line-height: 1.45;
 }
 
+/* --- Désabonnement --- */
+
+.todo-push-unsub {
+  display: block;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: opacity var(--ease);
+}
+
+.todo-push-unsub:disabled {
+  opacity: 0.5;
+}
+
 /* --- Ligne de tâche datée --- */
 
 .todo-body {
@@ -3902,6 +4003,80 @@ a {
 .todo-ics:active {
   transform: scale(0.85);
   color: var(--text);
+}
+
+/*
+ * Bouton d'édition d'échéance, par tâche. Reprend l'icône du
+ * bouton d'ajout d'échéance de la ligne de saisie, en plus
+ * petit — c'est le même geste, appliqué à une tâche qui
+ * existe déjà plutôt qu'à un brouillon.
+ */
+
+.todo-edit {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  transition:
+    color var(--ease),
+    transform var(--ease-spring);
+}
+
+.todo-edit:active {
+  transform: scale(0.85);
+}
+
+.todo-edit.is-active {
+  color: var(--accent-ink);
+}
+
+/*
+ * Le panneau d'édition réutilise `.todo-due-panel`, déjà
+ * utilisé à la création d'une tâche — mêmes champs, pas de
+ * style à dupliquer. Seule la ligne d'actions est propre à
+ * l'édition.
+ */
+
+.todo-edit-row {
+  list-style: none;
+}
+
+.todo-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.todo-edit-remove {
+  margin-right: auto;
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.todo-edit-cancel {
+  padding: 7px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.todo-edit-save {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 /* --- Raccourcis vers les deux applications --- */
