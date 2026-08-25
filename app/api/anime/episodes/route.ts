@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { debugAllowed } from '@/lib/debugGate';
 
 import {
   fetchCatalogue,
@@ -29,8 +30,6 @@ import {
  * les liens déjà en circulation.
  * =========================================================
  */
-
-import { debugAllowed } from '@/lib/debugGate';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -89,11 +88,22 @@ export async function GET(request: Request) {
       part = entry.path;
     }
 
- // if (searchParams.get('debug') === 'noms') {     →
+    /*
+     * Sonde de reconnaissance : &debug=noms
+     *
+     * Elle renvoie le contenu des balises <script> de la page
+     * de la partie, la ou vivent les titres des films. Elle
+     * existe parce que deviner la forme d'un balisage qu'on
+     * n'a pas sous les yeux revient a ecrire un analyseur au
+     * hasard — et un analyseur qui se trompe en silence rend
+     * simplement des titres vides.
+     */
+
     if (
       searchParams.get('debug') === 'noms' &&
       debugAllowed(request)
     ) {
+      const page = await fetchPartPage(slug, part, lang);
 
       if (!page) {
         return NextResponse.json(
