@@ -4,7 +4,7 @@ import crypto from 'crypto';
  * =========================================================
  * LES SONDES DE DIAGNOSTIC, DERRIÈRE UNE PORTE
  *
- * L'application avait accumulé neuf points d'entrée de
+ * L'application avait accumulé dix points d'entrée de
  * débogage, ajoutés un par un au fil des pannes qu'ils ont
  * servi à résoudre. Chacun se justifiait sur le moment ;
  * ensemble, ils exposaient à qui connaissait l'adresse le
@@ -19,9 +19,10 @@ import crypto from 'crypto';
  * DEUX PRINCIPES
  *
  * Fermé par défaut. Sans `DEBUG_KEY` dans l'environnement,
- * aucune sonde ne répond. C'est la sécurité qui ne demande
- * aucune action : le déploiement est protégé sans qu'on ait
- * rien à faire, et il faut un geste délibéré pour ouvrir.
+ * aucune sonde ne répond. C'est le sens de la sécurité qui
+ * ne demande aucune action : le déploiement d'aujourd'hui
+ * est protégé sans qu'on ait rien à faire, et il faut un
+ * geste délibéré pour ouvrir.
  *
  * Répondre 404, jamais 403. Un « accès refusé » confirme que
  * la sonde existe et invite à insister. Un « page
@@ -76,8 +77,8 @@ export function debugAllowed(request: Request) {
 }
 
 /*
- * La réponse quand la porte est fermée. Volontairement
- * identique à ce que rendrait une adresse inexistante.
+ * La réponse à servir quand la porte est fermée. Volontairement
+ * identique à ce que rendrait une adresse qui n'existe pas.
  */
 
 export function debugDenied() {
