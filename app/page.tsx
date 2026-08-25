@@ -35,6 +35,24 @@ import {
 
 const COORDS_KEY = 'hub_coords';
 const TODOS_KEY = 'hub_todos';
+const WEATHER_OPEN_KEY = 'hub_weather_open';
+
+type WeatherHour = {
+  label: string;
+  icon: string;
+  temp: number;
+  rain: number;
+};
+
+type ProductionForecast = {
+  kwh: number;
+  share: number;
+  tone: 'belle' | 'faible' | 'neutre';
+  label: string | null;
+  when: 'today' | 'tomorrow';
+  ceiling: number;
+  calibrated: boolean;
+};
 
 type Weather = {
   temperature: number;
@@ -43,6 +61,18 @@ type Weather = {
   icon: string;
   max: number;
   min: number;
+
+  /*
+   * Tout ce qui suit est arrivé après coup et reste
+   * facultatif : une réponse mise en cache par la version
+   * précédente de la route ne les porte pas, et la carte doit
+   * continuer à s'afficher sans eux.
+   */
+  sunrise?: string | null;
+  sunset?: string | null;
+  hours?: WeatherHour[];
+  hoursDay?: 'today' | 'tomorrow';
+  production?: ProductionForecast | null;
 };
 
 type Solar = {
@@ -132,6 +162,16 @@ export default function HubHome() {
 
   const [solarReady, setSolarReady] = useState(false);
 
+  /*
+   * L'état de la carte météo est retenu d'une visite à
+   * l'autre : quelqu'un qui la déplie chaque matin ne devrait
+   * pas avoir à le refaire. Et au bout d'une semaine, le fait
+   * qu'elle soit restée ouverte ou fermée répond tout seul à
+   * la question de savoir si la bande horaire valait le coup.
+   */
+
+  const [weatherOpen, setWeatherOpen] = useState(false);
+
   const [todos, setTodos] = useState<Todo[]>([]);
   const [draft, setDraft] = useState('');
   const [todosReady, setTodosReady] = useState(false);
@@ -194,7 +234,35 @@ export default function HubHome() {
 
   useEffect(() => {
     setToday(formatToday());
+
+    /*
+     * Lu après le montage, comme la date : le serveur n'a pas
+     * accès au stockage local, et rendre l'état déplié côté
+     * serveur provoquerait une erreur d'hydratation.
+     */
+    try {
+      setWeatherOpen(
+        localStorage.getItem(WEATHER_OPEN_KEY) === '1'
+      );
+    } catch {
+      // Stockage indisponible : replié, comme par défaut.
+    }
   }, []);
+
+  const toggleWeather = () => {
+    const next = !weatherOpen;
+
+    setWeatherOpen(next);
+
+    try {
+      localStorage.setItem(
+        WEATHER_OPEN_KEY,
+        next ? '1' : '0'
+      );
+    } catch {
+      // Rien : l'état vivra le temps de la visite.
+    }
+  };
 
   /*
    * =======================================================
@@ -499,6 +567,7 @@ export default function HubHome() {
       );
 
       let scheduled = 0;
+      let lastError: string | undefined;
 
       for (const todo of pending) {
         /*
@@ -511,12 +580,13 @@ export default function HubHome() {
          * peut-être un qui fonctionnait.
          */
 
-        const scheduleId = await scheduleReminder(
-          code,
-          todo
-        );
+        const { scheduleId, error } =
+          await scheduleReminder(code, todo);
 
-        if (!scheduleId) continue;
+        if (!scheduleId) {
+          lastError = error;
+          continue;
+        }
 
         if (todo.scheduleId) {
           await cancelReminder(
@@ -550,7 +620,9 @@ export default function HubHome() {
               scheduled > 1 ? 's' : ''
             } programmée${scheduled > 1 ? 's' : ''}.`
           : pending.length > 0
-          ? 'Rappels activés, mais la programmation a échoué. L’export calendrier reste disponible sur chaque tâche.'
+          ? `Rappels activés, mais la programmation a échoué${
+              lastError ? ` : ${lastError}` : '.'
+            } L’export calendrier reste disponible sur chaque tâche.`
           : 'Rappels activés sur cet appareil.'
       );
     } catch {
@@ -579,9 +651,24 @@ export default function HubHome() {
 
     if (!code || !todo.dueAt) return;
 
-    const scheduleId = await scheduleReminder(code, todo);
+    const { scheduleId, error } = await scheduleReminder(
+      code,
+      todo
+    );
 
-    if (!scheduleId) return;
+    if (!scheduleId) {
+      /*
+       * L'échec est dit, mais sans interrompre : la tâche
+       * est créée, sa date s'affiche, et le bouton
+       * calendrier reste là. Seule la notification manque.
+       */
+
+      if (error) {
+        setPushMessage(`Rappel non programmé : ${error}`);
+      }
+
+      return;
+    }
 
     /*
      * La planification part sans être attendue, pour que
@@ -768,34 +855,203 @@ export default function HubHome() {
           MÉTÉO
           --------------------------------------------- */}
 
-      <section className="hub-tile hub-weather">
+      <section
+        className={
+          weather && weatherOpen
+            ? 'hub-tile hub-weather is-open'
+            : 'hub-tile hub-weather'
+        }
+      >
 
         {weather ? (
           <>
 
-            <span className="hub-weather-icon">
-              {weather.icon}
-            </span>
+            {/*
+              La carte entière est le bouton. Une petite
+              flèche à toucher serait une cible de quelques
+              millimètres au pouce, alors que la surface est
+              déjà là et ne sert à rien d'autre.
+            */}
+            <button
+              type="button"
+              className="hub-weather-head"
+              onClick={toggleWeather}
+              aria-expanded={weatherOpen}
+              aria-label={
+                weatherOpen
+                  ? 'Replier la météo'
+                  : 'Déplier la météo'
+              }
+            >
 
-            <div className="hub-weather-main">
-
-              <strong>{weather.temperature}°</strong>
-
-              <span>{weather.label}</span>
-
-            </div>
-
-            <div className="hub-weather-side">
-
-              <span>
-                Ressenti {weather.feltAs}°
+              <span className="hub-weather-icon">
+                {weather.icon}
               </span>
 
-              <span>
-                {weather.min}° / {weather.max}°
+              <span className="hub-weather-main">
+
+                <strong>{weather.temperature}°</strong>
+
+                <span>{weather.label}</span>
+
               </span>
 
-            </div>
+              <span className="hub-weather-side">
+
+                <span>
+                  Ressenti {weather.feltAs}°
+                </span>
+
+                <span>
+                  {weather.min}° / {weather.max}°
+                </span>
+
+              </span>
+
+              <span
+                className="hub-weather-chevron"
+                aria-hidden="true"
+              >
+                ⌄
+              </span>
+
+            </button>
+
+            {/*
+              DÉTAIL REPLIÉ PAR DÉFAUT.
+              Les trois cartes de l'accueil tiennent tout
+              juste sur un écran de téléphone. Déployer la
+              bande horaire d'office ferait sortir les tâches
+              sous la ligne de flottaison, alors que ce sont
+              elles qu'on vient voir en premier.
+            */}
+
+            {weatherOpen &&
+              weather.hours &&
+              weather.hours.length > 0 && (
+                <div className="hub-weather-detail">
+
+                  {weather.hoursDay === 'tomorrow' && (
+                    <span className="hub-weather-when">
+                      Demain
+                    </span>
+                  )}
+
+                  <div className="hub-hours">
+
+                    {weather.hours.map((h) => (
+                      <div
+                        className="hub-hour"
+                        key={h.label}
+                      >
+
+                        <span className="hub-hour-time">
+                          {h.label}
+                        </span>
+
+                        <span className="hub-hour-icon">
+                          {h.icon}
+                        </span>
+
+                        <span className="hub-hour-temp">
+                          {h.temp}°
+                        </span>
+
+                        {/*
+                          La barre de pluie est muette sous
+                          10 % : une barre à peine visible
+                          pour « il ne pleuvra pas » ajoute du
+                          bruit sans rien dire.
+                        */}
+                        <span
+                          className="hub-hour-rain"
+                          title={`${h.rain} % de pluie`}
+                        >
+                          <i
+                            style={{
+                              height:
+                                h.rain >= 10
+                                  ? `${h.rain}%`
+                                  : '0%',
+                            }}
+                          />
+                        </span>
+
+                      </div>
+                    ))}
+
+                  </div>
+
+                  {weather.sunrise && weather.sunset && (
+                    <div className="hub-sun">
+                      <span>↑ {weather.sunrise}</span>
+                      <span>↓ {weather.sunset}</span>
+                    </div>
+                  )}
+
+                </div>
+              )}
+
+            {/*
+              PRÉVISION DE PRODUCTION — toujours visible, même
+              replié. C'est la ligne qui a motivé toute cette
+              refonte : elle transforme la météo en décision,
+              « est-ce que je lance le lave-linge ».
+            */}
+
+            {weather.production && (
+              <div
+                className={`hub-forecast is-${weather.production.tone}`}
+              >
+
+                <div className="hub-forecast-text">
+
+                  <span className="hub-forecast-when">
+                    {weather.production.when === 'today'
+                      ? 'Aujourd’hui'
+                      : 'Demain'}
+                  </span>
+
+                  <strong>
+                    ≈ {weather.production.kwh} kWh
+                  </strong>
+
+                </div>
+
+                <div
+                  className="hub-forecast-gauge"
+                  role="img"
+                  aria-label={`${Math.round(
+                    weather.production.share * 100
+                  )} % d’une belle journée de saison`}
+                >
+                  <i
+                    style={{
+                      width: `${Math.max(
+                        3,
+                        Math.round(
+                          weather.production.share * 100
+                        )
+                      )}%`,
+                    }}
+                  />
+                </div>
+
+                {/*
+                  Le mot n'apparaît qu'aux extrêmes, là où le
+                  modèle a 93 % de justesse. Entre les deux il
+                  se tait, et le chiffre parle seul — un
+                  qualificatif juste deux fois sur trois
+                  aurait l'air péremptoire pour rien.
+                */}
+                {weather.production.label && (
+                  <span className="hub-forecast-label">
+                    {weather.production.label}
+                  </span>
+                )}
+
+              </div>
+            )}
 
           </>
         ) : (
