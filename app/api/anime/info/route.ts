@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { debugAllowed } from '@/lib/debugGate';
 
 import {
   extractAnimeInfo,
@@ -16,9 +17,6 @@ import {
  * Ne touche jamais aux fichiers episodes.js.
  * =========================================================
  */
-
-import { debugAllowed } from '@/lib/debugGate';
-
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -47,21 +45,91 @@ export async function GET(request: Request) {
       );
     }
 
- // if (searchParams.get('debug') === 'status') {   →
     if (
       searchParams.get('debug') === 'status' &&
       debugAllowed(request)
     ) {
+      const matches = [
+        ...html.matchAll(/info-lbl["'][^>]*>/gi),
+      ];
 
-// if (searchParams.get('debug') === 'img') {      →
+      const target = matches[1] || matches[0];
+
+      const index = target
+        ? (target.index ?? 0)
+        : -1;
+
+      return NextResponse.json(
+        {
+          totalMatches: matches.length,
+          extrait:
+            index >= 0
+              ? html.slice(index, index + 12500)
+              : 'introuvable',
+        },
+        {
+          headers: {
+            'Content-Type':
+              'application/json; charset=utf-8',
+          },
+        }
+      );
+    }
+
+
+    /*
+     * Sonde image : /api/anime/info?slug=x&debug=img
+     */
     if (
       searchParams.get('debug') === 'img' &&
       debugAllowed(request)
     ) {
+      const og = html.match(
+        /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i
+      )?.[1];
 
-// if (searchParams.get('debug')) {                →
+      const imgTags = Array.from(
+        html.matchAll(/<img[^>]{0,300}>/gi)
+      )
+        .slice(0, 8)
+        .map((m) => m[0]);
+
+      return NextResponse.json(
+        { og, imgTags },
+        {
+          headers: {
+            'Content-Type':
+              'application/json; charset=utf-8',
+          },
+        }
+      );
+    }
+
+    /*
+     * Sonde générique : /api/anime/info?slug=x&debug=1
+     */
     if (searchParams.get('debug') && debugAllowed(request)) {
+      const index = html.search(/genre/i);
 
+      return NextResponse.json(
+        {
+          found: index,
+          snippet:
+            index >= 0
+              ? html.slice(
+                  Math.max(0, index - 300),
+                  index + 700
+                )
+              : html.slice(0, 500),
+        },
+        {
+          headers: {
+            'Content-Type':
+              'application/json; charset=utf-8',
+          },
+        }
+      );
+    }
 
     const info = extractAnimeInfo(
       html,
