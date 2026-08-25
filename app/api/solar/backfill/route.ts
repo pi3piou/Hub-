@@ -10,6 +10,7 @@ import {
   isConfigured,
   localSlot,
 } from '@/lib/solar';
+import { debugAllowed } from '@/lib/debugGate';
 
 /*
  * =============================================================
@@ -34,9 +35,6 @@ import {
  * les jours manquants.
  * =============================================================
  */
-
-import { debugAllowed } from '@/lib/debugGate';
-
 
 export const dynamic = 'force-dynamic';
 
@@ -192,9 +190,7 @@ export async function GET(request: Request) {
    * que ce soit a deviner la cle.
    */
 
-  // if (query.get('diag') === '1') {                →
   if (query.get('diag') === '1' && debugAllowed(request)) {
-
     const state = keyState(request);
 
     return Response.json({
