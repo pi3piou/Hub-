@@ -26,11 +26,12 @@ export const dynamic = 'force-dynamic';
  * =========================================================
  */
 
-const ALLOWED_HOSTS = FEEDS.map((f) =>
-  new URL(f.base).hostname.replace(/^www\./, '')
+const ALLOWED_HOSTS: string[] = FEEDS.map(
+  (f: { base: string }) =>
+    new URL(f.base).hostname.replace(/^www\./, '')
 );
 
-function hostAllowed(hostname) {
+function hostAllowed(hostname: string): boolean {
   const h = hostname.toLowerCase();
 
   return ALLOWED_HOSTS.some(
@@ -41,7 +42,7 @@ function hostAllowed(hostname) {
 const UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 
-export async function GET(request) {
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const raw = searchParams.get('u');
 
@@ -49,7 +50,7 @@ export async function GET(request) {
     return new Response('Paramètre manquant', { status: 400 });
   }
 
-  let target;
+  let target: URL;
 
   try {
     target = new URL(raw);
