@@ -4,7 +4,6 @@ import {
   loadRaw,
   loadReading,
 } from '@/lib/solar';
-
 import { debugAllowed } from '@/lib/debugGate';
 
 export const runtime = 'nodejs';
@@ -38,11 +37,16 @@ export async function GET(request: Request) {
   try {
     const debug = searchParams.get('debug');
 
-  // if (debug === 'powerflow' || debug === 'meter') { →
     if (
       (debug === 'powerflow' || debug === 'meter') &&
       debugAllowed(request)
     ) {
+      return Response.json({
+        configured: true,
+        kind: debug,
+        raw: await loadRaw(debug),
+      });
+    }
 
     const reading = await loadReading();
 
