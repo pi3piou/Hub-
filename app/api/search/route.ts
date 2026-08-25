@@ -93,7 +93,7 @@ function extractImageFromBlock(
     }
   }
 
-   /*
+  /*
    * Ce motif a passé sa vie entière à ne reconnaître rien.
    *
    * Il avait été collé depuis une fenêtre de discussion qui
@@ -113,6 +113,20 @@ function extractImageFromBlock(
     /background-image\s*:\s*url\(\s*["']?([^"')]+)["']?\s*\)/i
   );
 
+  if (background?.[1]) {
+    const image =
+      cleanImageUrl(
+        background[1],
+        pageUrl
+      );
+
+    if (image) {
+      return image;
+    }
+  }
+
+  return '';
+}
 
 function extractResults(
   html: string,
