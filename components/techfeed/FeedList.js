@@ -64,6 +64,25 @@ function saveListCache(list) {
   } catch (e) {}
 }
 
+/*
+ * Fait transiter la vignette par le proxy du Hub plutôt que de
+ * la charger directement depuis le téléphone. Certains sites
+ * (iPhoneAddict) répondent 200 avec leur propre logo quand la
+ * requête ne vient pas visiblement de chez eux, quel que soit
+ * le Referer envoyé par le navigateur — un serveur peut en
+ * revanche se faire passer pour une requête interne au site,
+ * ce qu'un navigateur ne peut jamais faire de lui-même. Seule
+ * l'adresse d'affichage change ici ; celle stockée dans le
+ * cache et comparée d'un rafraîchissement à l'autre reste
+ * l'adresse d'origine.
+ */
+
+function proxiedThumb(url) {
+  if (!url) return url;
+
+  return `/api/img?u=${encodeURIComponent(url)}`;
+}
+
 export default function FeedList() {
   const [sources, setSources] = useState([]);
   const [articles, setArticles] = useState([]);
@@ -876,26 +895,12 @@ export default function FeedList() {
                 {(a.thumbnail || imageCache[a.link]) && (
                   <img
                     className="card-thumb"
-                    src={a.thumbnail || imageCache[a.link]}
+                    src={proxiedThumb(
+                      a.thumbnail || imageCache[a.link]
+                    )}
                     alt=""
                     loading="lazy"
                     decoding="async"
-                    /*
-                     * `no-referrer` cachait l'origine du Hub à
-                     * TOUS les sites, y compris ceux dont le
-                     * CDN exige un Referer pour servir la vraie
-                     * photo — iPhoneAddict en fait partie : sans
-                     * lui, il répond quand même 200, mais avec
-                     * son propre logo à la place de l'image
-                     * demandée. Un `onError` ne voit donc rien
-                     * passer, et rien ne le distingue d'une
-                     * vignette qui aurait chargé normalement.
-                     *
-                     * `strict-origin-when-cross-origin` ne
-                     * révèle que le domaine du Hub, jamais
-                     * l'article consulté — juste assez pour
-                     * satisfaire ce genre de vérification.
-                     */
                     referrerPolicy="strict-origin-when-cross-origin"
                     draggable={false}
                     onError={(e) => {
