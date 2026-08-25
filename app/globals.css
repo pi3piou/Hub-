@@ -3300,10 +3300,47 @@ a {
   line-height: 1.5;
 }
 
+/*
+ * La tuile devient une colonne : l'en-tête garde la ligne
+ * horizontale d'origine, le détail et la prévision viennent
+ * dessous.
+ */
+
 .hub-weather {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* L'en-tête EST le bouton de repli — d'où la remise à zéro
+   des styles de bouton, qui donneraient sinon un fond gris et
+   une bordure de formulaire. */
+
+.hub-weather-head {
   display: flex;
   align-items: center;
   gap: 14px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hub-weather-chevron {
+  flex: 0 0 auto;
+  margin-left: 2px;
+  color: var(--text-dim);
+  font-size: 15px;
+  line-height: 1;
+  transition: transform var(--ease);
+}
+
+.hub-weather.is-open .hub-weather-chevron {
+  transform: rotate(180deg);
 }
 
 .hub-weather-icon {
@@ -3339,6 +3376,175 @@ a {
   align-items: flex-end;
   color: var(--text-dim);
   font-size: 11px;
+}
+
+/* =========================================================
+   MÉTÉO DÉPLIÉE — bande horaire et course du soleil
+   ========================================================= */
+
+.hub-weather-detail {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 0.5px solid var(--border);
+}
+
+.hub-weather-when {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hub-hours {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.hub-hour {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.hub-hour-time {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-hour-icon {
+  font-size: 15px;
+  line-height: 1.1;
+}
+
+.hub-hour-temp {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * La probabilité de pluie en petite jauge verticale plutôt
+ * qu'en pourcentage écrit : cinq nombres alignés sous cinq
+ * températures se confondraient avec elles, alors qu'une
+ * hauteur se compare d'un seul regard.
+ */
+
+.hub-hour-rain {
+  display: block;
+  width: 4px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 2px;
+  background: var(--surface-strong);
+  overflow: hidden;
+  position: relative;
+}
+
+.hub-hour-rain i {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 2px;
+  background: var(--solar-consumption);
+  transition: height var(--ease);
+}
+
+.hub-sun {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 11px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================
+   PRÉVISION DE PRODUCTION
+
+   Toujours visible, repliée ou non : c'est la ligne qui
+   transforme la météo en décision.
+   ========================================================= */
+
+.hub-forecast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 0.5px solid var(--border);
+}
+
+.hub-forecast-text {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.hub-forecast-when {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hub-forecast-text strong {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * La jauge se lit contre le plafond de la SAISON, pas contre
+ * la puissance installée. Trente kilowattheures est une
+ * mauvaise journée en juin et une excellente en décembre ;
+ * une jauge calée sur le maximum absolu resterait au ras du
+ * sol tout l'hiver et ne dirait plus rien.
+ */
+
+.hub-forecast-gauge {
+  flex: 1;
+  min-width: 0;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-strong);
+  overflow: hidden;
+}
+
+.hub-forecast-gauge i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--solar-production);
+  transition: width var(--ease);
+}
+
+.hub-forecast.is-faible .hub-forecast-gauge i {
+  background: var(--text-dim);
+}
+
+.hub-forecast-label {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hub-forecast.is-belle .hub-forecast-label {
+  color: var(--solar-production);
 }
 
 .hub-section {
@@ -5063,6 +5269,7 @@ main:has(.reader-page) { overflow-x: clip; }
    avec une large marge. Si le jaune éblouit à l'usage,
    #b38f00 respecte la plage — au prix d'un jaune moutarde.
    ========================================================= */
+
 :root {
   --solar-production: #ffcc00;
   --solar-self: #e8590c;
@@ -5074,7 +5281,11 @@ main:has(.reader-page) { overflow-x: clip; }
    * c'est-à-dire les teintes de ce qui est éteint. Tant que
    * rien ne s'estompait, ça passait. Depuis que les nœuds
    * inutilisés s'atténuent, un nœud déjà gris ne peut plus
-   * montrer qu'il s'éteint — il lui faut un état allumé.
+   * montrer qu'il s'éteint — il lui faut donc un état allumé.
+   *
+   * Un ardoise franc plutôt qu'une troisième couleur vive :
+   * le réseau n'est ni la production ni la consommation, il
+   * ne doit pas leur disputer l'attention.
    */
   --solar-grid: #93a1b2;
 }
@@ -5085,7 +5296,6 @@ main:has(.reader-page) { overflow-x: clip; }
   --solar-consumption: #2a78d6;
   --solar-grid: #5c6a7d;
 }
-
 
 /* =========================================================
    SOLAIRE — FLUX ANIMÉ DE L'ACCUEIL
@@ -5111,18 +5321,27 @@ main:has(.reader-page) { overflow-x: clip; }
 }
 
 /*
- * Un segment où rien ne circule s'efface. Chaque segment
- * porte exactement une grandeur — production, consommation,
- * échange réseau — ce qui permet de le masquer seul.
+ * Un segment où rien ne circule s'efface.
+ *
+ * Chaque segment porte exactement une grandeur — production,
+ * consommation, échange réseau — ce qui permet de le masquer
+ * seul. La nuit, plus de trait entre le soleil et la maison ;
+ * à l'équilibre parfait, plus de trait vers le réseau.
  *
  * Le fondu compte autant que l'effacement : un trait qui
- * disparaît d'un coup au coucher du soleil ne se remarque
- * pas, un trait qui s'estompe se lit.
+ * disparaît d'un coup au coucher du soleil ne se remarque pas,
+ * un trait qui s'estompe se lit.
  */
 
 .flow-lane.is-off {
   opacity: 0;
 }
+
+/*
+ * Les nœuds suivent leurs segments. Un soleil en pleine
+ * couleur relié à rien, la nuit, raconterait encore quelque
+ * chose de faux.
+ */
 
 .flow-node {
   transition: opacity 0.5s ease;
@@ -5131,7 +5350,6 @@ main:has(.reader-page) { overflow-x: clip; }
 .flow-node.is-dim {
   opacity: 0.32;
 }
-
 
 .flow-ring {
   fill: var(--surface-strong);
@@ -5150,7 +5368,6 @@ main:has(.reader-page) { overflow-x: clip; }
 .flow-ring.is-grid {
   stroke: var(--solar-grid);
 }
-
 
 .flow-glyph.is-sun {
   fill: var(--solar-production);
@@ -5205,16 +5422,11 @@ main:has(.reader-page) { overflow-x: clip; }
 }
 
 /*
- * Mouvement réduit : les billes disparaissent. Un défilement
- * perpétuel est une gêne réelle pour qui y est sensible, et
- * l'information reste entière dans les chiffres en dessous.
- */
-
-/*
  * Une bille qui vient du réseau part de la couleur du pylône,
  * pas de celle du soleil. Sans cette variante, l'électricité
  * soutirée la nuit arrivait teintée en jaune production —
- * exactement le contresens que le schéma cherche à éviter.
+ * exactement le contresens que le reste du schéma cherche à
+ * éviter.
  */
 
 .flow-bead.is-from-grid {
@@ -5231,10 +5443,21 @@ main:has(.reader-page) { overflow-x: clip; }
   }
 }
 
+/*
+ * Un chiffre à zéro s'atténue au lieu de disparaître : la
+ * colonne garde sa place, et l'œil n'a pas à se réhabituer à
+ * une nouvelle disposition au lever du jour.
+ */
+
 .flow-value strong.is-idle {
   color: var(--text-dim);
 }
 
+/*
+ * Mouvement réduit : les billes disparaissent. Un défilement
+ * perpétuel est une gêne réelle pour qui y est sensible, et
+ * l'information reste entière dans les chiffres en dessous.
+ */
 
 @media (prefers-reduced-motion: reduce) {
   .flow-bead {
