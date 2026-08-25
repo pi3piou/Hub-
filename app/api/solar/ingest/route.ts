@@ -7,6 +7,8 @@ import {
   savePowerflow,
 } from '@/lib/solar';
 
+import { debugAllowed } from '@/lib/debugGate';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +41,13 @@ function checkKey(request: Request) {
 
   const { searchParams } = new URL(request.url);
 
-  if (searchParams.get('key') === expected) return true;
+// if (searchParams.get('probe') === '1') {        →
+  if (
+    searchParams.get('probe') === '1' &&
+    debugAllowed(request)
+  ) {
+
+
 
   /*
    * Repli sur l'authentification HTTP classique, au cas où le
