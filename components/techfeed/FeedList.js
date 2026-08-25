@@ -880,7 +880,23 @@ export default function FeedList() {
                     alt=""
                     loading="lazy"
                     decoding="async"
-                    referrerPolicy="no-referrer"
+                    /*
+                     * `no-referrer` cachait l'origine du Hub à
+                     * TOUS les sites, y compris ceux dont le
+                     * CDN exige un Referer pour servir la vraie
+                     * photo — iPhoneAddict en fait partie : sans
+                     * lui, il répond quand même 200, mais avec
+                     * son propre logo à la place de l'image
+                     * demandée. Un `onError` ne voit donc rien
+                     * passer, et rien ne le distingue d'une
+                     * vignette qui aurait chargé normalement.
+                     *
+                     * `strict-origin-when-cross-origin` ne
+                     * révèle que le domaine du Hub, jamais
+                     * l'article consulté — juste assez pour
+                     * satisfaire ce genre de vérification.
+                     */
+                    referrerPolicy="strict-origin-when-cross-origin"
                     draggable={false}
                     onError={(e) => {
                       /*
