@@ -1,7 +1,17 @@
 import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 
-import { deliverySecret } from '@/lib/qstash';
+import {
+  debugAllowed,
+  debugDenied,
+} from '@/lib/debugGate';
+
+import {
+  cancelMessage,
+  deliverySecret,
+  publicOrigin,
+  scheduleMessage,
+} from '@/lib/qstash';
 import {
   redis,
   redisConfigured,
@@ -13,8 +23,6 @@ import {
   pushConfigured,
   sendPush,
 } from '@/lib/webpush';
-
-import import { debugAllowed, debugDenied } from '@/lib/debugGate';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -69,14 +77,6 @@ function formatTime(ts: number) {
 
 export async function POST(request: Request) {
   const secret = deliverySecret();
-  /*
-   * Cette sonde était ouverte à tous, et c'était une erreur :
-   * elle dresse l'inventaire de la configuration serveur, et
-   * `?probe=qstash` envoie un vrai message — de quoi vider un
-   * quota depuis une barre d'adresse.
-   */
-
-  if (!debugAllowed(request)) return debugDenied();
 
   const provided =
     request.headers.get('x-hub-key') ||
@@ -205,17 +205,100 @@ export async function POST(request: Request) {
 }
 
 /*
- * Sonde de configuration. Répond sans rien envoyer, pour
- * vérifier depuis un navigateur que les clés sont en place
- * — un rappel qui ne sonne pas ne dit jamais lequel des
- * quatre réglages manque.
+ * =========================================================
+ * SONDES
+ *
+ * Sans argument : les quatre réglages sont-ils présents.
+ *
+ * `?probe=qstash` : est-ce qu'ils FONCTIONNENT. La
+ * distinction n'est pas académique — une variable peut être
+ * là et refusée. Le jeton de signature d'Upstash
+ * (QSTASH_CURRENT_SIGNING_KEY) ressemble beaucoup au jeton
+ * d'envoi, se colle aussi facilement, et donne une
+ * configuration qui a l'air parfaite jusqu'au premier
+ * message, refusé par un 401.
+ *
+ * La sonde envoie un vrai message, planifié dans une
+ * minute, désignant une tâche qui n'existe pas : à
+ * l'arrivée, le point de livraison ne trouvera aucune fiche
+ * et se taira. Rien ne sonne, mais toute la chaîne a été
+ * parcourue.
+ * =========================================================
  */
 
-export async function GET() {
-  return NextResponse.json({
+export async function GET(request: Request) {
+  /*
+   * Cette sonde était ouverte à tous, et c'était une erreur :
+   * elle dresse l'inventaire de la configuration serveur, et
+   * `?probe=qstash` envoie un vrai message — de quoi vider un
+   * quota depuis une barre d'adresse.
+   */
+
+  if (!debugAllowed(request)) return debugDenied();
+
+  const { searchParams } = new URL(request.url);
+
+  const base = {
     redis: redisConfigured(),
     vapid: pushConfigured(),
     qstash: Boolean(process.env.QSTASH_TOKEN),
     secret: Boolean(deliverySecret()),
-  });
+  };
+
+  if (searchParams.get('probe') !== 'qstash') {
+    return NextResponse.json(base);
+  }
+
+  const secret = deliverySecret();
+  const origin = publicOrigin(request);
+
+  if (!secret || !origin) {
+    return NextResponse.json({
+      ...base,
+      probe: 'échec',
+      origin,
+      detail: !origin
+        ? 'Adresse publique indéterminable (essaie APP_URL)'
+        : 'Secret de livraison indisponible',
+    });
+  }
+
+  const destination = `${origin}/api/reminders/deliver`;
+
+  try {
+    const messageId = await scheduleMessage(
+      destination,
+      Date.now() + 60_000,
+      { code: 'sonde', todoId: 'sonde' },
+      secret
+    );
+
+    /*
+     * Le message est annulé aussitôt. Le laisser partir ne
+     * ferait rien de visible, mais laisserait une trace
+     * inexplicable dans le journal QStash.
+     */
+
+    const cancelled = await cancelMessage(messageId);
+
+    return NextResponse.json({
+      ...base,
+      probe: 'ok',
+      origin,
+      destination,
+      messageId,
+      cancelled,
+    });
+  } catch (error) {
+    return NextResponse.json({
+      ...base,
+      probe: 'échec',
+      origin,
+      destination,
+      detail:
+        error instanceof Error
+          ? error.message
+          : String(error),
+    });
+  }
 }
