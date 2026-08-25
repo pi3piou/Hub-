@@ -5063,18 +5063,29 @@ main:has(.reader-page) { overflow-x: clip; }
    avec une large marge. Si le jaune éblouit à l'usage,
    #b38f00 respecte la plage — au prix d'un jaune moutarde.
    ========================================================= */
-
 :root {
   --solar-production: #ffcc00;
   --solar-self: #e8590c;
   --solar-consumption: #3987e5;
+
+  /*
+   * Le réseau n'avait pas de couleur : son cercle retombait
+   * sur `--border` et son pictogramme sur `--text-muted`,
+   * c'est-à-dire les teintes de ce qui est éteint. Tant que
+   * rien ne s'estompait, ça passait. Depuis que les nœuds
+   * inutilisés s'atténuent, un nœud déjà gris ne peut plus
+   * montrer qu'il s'éteint — il lui faut un état allumé.
+   */
+  --solar-grid: #93a1b2;
 }
 
 :root[data-theme="light"] {
   --solar-production: #e0a800;
   --solar-self: #e8590c;
   --solar-consumption: #2a78d6;
+  --solar-grid: #5c6a7d;
 }
+
 
 /* =========================================================
    SOLAIRE — FLUX ANIMÉ DE L'ACCUEIL
@@ -5096,7 +5107,31 @@ main:has(.reader-page) { overflow-x: clip; }
   stroke-width: 1;
   stroke-linecap: round;
   stroke-linejoin: round;
+  transition: opacity 0.5s ease;
 }
+
+/*
+ * Un segment où rien ne circule s'efface. Chaque segment
+ * porte exactement une grandeur — production, consommation,
+ * échange réseau — ce qui permet de le masquer seul.
+ *
+ * Le fondu compte autant que l'effacement : un trait qui
+ * disparaît d'un coup au coucher du soleil ne se remarque
+ * pas, un trait qui s'estompe se lit.
+ */
+
+.flow-lane.is-off {
+  opacity: 0;
+}
+
+.flow-node {
+  transition: opacity 0.5s ease;
+}
+
+.flow-node.is-dim {
+  opacity: 0.32;
+}
+
 
 .flow-ring {
   fill: var(--surface-strong);
@@ -5111,6 +5146,11 @@ main:has(.reader-page) { overflow-x: clip; }
 .flow-ring.is-house {
   stroke: var(--solar-consumption);
 }
+
+.flow-ring.is-grid {
+  stroke: var(--solar-grid);
+}
+
 
 .flow-glyph.is-sun {
   fill: var(--solar-production);
@@ -5138,7 +5178,7 @@ main:has(.reader-page) { overflow-x: clip; }
 }
 
 .flow-glyph-line.is-grid {
-  stroke: var(--text-muted);
+  stroke: var(--solar-grid);
 }
 
 /*
@@ -5169,6 +5209,32 @@ main:has(.reader-page) { overflow-x: clip; }
  * perpétuel est une gêne réelle pour qui y est sensible, et
  * l'information reste entière dans les chiffres en dessous.
  */
+
+/*
+ * Une bille qui vient du réseau part de la couleur du pylône,
+ * pas de celle du soleil. Sans cette variante, l'électricité
+ * soutirée la nuit arrivait teintée en jaune production —
+ * exactement le contresens que le schéma cherche à éviter.
+ */
+
+.flow-bead.is-from-grid {
+  fill: var(--solar-grid);
+  animation-name: flow-bead-color-grid;
+}
+
+@keyframes flow-bead-color-grid {
+  0% {
+    fill: var(--solar-grid);
+  }
+  100% {
+    fill: var(--solar-consumption);
+  }
+}
+
+.flow-value strong.is-idle {
+  color: var(--text-dim);
+}
+
 
 @media (prefers-reduced-motion: reduce) {
   .flow-bead {
