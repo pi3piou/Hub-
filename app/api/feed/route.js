@@ -5,7 +5,7 @@ import {
   parseFeed,
 } from '@/lib/techfeed/feeds';
 
-import { debugAllowed } from '@/lib/debugGate
+import { debugAllowed } from '@/lib/debugGate';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
