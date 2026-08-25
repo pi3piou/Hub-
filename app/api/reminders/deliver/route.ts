@@ -14,6 +14,8 @@ import {
   sendPush,
 } from '@/lib/webpush';
 
+import import { debugAllowed, debugDenied } from '@/lib/debugGate';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -67,6 +69,14 @@ function formatTime(ts: number) {
 
 export async function POST(request: Request) {
   const secret = deliverySecret();
+  /*
+   * Cette sonde était ouverte à tous, et c'était une erreur :
+   * elle dresse l'inventaire de la configuration serveur, et
+   * `?probe=qstash` envoie un vrai message — de quoi vider un
+   * quota depuis une barre d'adresse.
+   */
+
+  if (!debugAllowed(request)) return debugDenied();
 
   const provided =
     request.headers.get('x-hub-key') ||
