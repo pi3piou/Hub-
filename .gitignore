@@ -4,3 +4,17 @@ out
 .vercel
 *.log
 .DS_Store
+
+# Variables d'environnement.
+#
+# Aucun fichier .env n'existe encore dans ce dépôt — cette
+# règle est là pour le jour où il en existera un. C'est le
+# seul moment où l'ajouter coûte zéro : une fois le fichier
+# créé puis commité, le secret reste dans l'historique même
+# après suppression, et il faut le révoquer.
+#
+# .env.example est explicitement conservé : il documente les
+# variables attendues sans contenir aucune valeur.
+.env
+.env.*
+!.env.example
