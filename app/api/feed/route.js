@@ -4,8 +4,9 @@ import {
   inspectThumbnail,
   parseFeed,
 } from '@/lib/techfeed/feeds';
-
-import { debugAllowed } from '@/lib/debugGate';
+import {
+  debugAllowed,
+} from '@/lib/debugGate';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,11 +32,54 @@ export async function GET(request) {
     if (!res.ok) return Response.json({ articles: [] });
     const xml = await res.text();
 
-  // if (searchParams.get('debug') === 'vignettes') { →
+    /*
+     * Sonde : &debug=vignettes
+     *
+     * Pour les six premiers articles, toutes les adresses
+     * d'image envisagees et celle qui l'emporte. Sans elle, un
+     * logo de site affiche a la place d'une photo ressemble
+     * exactement a une extraction reussie — il faut voir les
+     * adresses pour savoir laquelle bannir.
+     */
+
     if (
       searchParams.get('debug') === 'vignettes' &&
       debugAllowed(request)
     ) {
+      const blocks = xml.split(/<item[\s>]/).slice(1).slice(0, 6);
+
+      const items = blocks.map((block) => {
+        const chunk = block.split('</item>')[0];
+
+        const titre = decodeEntities(
+          cleanText(
+            (chunk.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [
+              '',
+              '',
+            ])[1]
+          )
+        );
+
+        const description = (chunk.match(
+          /<description[^>]*>([\s\S]*?)<\/description>/i
+        ) || ['', ''])[1];
+
+        return {
+          titre: titre.slice(0, 70),
+          ...inspectThumbnail(chunk, description),
+        };
+      });
+
+      return Response.json(
+        { source: name, articles: items },
+        {
+          headers: {
+            'Content-Type':
+              'application/json; charset=utf-8',
+          },
+        }
+      );
+    }
 
     const articles = parseFeed(xml, name, page).map((a) => ({
       ...a,
