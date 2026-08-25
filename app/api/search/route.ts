@@ -93,25 +93,26 @@ function extractImageFromBlock(
     }
   }
 
-  const background =
-    block.match(
-      /background-image\s*:\s*url$begin:math:text$\\s\*\[\"\'\]\?\(\[\^\"\'\)\]\+\)\[\"\'\]\?\\s\*$end:math:text$/i
-    );
+   /*
+   * Ce motif a passé sa vie entière à ne reconnaître rien.
+   *
+   * Il avait été collé depuis une fenêtre de discussion qui
+   * avait pris ses parenthèses pour des délimiteurs de
+   * formule mathématique et les avait remplacées par des
+   * marqueurs — tout en échappant le reste. Le littéral
+   * restait syntaxiquement valide, donc aucune erreur au
+   * build ; simplement, aucune chaîne au monde ne pouvait
+   * lui correspondre.
+   *
+   * La panne était invisible parce que le repli suivant
+   * (une couverture reconstruite depuis le slug) prenait le
+   * relais sans rien dire.
+   */
 
-  if (background?.[1]) {
-    const image =
-      cleanImageUrl(
-        background[1],
-        pageUrl
-      );
+  const background = block.match(
+    /background-image\s*:\s*url\(\s*["']?([^"')]+)["']?\s*\)/i
+  );
 
-    if (image) {
-      return image;
-    }
-  }
-
-  return '';
-}
 
 function extractResults(
   html: string,
