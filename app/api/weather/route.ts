@@ -217,13 +217,19 @@ export async function GET(request: Request) {
     `&longitude=${lon.toFixed(4)}` +
     '&current=temperature_2m,apparent_temperature,weather_code,is_day' +
     '&hourly=temperature_2m,weather_code,precipitation_probability' +
-    '&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,shortwave_radiation_sum' +
+    '&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,shortwave_radiation_sum,precipitation_probability_max' +
     /*
      * `past_days=1` sert uniquement à la recalibration : il
      * ramène le rayonnement d'hier, qu'on confronte à la
      * production réellement enregistrée.
+     *
+     * `forecast_days=7` donne, au-delà d'aujourd'hui et demain,
+     * cinq jours de plus pour la petite bande « prochains
+     * jours ». Ni plus (Open-Meteo perd en fiabilité au-delà
+     * d'une semaine) ni moins (une bande à trois jours se lit
+     * mal).
      */
-    '&past_days=1&forecast_days=2' +
+    '&past_days=1&forecast_days=7' +
     '&timezone=auto';
 
   try {
@@ -305,27 +311,31 @@ export async function GET(request: Request) {
     const set = hourOf(at('sunset', stripDay), 21);
 
     /*
-     * Demain, on étale cinq créneaux du lever au coucher pour
-     * couvrir la journée entière. Aujourd'hui, on avance de
-     * deux heures depuis maintenant : ce qui reste est plus
-     * intéressant que la vue d'ensemble.
+     * Un créneau par heure plutôt que tous les deux : la
+     * version précédente en tenait cinq pour rester lisible
+     * sur une seule ligne, mais c'était plus court qu'utile.
+     * La bande défile désormais horizontalement (voir le CSS),
+     * ce qui autorise plus de détail sans casser la mise en
+     * page.
+     *
+     * Demain, on part du lever du jour. Aujourd'hui, on part
+     * de l'heure qui vient : l'heure déjà passée n'intéresse
+     * personne.
      */
 
     const first = useTomorrow
-      ? rise + 1
+      ? rise
       : Math.max(rise, nowHourNum + 1);
 
-    const step = useTomorrow
-      ? Math.max(2, Math.round((set - rise - 1) / 4))
-      : 2;
+    const MAX_HOURS = 12;
 
     const hours = [];
 
-    for (let k = 0; k < 5; k += 1) {
-      const hour = first + k * step;
-
-      if (hour > set) break;
-
+    for (
+      let hour = first;
+      hour <= set && hours.length < MAX_HOURS;
+      hour += 1
+    ) {
       const i = times.indexOf(
         `${stripDate}T${String(hour).padStart(2, '0')}:00`
       );
@@ -361,32 +371,94 @@ export async function GET(request: Request) {
       : DEFAULT_CALIBRATION;
 
     /*
-     * Avant 15 h on annonce la journée en cours, après on
-     * annonce demain. C'est la question qu'on se pose
-     * réellement : le matin « est-ce que je lance le
-     * lave-linge aujourd'hui », le soir « est-ce que
-     * j'attends demain ».
+     * La prévision du jour reste affichée toute la journée,
+     * du matin (« est-ce que je lance le lave-linge ») jusqu'au
+     * soir, où elle sert alors à comparer l'annonce à ce que
+     * les panneaux ont vraiment donné. La remplacer par celle
+     * de demain à 15 h, comme le faisait une version
+     * précédente, effaçait cette comparaison au moment
+     * précis où elle devenait possible.
+     *
+     * Celle de demain est calculée en plus, pas à la place.
      */
 
-    const nowHour = Number(
-      (data?.current?.time || 'T12').slice(11, 13)
-    );
+    const forecastFor = (dayIndex: number) => {
+      const dateStr = (
+        at('sunrise', dayIndex) ||
+        at('time', dayIndex) ||
+        ''
+      ).slice(0, 10);
 
-    const target = nowHour < 15 ? AUJOURD_HUI : DEMAIN;
+      if (!dateStr) return null;
 
-    const targetDate = new Date(
-      `${(at('sunrise', target) || '').slice(
-        0,
-        10
-      )}T12:00:00`
-    );
+      const date = new Date(`${dateStr}T12:00:00`);
 
-    const production = forecastProduction(
-      at('shortwave_radiation_sum', target),
-      at('temperature_2m_max', target),
-      targetDate,
-      calibration
-    );
+      const forecast = forecastProduction(
+        at('shortwave_radiation_sum', dayIndex),
+        at('temperature_2m_max', dayIndex),
+        date,
+        calibration
+      );
+
+      if (!forecast) return null;
+
+      return {
+        ...forecast,
+        ceiling: Math.round(seasonalCeiling(date)),
+        /* Rendu visible pour que la dérive éventuelle des
+           panneaux soit constatable, pas seulement subie. */
+        calibrated: calibration.samples > 0,
+      };
+    };
+
+    const production = {
+      today: forecastFor(AUJOURD_HUI),
+      tomorrow: forecastFor(DEMAIN),
+    };
+
+    /*
+     * --- prochains jours ---
+     *
+     * Un simple coup d'œil au-delà de demain : icône et
+     * températures, sans prévision de production — le modèle
+     * de production n'a jamais été validé à plus d'un jour, le
+     * proposer plus loin annoncerait une confiance qu'il n'a
+     * pas.
+     */
+
+    const dayLabel = (iso: string) => {
+      const label = new Date(
+        `${iso}T12:00:00`
+      ).toLocaleDateString('fr-FR', { weekday: 'short' });
+
+      return (
+        label.charAt(0).toUpperCase() + label.slice(1)
+      ).replace(/\.$/, '');
+    };
+
+    const days = [];
+
+    for (let i = DEMAIN; i < 8; i += 1) {
+      const dateStr = at('time', i);
+
+      if (!dateStr) break;
+
+      const dayCode = at('weather_code', i);
+
+      days.push({
+        label: dayLabel(dateStr),
+        icon: describe(dayCode ?? -1).icon,
+        max: Math.round(
+          at('temperature_2m_max', i) ?? 0
+        ),
+        min: Math.round(
+          at('temperature_2m_min', i) ?? 0
+        ),
+        rain: Math.round(
+          at('precipitation_probability_max', i) ?? 0
+        ),
+      });
+    }
 
     return Response.json({
       temperature: Math.round(
@@ -413,16 +485,9 @@ export async function GET(request: Request) {
        */
       hoursDay: useTomorrow ? 'tomorrow' : 'today',
 
-      production: production
-        ? {
-            ...production,
-            when: target === AUJOURD_HUI ? 'today' : 'tomorrow',
-            ceiling: Math.round(seasonalCeiling(targetDate)),
-            /* Rendu visible pour que la dérive éventuelle des
-               panneaux soit constatable, pas seulement subie. */
-            calibrated: calibration.samples > 0,
-          }
-        : null,
+      days,
+
+      production,
     });
   } catch {
     return Response.json(
