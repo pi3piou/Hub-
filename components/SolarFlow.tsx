@@ -2,28 +2,55 @@
 
 /*
  * =============================================================
- * FLUX SOLAIRE — trois nœuds, des billes qui remontent
+ * FLUX SOLAIRE — TROIS SEGMENTS, UN TRONC COMMUN
  *
- * Les icônes sont DESSINÉES ici, en SVG. La version
- * précédente utilisait trois caractères de police (☀ ⌂ ⌁) :
- * on héritait alors du dessin de la police du système, sans
- * aucun contrôle sur l'épaisseur, le cadrage ou le style — et
- * ça se voyait, les trois n'appartenaient visiblement pas à
- * la même famille.
+ * Les icônes sont DESSINÉES ici, en SVG. La version d'origine
+ * utilisait trois caractères de police (☀ ⌂ ⌁) : on héritait
+ * alors du dessin de la police du système, sans aucun contrôle
+ * sur l'épaisseur, le cadrage ou le style.
  *
- * Les billes descendent du nœud de départ, longent le bas, et
- * REMONTENT dans le nœud d'arrivée. Ce détour par le bas rend
- * le sens du courant lisible d'un coup d'œil, là où un trait
- * droit entre deux cercles ne dit rien de la direction.
+ * Les billes descendent, longent le bas, et REMONTENT dans le
+ * nœud d'arrivée. Ce détour rend le sens du courant lisible
+ * d'un coup d'œil.
  *
- * Tout est dans un seul SVG à viewBox fixe : le dessin
- * s'adapte à la largeur sans qu'aucune coordonnée n'ait à
- * être recalculée en JavaScript.
+ * ------------------------------------------------------------
+ * CE QUI A CHANGÉ, ET POURQUOI
+ *
+ * Le dessin était fait de TRAJETS complets — soleil→maison,
+ * soleil→réseau — qui se recouvraient sur une partie de leur
+ * longueur. Deux conséquences :
+ *
+ *   1. Les traits restaient affichés la nuit. On ne peut pas
+ *      effacer un morceau partagé sans effacer les deux
+ *      trajets qui le traversent.
+ *
+ *   2. Le départ des deux trajets s'empilait sous le soleil,
+ *      ce qui déséquilibrait le dessin vers la gauche.
+ *
+ * Il est maintenant fait de trois SEGMENTS qui se rejoignent
+ * sous la maison, et chacun transporte exactement une
+ * grandeur :
+ *
+ *      gauche  → la production
+ *      montant → ce que consomme la maison
+ *      droit   → l'échange avec le réseau
+ *
+ * Chacun peut donc s'effacer indépendamment. La nuit, le
+ * segment gauche disparaît. À l'équilibre parfait entre
+ * production et consommation, c'est le segment droit qui s'en
+ * va. C'est vrai physiquement, et c'est ce qui rend le schéma
+ * honnête : un trait affiché veut dire qu'il y passe du
+ * courant.
  * =============================================================
  */
 
 const VW = 320;
-const VH = 154;
+
+/*
+ * Un seul niveau de couloir au lieu de deux, donc 26 unités de
+ * hauteur gagnées sur l'accueil — où chaque ligne compte.
+ */
+const VH = 128;
 
 const NODE_R = 27;
 const NODE_Y = 40;
@@ -32,49 +59,62 @@ const SUN_X = 42;
 const HOUSE_X = 160;
 const GRID_X = 278;
 
+/* Le point de partage, sous la maison. */
+const LANE_Y = 112;
+
+const NODE_BOTTOM = NODE_Y + NODE_R;
+
 /*
- * DEUX couloirs, à deux profondeurs, et c'est le cœur de la
- * correction.
- *
- * Le surplus ne sort pas de la maison : il n'y est jamais
- * entré. Il part du soleil et file au réseau. Le faire
- * démarrer de la maison racontait une histoire fausse — celle
- * d'une électricité qui entrerait chez soi pour en ressortir
- * aussitôt.
- *
- * Le couloir profond part donc du soleil et PASSE SOUS la
- * maison sans s'y arrêter, ce qui se lit immédiatement. Le
- * couloir proche sert aux deux échanges qui concernent
- * vraiment la maison : ce qu'elle prend au soleil, et ce
- * qu'elle prend au réseau.
+ * En dessous de ce seuil, ni trait ni bille. Un onduleur au
+ * repos n'affiche jamais zéro pile, et des billes rampant pour
+ * 3 W laisseraient croire à un flux réel.
  */
-
-const LANE_NEAR = 98;
-const LANE_FAR = 126;
-
-const BEADS = [0, 1, 2, 3];
+const MIN_WATTS = 20;
 
 /*
- * Vitesse des billes, en secondes par traversée complète.
- *
- * Le trajet fait le tour par le bas : il est bien plus long
- * qu'il n'en a l'air, presque deux cents unités. Une traversée
- * en une seconde donnait donc des billes filantes, illisibles.
+ * Vitesse, en secondes pour parcourir un segment de référence.
  *
  * Le palier de pleine vitesse est calé à 6 kW pour qu'une
- * production ordinaire tombe au MILIEU de la plage : si le
- * palier était au niveau habituel, tout se passerait à fond
- * toute la journée et la vitesse ne dirait plus rien.
+ * production ordinaire tombe au MILIEU de la plage : au niveau
+ * habituel, tout se passerait à fond toute la journée et la
+ * vitesse ne dirait plus rien.
  */
-
-const SLOWEST = 9;
-const FASTEST = 3;
+const SLOWEST = 14;
+const FASTEST = 5;
 const FULL_SPEED_W = 6000;
 
-function duration(watts: number) {
-  const ratio = Math.min(Math.abs(watts) / FULL_SPEED_W, 1);
+/*
+ * Longueurs réelles des tracés, en unités de la viewBox. Le
+ * montant est presque quatre fois plus court que les deux
+ * autres : à durée égale ses billes ramperaient pendant que
+ * celles du bas fileraient. La durée est donc proportionnelle
+ * à la longueur, ce qui donne la même vitesse partout.
+ */
+const DROP = LANE_Y - NODE_BOTTOM;          /* 45 */
+const RUN = HOUSE_X - SUN_X;                /* 118 */
+const LONG_LEN = DROP + RUN;                /* 163 */
+const SHORT_LEN = DROP;                     /* 45  */
+const REF_LEN = LONG_LEN;
 
-  return SLOWEST - (SLOWEST - FASTEST) * ratio;
+/* Une bille toutes les 45 unités environ : le montant en
+   reçoit une seule, les deux longs segments quatre. Quatre
+   billes sur 45 unités s'empileraient. */
+const SPACING = 45;
+
+function beadCount(length: number) {
+  return Math.max(1, Math.round(length / SPACING));
+}
+
+function duration(watts: number, length: number) {
+  const ratio = Math.min(
+    Math.abs(watts) / FULL_SPEED_W,
+    1
+  );
+
+  const base =
+    SLOWEST - (SLOWEST - FASTEST) * ratio;
+
+  return base * (length / REF_LEN);
 }
 
 function formatWatts(value: number | null) {
@@ -91,20 +131,23 @@ function formatWatts(value: number | null) {
   return watts + ' W';
 }
 
-/* Trajet en U : on descend, on longe, on remonte. */
+/* =========================================================
+   LES TROIS TRACÉS
 
-function lanePath(
-  fromX: number,
-  toX: number,
-  laneY: number
-) {
-  return (
-    `M${fromX} ${NODE_Y + NODE_R}` +
-    ` V${laneY}` +
-    ` H${toX}` +
-    ` V${NODE_Y + NODE_R}`
-  );
-}
+   Le trait dessiné est le même quel que soit le sens du
+   courant ; seul le TRAJET des billes s'inverse. D'où deux
+   familles distinctes : `LANE_*` pour ce qu'on voit, `BEAD_*`
+   pour ce que suivent les billes.
+   ========================================================= */
+
+const LANE_SUN = `M${SUN_X} ${NODE_BOTTOM} V${LANE_Y} H${HOUSE_X}`;
+const LANE_HOUSE = `M${HOUSE_X} ${LANE_Y} V${NODE_BOTTOM}`;
+const LANE_GRID = `M${HOUSE_X} ${LANE_Y} H${GRID_X} V${NODE_BOTTOM}`;
+
+const BEAD_SUN = LANE_SUN;
+const BEAD_HOUSE = LANE_HOUSE;
+const BEAD_GRID_OUT = LANE_GRID;
+const BEAD_GRID_IN = `M${GRID_X} ${NODE_BOTTOM} V${LANE_Y} H${HOUSE_X}`;
 
 type Props = {
   production: number | null;
@@ -112,78 +155,103 @@ type Props = {
   grid: number | null;
 };
 
-function Beads({
+/* =========================================================
+   UN SEGMENT
+   ========================================================= */
+
+function Segment({
   id,
+  lane,
+  bead,
   watts,
+  length,
+  fromGrid,
 }: {
   id: string;
+  lane: string;
+  bead: string;
   watts: number;
+  length: number;
+  fromGrid: boolean;
 }) {
-  /*
-   * En dessous de 20 W, rien ne circule. Un onduleur au repos
-   * n'affiche jamais zéro pile, et des billes rampant pour
-   * 3 W laisseraient croire à un flux réel.
-   */
+  const active = Math.abs(watts) >= MIN_WATTS;
 
-  if (Math.abs(watts) < 20) return null;
-
-  const seconds = duration(watts);
+  const seconds = duration(watts, length);
+  const count = beadCount(length);
 
   return (
     <>
-      {BEADS.map((index) => (
-        <circle
-          key={index}
-          className="flow-bead"
-          r={3.5}
-          style={{
-            animationDuration: seconds + 's',
-            animationDelay:
-              -(seconds / BEADS.length) * index + 's',
-          }}
-        >
-          {/*
-            `begin` négatif décale la PHASE : la bille démarre
-            comme si l'animation tournait déjà depuis ce
-            temps-là. C'est ce qui les répartit le long du
-            trajet dès la première image, au lieu de les faire
-            apparaître les unes après les autres.
-          */}
-          <animateMotion
-            dur={seconds + 's'}
-            begin={
-              -(seconds / BEADS.length) * index + 's'
+      <defs>
+        <path id={id} d={bead} />
+      </defs>
+
+      {/*
+        Le trait reste monté et s'efface en opacité plutôt que
+        d'être retiré du DOM : un segment qui disparaît d'un
+        coup au coucher du soleil se remarque à peine, un
+        segment qui s'estompe se lit.
+      */}
+      <path
+        className={
+          active ? 'flow-lane' : 'flow-lane is-off'
+        }
+        d={lane}
+      />
+
+      {active &&
+        Array.from({ length: count }).map((_, index) => (
+          <circle
+            key={index}
+            className={
+              fromGrid
+                ? 'flow-bead is-from-grid'
+                : 'flow-bead'
             }
-            repeatCount="indefinite"
-            rotate="0"
+            r={3.5}
+            style={{
+              animationDuration: seconds + 's',
+              animationDelay:
+                -(seconds / count) * index + 's',
+            }}
           >
-            <mpath href={'#' + id} />
-          </animateMotion>
+            {/*
+              `begin` négatif décale la PHASE : la bille démarre
+              comme si l'animation tournait déjà depuis ce
+              temps-là. C'est ce qui les répartit le long du
+              trajet dès la première image.
+            */}
+            <animateMotion
+              dur={seconds + 's'}
+              begin={-(seconds / count) * index + 's'}
+              repeatCount="indefinite"
+              rotate="0"
+            >
+              <mpath href={'#' + id} />
+            </animateMotion>
 
-          {/*
-            La COULEUR est animée en CSS, pas ici. SMIL
-            n'interpole pas les variables CSS : il aurait fallu
-            écrire les teintes en dur et perdre le thème clair.
-            Le CSS, lui, les résout — d'où ce partage des
-            rôles, le mouvement à SMIL, la couleur au CSS, avec
-            la même durée et le même décalage de phase.
-          */}
-
-          <animate
-            attributeName="opacity"
-            values="0;1;1;0"
-            keyTimes="0;0.14;0.86;1"
-            dur={seconds + 's'}
-            begin={
-              -(seconds / BEADS.length) * index + 's'
-            }
-            repeatCount="indefinite"
-          />
-        </circle>
-      ))}
+            {/*
+              La COULEUR est animée en CSS, pas ici. SMIL
+              n'interpole pas les variables CSS : il aurait
+              fallu écrire les teintes en dur et perdre le
+              thème clair.
+            */}
+            <animate
+              attributeName="opacity"
+              values="0;1;1;0"
+              keyTimes="0;0.14;0.86;1"
+              dur={seconds + 's'}
+              begin={-(seconds / count) * index + 's'}
+              repeatCount="indefinite"
+            />
+          </circle>
+        ))}
     </>
   );
 }
+
+/* =========================================================
+   LE SCHÉMA
+   ========================================================= */
 
 export default function SolarFlow({
   production,
@@ -194,16 +262,30 @@ export default function SolarFlow({
   const load = consumption ?? 0;
   const net = grid ?? 0;
 
-  /* Ce que la maison prend directement au soleil : on ne peut
-     autoconsommer ni plus qu'on ne produit, ni plus qu'on ne
-     consomme. */
-
-  const selfUse = Math.min(pv, load);
-
   /* `net` positif = soutirage. Le trajet de droite change donc
      de sens selon le signe. */
-
   const importing = net > 0;
+
+  const exchange = Math.abs(net);
+
+  const sunOn = pv >= MIN_WATTS;
+  const houseOn = load >= MIN_WATTS;
+  const gridOn = exchange >= MIN_WATTS;
+
+  /*
+   * Le montant prend la couleur du réseau uniquement quand le
+   * soleil ne donne rien du tout : c'est alors bien du courant
+   * réseau qui monte à la maison. Dès qu'il y a de la
+   * production, même partielle, elle est prioritaire dans
+   * l'autoconsommation — la teinte solaire reste juste.
+   */
+  const houseFedByGrid = !sunOn;
+
+  const label = sunOn
+    ? importing
+      ? 'Le soleil et le réseau alimentent la maison'
+      : 'Le soleil alimente la maison et injecte le surplus au réseau'
+    : 'Le réseau alimente la maison, le soleil ne produit pas';
 
   return (
     <div className="flow">
@@ -212,48 +294,57 @@ export default function SolarFlow({
         className="flow-svg"
         viewBox={`0 0 ${VW} ${VH}`}
         role="img"
-        aria-label="Circulation de l'énergie entre le soleil, la maison et le réseau"
+        aria-label={label}
       >
 
-        <defs>
-          <path
-            id="flow-sun-house"
-            d={lanePath(SUN_X, HOUSE_X, LANE_NEAR)}
-          />
-          <path
-            id="flow-sun-grid"
-            d={lanePath(SUN_X, GRID_X, LANE_FAR)}
-          />
-          <path
-            id="flow-grid-house"
-            d={lanePath(GRID_X, HOUSE_X, LANE_NEAR)}
-          />
-        </defs>
+        {/* --- SEGMENT GAUCHE : la production --- */}
 
-        {/* --- les couloirs, en trait fin ---
-
-            Seul le couloir réellement emprunté est tracé :
-            afficher en permanence les trois donnerait un
-            écheveau de lignes dont deux ne servent à rien à
-            l'instant où on regarde. */}
-
-        <path
-          className="flow-lane"
-          d={lanePath(SUN_X, HOUSE_X, LANE_NEAR)}
+        <Segment
+          id="flow-seg-sun"
+          lane={LANE_SUN}
+          bead={BEAD_SUN}
+          watts={pv}
+          length={LONG_LEN}
+          fromGrid={false}
         />
 
-        <path
-          className="flow-lane"
-          d={
-            importing
-              ? lanePath(GRID_X, HOUSE_X, LANE_NEAR)
-              : lanePath(SUN_X, GRID_X, LANE_FAR)
-          }
+        {/* --- MONTANT : ce que consomme la maison --- */}
+
+        <Segment
+          id="flow-seg-house"
+          lane={LANE_HOUSE}
+          bead={BEAD_HOUSE}
+          watts={load}
+          length={SHORT_LEN}
+          fromGrid={houseFedByGrid}
         />
+
+        {/* --- SEGMENT DROIT : l'échange avec le réseau --- */}
+
+        <Segment
+          id="flow-seg-grid"
+          lane={LANE_GRID}
+          bead={importing ? BEAD_GRID_IN : BEAD_GRID_OUT}
+          watts={exchange}
+          length={LONG_LEN}
+          fromGrid={importing}
+        />
+
+        {/*
+          Un nœud dont plus rien ne part ni n'arrive s'estompe
+          avec son segment. La nuit, un soleil en pleine
+          couleur relié à rien raconterait encore quelque chose
+          de faux.
+        */}
 
         {/* --- SOLEIL --- */}
 
-        <g transform={`translate(${SUN_X} ${NODE_Y})`}>
+        <g
+          className={
+            sunOn ? 'flow-node' : 'flow-node is-dim'
+          }
+          transform={`translate(${SUN_X} ${NODE_Y})`}
+        >
 
           <circle
             className="flow-ring is-sun"
@@ -280,7 +371,12 @@ export default function SolarFlow({
 
         {/* --- MAISON --- */}
 
-        <g transform={`translate(${HOUSE_X} ${NODE_Y})`}>
+        <g
+          className={
+            houseOn ? 'flow-node' : 'flow-node is-dim'
+          }
+          transform={`translate(${HOUSE_X} ${NODE_Y})`}
+        >
 
           <circle
             className="flow-ring is-house"
@@ -304,7 +400,12 @@ export default function SolarFlow({
 
         {/* --- RÉSEAU : un pylône, pas un éclair --- */}
 
-        <g transform={`translate(${GRID_X} ${NODE_Y})`}>
+        <g
+          className={
+            gridOn ? 'flow-node' : 'flow-node is-dim'
+          }
+          transform={`translate(${GRID_X} ${NODE_Y})`}
+        >
 
           <circle
             className="flow-ring is-grid"
@@ -323,39 +424,32 @@ export default function SolarFlow({
 
         </g>
 
-        {/* --- les billes --- */}
-
-        <Beads id="flow-sun-house" watts={selfUse} />
-
-        <Beads
-          id={
-            importing ? 'flow-grid-house' : 'flow-sun-grid'
-          }
-          watts={net}
-        />
-
       </svg>
 
       <div className="flow-values">
 
         <div className="flow-value">
-          <strong>{formatWatts(production)}</strong>
+          <strong className={sunOn ? undefined : 'is-idle'}>
+            {formatWatts(production)}
+          </strong>
           <small>Production</small>
         </div>
 
         <div className="flow-value">
-          <strong>{formatWatts(consumption)}</strong>
+          <strong className={houseOn ? undefined : 'is-idle'}>
+            {formatWatts(consumption)}
+          </strong>
           <small>Maison</small>
         </div>
 
         <div className="flow-value">
-          <strong>
+          <strong className={gridOn ? undefined : 'is-idle'}>
             {formatWatts(
-              grid === null ? null : Math.abs(grid)
+              grid === null ? null : exchange
             )}
           </strong>
           <small>
-            {grid === null
+            {grid === null || !gridOn
               ? 'Réseau'
               : importing
                 ? 'Soutiré'
