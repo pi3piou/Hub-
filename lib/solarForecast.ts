@@ -304,7 +304,7 @@ export function calibrate(
    * LA MÉDIANE, PAS LA MOYENNE.
    *
    * Trois pour cent des journées voient le soleil sans que
-   * la production suive — onduleur en défaut, nuage très
+   * la production suive — onduleur en défaut, nuage very
    * localisé, ombre imprévue. Une moyenne les absorberait et
    * ferait dériver la prévision vers le bas de façon
    * permanente à cause d'une poignée d'incidents. La médiane
