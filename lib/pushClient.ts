@@ -276,11 +276,28 @@ export async function disablePush(code: string) {
  * rappel à 21 h en été.
  */
 
+/*
+ * Le motif de l'échec voyage avec le résultat.
+ *
+ * La version précédente renvoyait `null` sans distinction :
+ * jeton QStash refusé, stockage injoignable, réseau coupé,
+ * tout ressemblait à la même panne muette. Or le serveur
+ * renvoie déjà un `detail` précis — il n'arrivait
+ * simplement jamais jusqu'à l'écran.
+ */
+
+export interface ScheduleResult {
+  scheduleId: string | null;
+  error?: string;
+}
+
 export async function scheduleReminder(
   code: string,
   todo: Todo
-): Promise<string | null> {
-  if (!todo.dueAt) return null;
+): Promise<ScheduleResult> {
+  if (!todo.dueAt) {
+    return { scheduleId: null, error: 'Tâche sans date' };
+  }
 
   const fireAt = computeFireAt(
     todo.dueAt,
@@ -300,11 +317,35 @@ export async function scheduleReminder(
       }),
     });
 
-    const json = await response.json();
+    const json = await response.json().catch(() => null);
 
-    return json?.scheduleId || null;
-  } catch {
-    return null;
+    if (json?.scheduleId) {
+      return { scheduleId: String(json.scheduleId) };
+    }
+
+    if (json?.reason === 'not_configured') {
+      return {
+        scheduleId: null,
+        error:
+          'Serveur non configuré (QStash, Redis ou clés VAPID).',
+      };
+    }
+
+    return {
+      scheduleId: null,
+      error:
+        json?.detail ||
+        json?.error ||
+        `Le serveur a répondu ${response.status}.`,
+    };
+  } catch (error) {
+    return {
+      scheduleId: null,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Requête impossible',
+    };
   }
 }
 
