@@ -8,6 +8,7 @@ import { getProfileCode } from '@/lib/profile';
 import {
   PushState,
   cancelReminder,
+  disablePush,
   getPushState,
   enablePush,
   registerServiceWorker,
@@ -36,6 +37,7 @@ import {
 const COORDS_KEY = 'hub_coords';
 const TODOS_KEY = 'hub_todos';
 const WEATHER_OPEN_KEY = 'hub_weather_open';
+const PUSH_SUB_KEY = 'hub_push_subscribed';
 
 type WeatherHour = {
   label: string;
@@ -44,12 +46,19 @@ type WeatherHour = {
   rain: number;
 };
 
+type WeatherDay = {
+  label: string;
+  icon: string;
+  max: number;
+  min: number;
+  rain: number;
+};
+
 type ProductionForecast = {
   kwh: number;
   share: number;
   tone: 'belle' | 'faible' | 'neutre';
   label: string | null;
-  when: 'today' | 'tomorrow';
   ceiling: number;
   calibrated: boolean;
 };
@@ -72,7 +81,17 @@ type Weather = {
   sunset?: string | null;
   hours?: WeatherHour[];
   hoursDay?: 'today' | 'tomorrow';
-  production?: ProductionForecast | null;
+  days?: WeatherDay[];
+
+  /*
+   * Celle du jour reste affichée toute la journée, pour être
+   * comparée à la production réelle une fois le soir venu.
+   * Celle de demain vient en plus, pas à la place.
+   */
+  production?: {
+    today: ProductionForecast | null;
+    tomorrow: ProductionForecast | null;
+  } | null;
 };
 
 type Solar = {
@@ -201,6 +220,18 @@ export default function HubHome() {
   >(null);
 
   const [pushBusy, setPushBusy] = useState(false);
+  const [pushDisabling, setPushDisabling] = useState(false);
+
+  /*
+   * `Notification.permission` reste « granted » même après un
+   * désabonnement : c'est une autorisation du navigateur, pas
+   * un état d'abonnement. Sans ce second indicateur, un
+   * appareil désabonné ne réafficherait jamais la bannière
+   * d'activation et ses rappels resteraient silencieusement
+   * sans destinataire.
+   */
+
+  const [subscribed, setSubscribed] = useState(false);
 
   /*
    * Les rappels voyagent par le profil : c'est lui qui
@@ -211,6 +242,22 @@ export default function HubHome() {
    */
 
   const [hasProfile, setHasProfile] = useState(true);
+
+  /*
+   * Édition de l'échéance d'une tâche existante — sans passer
+   * par supprimer puis recréer, ce qui perdait le reste de la
+   * tâche (et l'historique du rappel) pour un simple
+   * changement d'heure.
+   */
+
+  const [editingId, setEditingId] = useState<string | null>(
+    null
+  );
+
+  const [editDueDraft, setEditDueDraft] = useState('');
+
+  const [editOffsetDraft, setEditOffsetDraft] =
+    useState<ReminderOffset>('1h');
 
   /*
    * Miroir de la liste, lisible depuis une fonction
@@ -453,12 +500,43 @@ export default function HubHome() {
    * =======================================================
    */
 
+  /*
+   * Le drapeau d'abonnement vit à la fois en mémoire et dans
+   * le stockage local : la mémoire pour le rendu immédiat, le
+   * stockage pour survivre à un rechargement de la page — sans
+   * lui, chaque nouvelle visite oublierait un désabonnement et
+   * ferait réapparaître un appareil qui ne devrait plus sonner.
+   */
+
+  const markSubscribed = (value: boolean) => {
+    setSubscribed(value);
+
+    try {
+      if (value) {
+        localStorage.setItem(PUSH_SUB_KEY, '1');
+      } else {
+        localStorage.removeItem(PUSH_SUB_KEY);
+      }
+    } catch {
+      // Rien : l'état vivra le temps de la visite.
+    }
+  };
+
   useEffect(() => {
     const state = getPushState();
     const code = getProfileCode();
 
     setPushState(state);
     setHasProfile(Boolean(code));
+
+    try {
+      setSubscribed(
+        localStorage.getItem(PUSH_SUB_KEY) === '1'
+      );
+    } catch {
+      // localStorage indisponible : on repartira de « non
+      // abonné », quitte à redemander l'activation pour rien.
+    }
 
     registerServiceWorker();
 
@@ -482,9 +560,13 @@ export default function HubHome() {
      */
 
     if (state === 'granted' && code) {
-      enablePush(code).catch(() => {
-        // Simple remise à niveau, rien à signaler
-      });
+      enablePush(code)
+        .then((result) => {
+          if (result.ok) markSubscribed(true);
+        })
+        .catch(() => {
+          // Simple remise à niveau, rien à signaler
+        });
     }
   }, []);
 
@@ -549,6 +631,8 @@ export default function HubHome() {
         );
         return;
       }
+
+      markSubscribed(true);
 
       /*
        * Rattrapage des tâches déjà créées.
@@ -635,6 +719,38 @@ export default function HubHome() {
   };
 
   /*
+   * Désabonne cet appareil sans toucher aux tâches ni à leurs
+   * échéances : seule la notification s'arrête, l'export
+   * calendrier reste disponible comme recours.
+   */
+
+  const deactivatePush = async () => {
+    const code = getProfileCode();
+
+    if (!code) return;
+
+    setPushDisabling(true);
+    setPushMessage(null);
+
+    try {
+      const ok = await disablePush(code);
+
+      if (ok) {
+        markSubscribed(false);
+        setPushMessage(
+          'Notifications désactivées sur cet appareil.'
+        );
+      } else {
+        setPushMessage(
+          'Désactivation impossible. Réessaie dans un instant.'
+        );
+      }
+    } finally {
+      setPushDisabling(false);
+    }
+  };
+
+  /*
    * =======================================================
    * PLANIFICATION
    *
@@ -705,6 +821,139 @@ export default function HubHome() {
     if (!code || !todo.dueAt) return;
 
     cancelReminder(code, todo.id, todo.scheduleId);
+  };
+
+  /*
+   * =======================================================
+   * ÉDITION D'UNE ÉCHÉANCE EXISTANTE
+   *
+   * Avant, changer l'heure d'un rendez-vous voulait dire
+   * supprimer la tâche et en recréer une — perdant au passage
+   * le fait qu'elle avait déjà sonné une fois, ou simplement
+   * obligeant à retaper le texte. Le même panneau que pour une
+   * nouvelle tâche sert ici, mais ciblé sur une tâche
+   * existante via `editingId`.
+   * =======================================================
+   */
+
+  const startEdit = (todo: Todo) => {
+    setEditingId(todo.id);
+
+    if (todo.dueAt) {
+      setEditDueDraft(toLocalInputValue(todo.dueAt));
+      setEditOffsetDraft(todo.offset || 'at');
+      return;
+    }
+
+    const tomorrow = new Date();
+
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+
+    setEditDueDraft(toLocalInputValue(tomorrow.getTime()));
+    setEditOffsetDraft('1h');
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const saveEdit = async () => {
+    const id = editingId;
+
+    if (!id) return;
+
+    const todo = todosRef.current.find((t) => t.id === id);
+
+    if (!todo) {
+      setEditingId(null);
+      return;
+    }
+
+    const parsed = editDueDraft
+      ? new Date(editDueDraft).getTime()
+      : NaN;
+
+    const hasNextDue = Number.isFinite(parsed);
+
+    const updated: Todo = {
+      ...todo,
+      dueAt: hasNextDue ? parsed : undefined,
+      offset: hasNextDue ? editOffsetDraft : undefined,
+      scheduleId: undefined,
+    };
+
+    setTodos((prev) =>
+      prev.map((t) => (t.id === id ? updated : t))
+    );
+
+    setEditingId(null);
+
+    const code = getProfileCode();
+    const previousScheduleId = todo.scheduleId;
+
+    /*
+     * Même ordre qu'ailleurs dans ce fichier : on planifie
+     * avant d'annuler. Un échec de planification laisse ainsi
+     * l'ancien rappel actif plutôt que de tout perdre.
+     */
+
+    if (hasNextDue && code) {
+      const { scheduleId, error } = await scheduleReminder(
+        code,
+        updated
+      );
+
+      if (scheduleId) {
+        if (previousScheduleId) {
+          cancelReminder(code, id, previousScheduleId);
+        }
+
+        setTodos((prev) =>
+          prev.map((t) =>
+            t.id === id ? { ...t, scheduleId } : t
+          )
+        );
+      } else if (error) {
+        setPushMessage(`Rappel non programmé : ${error}`);
+      }
+    } else if (previousScheduleId && code) {
+      cancelReminder(code, id, previousScheduleId);
+    }
+  };
+
+  /* Retire l'échéance d'un coup, sans passer par le champ de
+     date — plus sûr que de compter sur un champ vidé à la
+     main, capricieux sur Safari iOS. */
+
+  const removeEditDue = () => {
+    const id = editingId;
+
+    if (!id) return;
+
+    const todo = todosRef.current.find((t) => t.id === id);
+
+    if (!todo) {
+      setEditingId(null);
+      return;
+    }
+
+    const updated: Todo = {
+      ...todo,
+      dueAt: undefined,
+      offset: undefined,
+      scheduleId: undefined,
+    };
+
+    setTodos((prev) =>
+      prev.map((t) => (t.id === id ? updated : t))
+    );
+
+    setEditingId(null);
+
+    const code = getProfileCode();
+
+    if (todo.scheduleId && code) {
+      cancelReminder(code, id, todo.scheduleId);
+    }
   };
 
   const addTodo = () => {
@@ -838,6 +1087,64 @@ export default function HubHome() {
 
   const hasDated = todos.some(
     (t) => t.dueAt && !t.done
+  );
+
+  /*
+   * Un seul bloc pour la prévision du jour et celle de demain,
+   * plutôt que deux JSX presque identiques à maintenir en
+   * double — c'est exactement le genre d'écart qui, copié à
+   * la main deux fois, finit par diverger sans qu'on s'en
+   * rende compte.
+   */
+
+  const forecastBlock = (
+    forecast: ProductionForecast,
+    when: string,
+    variant?: string
+  ) => (
+    <div
+      className={`hub-forecast${
+        variant ? ` ${variant}` : ''
+      } is-${forecast.tone}`}
+    >
+
+      <div className="hub-forecast-text">
+
+        <span className="hub-forecast-when">{when}</span>
+
+        <strong>≈ {forecast.kwh} kWh</strong>
+
+      </div>
+
+      <div
+        className="hub-forecast-gauge"
+        role="img"
+        aria-label={`${Math.round(
+          forecast.share * 100
+        )} % d’une belle journée de saison`}
+      >
+        <i
+          style={{
+            width: `${Math.max(
+              3,
+              Math.round(forecast.share * 100)
+            )}%`,
+          }}
+        />
+      </div>
+
+      {/*
+        Le mot n'apparaît qu'aux extrêmes, là où le modèle a
+        93 % de justesse. Entre les deux il se tait, et le
+        chiffre parle seul.
+      */}
+      {forecast.label && (
+        <span className="hub-forecast-label">
+          {forecast.label}
+        </span>
+      )}
+
+    </div>
   );
 
   return (
@@ -989,69 +1296,73 @@ export default function HubHome() {
                     </div>
                   )}
 
+                  {/*
+                    PROCHAINS JOURS — un coup d'œil au-delà de
+                    demain. Pas de prévision de production ici :
+                    le modèle n'a jamais été validé à plus d'un
+                    jour, l'afficher plus loin promettrait une
+                    confiance qu'il n'a pas.
+                  */}
+
+                  {weather.days && weather.days.length > 0 && (
+                    <div className="hub-days">
+
+                      {weather.days.map((d, i) => (
+                        <div
+                          className="hub-day"
+                          key={`${d.label}-${i}`}
+                        >
+
+                          <span className="hub-day-label">
+                            {d.label}
+                          </span>
+
+                          <span className="hub-day-icon">
+                            {d.icon}
+                          </span>
+
+                          <span className="hub-day-temps">
+                            <strong>{d.max}°</strong>
+                            <span>{d.min}°</span>
+                          </span>
+
+                        </div>
+                      ))}
+
+                    </div>
+                  )}
+
+                  {/*
+                    Prévision de demain — en plus de celle
+                    d'aujourd'hui, pas à la place. Réservée au
+                    détail déplié : la garder aussi discrète que
+                    celle du jour aurait redonné le problème de
+                    place qui avait motivé le repli par défaut.
+                  */}
+
+                  {weather.production?.tomorrow &&
+                    forecastBlock(
+                      weather.production.tomorrow,
+                      'Demain',
+                      'hub-forecast-secondary'
+                    )}
+
                 </div>
               )}
 
             {/*
-              PRÉVISION DE PRODUCTION — toujours visible, même
-              replié. C'est la ligne qui a motivé toute cette
-              refonte : elle transforme la météo en décision,
-              « est-ce que je lance le lave-linge ».
+              PRÉVISION DU JOUR — toujours visible, même replié,
+              et toujours celle d'AUJOURD'HUI, matin comme soir :
+              c'est ce qui permet de la comparer, une fois la
+              journée finie, à ce que les panneaux ont vraiment
+              donné.
             */}
 
-            {weather.production && (
-              <div
-                className={`hub-forecast is-${weather.production.tone}`}
-              >
-
-                <div className="hub-forecast-text">
-
-                  <span className="hub-forecast-when">
-                    {weather.production.when === 'today'
-                      ? 'Aujourd’hui'
-                      : 'Demain'}
-                  </span>
-
-                  <strong>
-                    ≈ {weather.production.kwh} kWh
-                  </strong>
-
-                </div>
-
-                <div
-                  className="hub-forecast-gauge"
-                  role="img"
-                  aria-label={`${Math.round(
-                    weather.production.share * 100
-                  )} % d’une belle journée de saison`}
-                >
-                  <i
-                    style={{
-                      width: `${Math.max(
-                        3,
-                        Math.round(
-                          weather.production.share * 100
-                        )
-                      )}%`,
-                    }}
-                  />
-                </div>
-
-                {/*
-                  Le mot n'apparaît qu'aux extrêmes, là où le
-                  modèle a 93 % de justesse. Entre les deux il
-                  se tait, et le chiffre parle seul — un
-                  qualificatif juste deux fois sur trois
-                  aurait l'air péremptoire pour rien.
-                */}
-                {weather.production.label && (
-                  <span className="hub-forecast-label">
-                    {weather.production.label}
-                  </span>
-                )}
-
-              </div>
-            )}
+            {weather.production?.today &&
+              forecastBlock(
+                weather.production.today,
+                'Aujourd’hui'
+              )}
 
           </>
         ) : (
@@ -1265,7 +1576,9 @@ export default function HubHome() {
         */}
 
         {hasDated &&
-          (!hasProfile || pushState !== 'granted') && (
+          (!hasProfile ||
+            pushState !== 'granted' ||
+            !subscribed) && (
             <div className="todo-push-banner">
 
               <p>
@@ -1280,16 +1593,19 @@ export default function HubHome() {
                   : 'Active les notifications pour recevoir tes rappels.'}
               </p>
 
-              {hasProfile && pushState === 'default' && (
-                <button
-                  type="button"
-                  className="todo-push-button"
-                  onClick={activatePush}
-                  disabled={pushBusy}
-                >
-                  {pushBusy ? 'Activation…' : 'Activer'}
-                </button>
-              )}
+              {hasProfile &&
+                (pushState === 'default' ||
+                  (pushState === 'granted' &&
+                    !subscribed)) && (
+                  <button
+                    type="button"
+                    className="todo-push-button"
+                    onClick={activatePush}
+                    disabled={pushBusy}
+                  >
+                    {pushBusy ? 'Activation…' : 'Activer'}
+                  </button>
+                )}
 
             </div>
           )}
@@ -1300,6 +1616,28 @@ export default function HubHome() {
           </p>
         )}
 
+        {/*
+          Contrôle de désabonnement — volontairement discret et
+          hors de la bannière, qui ne parle qu'à qui n'est pas
+          encore activé. Visible dès que l'appareil est
+          effectivement abonné, pas seulement quand il y a une
+          tâche datée : on doit pouvoir se désabonner même s'il
+          n'y a rien à faire sonner pour l'instant.
+        */}
+
+        {hasProfile && pushState === 'granted' && subscribed && (
+          <button
+            type="button"
+            className="todo-push-unsub"
+            onClick={deactivatePush}
+            disabled={pushDisabling}
+          >
+            {pushDisabling
+              ? 'Désactivation…'
+              : 'Désactiver les notifications sur cet appareil'}
+          </button>
+        )}
+
         {todos.length === 0 ? (
           <p className="todo-empty">
             Rien de prévu pour l&apos;instant.
@@ -1307,76 +1645,183 @@ export default function HubHome() {
         ) : (
           <ul className="todo-list">
 
-            {ordered.map((todo) => (
-              <li
-                key={todo.id}
-                className={
-                  todo.done
-                    ? 'todo-row is-done'
-                    : 'todo-row'
-                }
-              >
-
-                <button
-                  type="button"
-                  className="todo-check"
-                  onClick={() => toggleTodo(todo.id)}
-                  aria-label={
+            {ordered.flatMap((todo) => {
+              const row = (
+                <li
+                  key={todo.id}
+                  className={
                     todo.done
-                      ? 'Marquer comme à faire'
-                      : 'Marquer comme fait'
+                      ? 'todo-row is-done'
+                      : 'todo-row'
                   }
                 >
-                  {todo.done ? '✓' : ''}
-                </button>
 
-                <span className="todo-body">
-
-                  <span className="todo-text">
-                    {todo.text}
-                  </span>
-
-                  {todo.dueAt && (
-                    <span
-                      className={
-                        !todo.done &&
-                        isOverdue(todo.dueAt)
-                          ? 'todo-due is-late'
-                          : 'todo-due'
-                      }
-                    >
-                      {formatDue(todo.dueAt)}
-                      <em>
-                        {offsetLabel(todo.offset)}
-                      </em>
-                    </span>
-                  )}
-
-                </span>
-
-                {todo.dueAt && (
                   <button
                     type="button"
-                    className="todo-ics"
-                    onClick={() => exportIcs(todo)}
-                    aria-label="Ajouter au calendrier"
-                    title="Ajouter au calendrier"
+                    className="todo-check"
+                    onClick={() => toggleTodo(todo.id)}
+                    aria-label={
+                      todo.done
+                        ? 'Marquer comme à faire'
+                        : 'Marquer comme fait'
+                    }
                   >
-                    ▦
+                    {todo.done ? '✓' : ''}
                   </button>
-                )}
 
-                <button
-                  type="button"
-                  className="todo-remove"
-                  onClick={() => removeTodo(todo.id)}
-                  aria-label="Supprimer"
+                  <span className="todo-body">
+
+                    <span className="todo-text">
+                      {todo.text}
+                    </span>
+
+                    {todo.dueAt && (
+                      <span
+                        className={
+                          !todo.done &&
+                          isOverdue(todo.dueAt)
+                            ? 'todo-due is-late'
+                            : 'todo-due'
+                        }
+                      >
+                        {formatDue(todo.dueAt)}
+                        <em>
+                          {offsetLabel(todo.offset)}
+                        </em>
+                      </span>
+                    )}
+
+                  </span>
+
+                  <button
+                    type="button"
+                    className={
+                      editingId === todo.id
+                        ? 'todo-edit is-active'
+                        : 'todo-edit'
+                    }
+                    onClick={() =>
+                      editingId === todo.id
+                        ? cancelEdit()
+                        : startEdit(todo)
+                    }
+                    aria-label="Modifier l’échéance"
+                    aria-pressed={editingId === todo.id}
+                    title={
+                      todo.dueAt
+                        ? 'Modifier l’échéance'
+                        : 'Ajouter une échéance'
+                    }
+                  >
+                    ◷
+                  </button>
+
+                  {todo.dueAt && (
+                    <button
+                      type="button"
+                      className="todo-ics"
+                      onClick={() => exportIcs(todo)}
+                      aria-label="Ajouter au calendrier"
+                      title="Ajouter au calendrier"
+                    >
+                      ▦
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    className="todo-remove"
+                    onClick={() => removeTodo(todo.id)}
+                    aria-label="Supprimer"
+                  >
+                    ✕
+                  </button>
+
+                </li>
+              );
+
+              if (editingId !== todo.id) return [row];
+
+              const edit = (
+                <li
+                  key={`${todo.id}-edit`}
+                  className="todo-edit-row"
                 >
-                  ✕
-                </button>
 
-              </li>
-            ))}
+                  <div className="todo-due-panel">
+
+                    <label className="todo-due-field">
+
+                      <span>Échéance</span>
+
+                      <input
+                        type="datetime-local"
+                        value={editDueDraft}
+                        onChange={(e) =>
+                          setEditDueDraft(e.target.value)
+                        }
+                      />
+
+                    </label>
+
+                    <div className="todo-offset-row">
+
+                      {OFFSETS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className={
+                            editOffsetDraft === option.value
+                              ? 'todo-offset is-active'
+                              : 'todo-offset'
+                          }
+                          onClick={() =>
+                            setEditOffsetDraft(option.value)
+                          }
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+
+                    </div>
+
+                    <div className="todo-edit-actions">
+
+                      {todo.dueAt && (
+                        <button
+                          type="button"
+                          className="todo-edit-remove"
+                          onClick={removeEditDue}
+                        >
+                          Retirer la date
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        className="todo-edit-cancel"
+                        onClick={cancelEdit}
+                      >
+                        Annuler
+                      </button>
+
+                      <button
+                        type="button"
+                        className="todo-edit-save"
+                        onClick={saveEdit}
+                      >
+                        Enregistrer
+                      </button>
+
+                    </div>
+
+                  </div>
+
+                </li>
+              );
+
+              return [row, edit];
+            })}
 
           </ul>
         )}
